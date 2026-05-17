@@ -184,9 +184,6 @@
       letter-spacing: 1.8px;
       text-transform: uppercase;
       white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 150px;
     }
 
     @media (max-width: 500px) {
@@ -276,7 +273,7 @@
       background:
         linear-gradient(90deg, rgba(6,4,8,0.92) 0%, rgba(6,4,8,0.42) 54%, rgba(6,4,8,0.18) 100%),
         linear-gradient(0deg, #080609 0%, rgba(8,6,9,0.52) 42%, transparent 90%),
-        var(--hero-bg, radial-gradient(circle at 70% 20%, #4a0a13, #09070a 55%));
+        var(--hero-backdrop-url, var(--hero-bg, radial-gradient(circle at 70% 20%, #4a0a13, #09070a 55%)));
       background-size: cover;
       background-position: center;
       z-index: -1;
@@ -2495,7 +2492,8 @@
     function renderHero() {
       const heroItem = state.data.find((item) => item.id === "hereditary") || state.data[0];
       const hero = $("#hero");
-      hero.style.cssText = `${itemStyle(heroItem)};${backdropBackground(heroItem, "rgba(5,4,6,0.18)")}`;
+      const backdrop = backdropUrl(heroItem) || "assets/fallback-horror.jpg";
+      hero.style.cssText = `${itemStyle(heroItem)}; --hero-backdrop-url: url('${backdrop}'), url('assets/fallback-horror.jpg')`;
       hero.innerHTML = `
         <div class="hero-content">
           <span class="eyebrow">Em alta no DarkFrame</span>
