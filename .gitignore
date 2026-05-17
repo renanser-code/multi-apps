@@ -1,0 +1,37 @@
+# Node dependencies in monorepo
+node_modules/
+**/node_modules/
+package-lock.json.bak
+
+# Native Android intermediate compilation files
+.gradle/
+**/build/
+**/.gradle/
+**/android/app/build/
+**/android/.gradle/
+**/android/local.properties
+**/android/captures/
+**/.externalNativeBuild/
+**/.cxx/
+
+# iOS compilation files
+**/ios/App/Pods/
+**/ios/App/Podfile.lock
+**/ios/App/App.xcworkspace/xcuserdata/
+**/ios/App/App.xcodeproj/xcuserdata/
+
+# OS-specific files
+.DS_Store
+**/Thumbs.db
+**/desktop.ini
+
+# IDE config files
+.idea/
+**/.idea/
+.vscode/
+**/.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

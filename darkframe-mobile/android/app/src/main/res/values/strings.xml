@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">DarkFrame</string>
+    <string name="title_activity_main">DarkFrame</string>
+    <string name="package_name">com.renanpires.darkframe</string>
+    <string name="custom_url_scheme">com.renanpires.darkframe</string>
+</resources>

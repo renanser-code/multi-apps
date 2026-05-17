@@ -1,0 +1,3080 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#09070a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="DarkFrame">
+  <title>DarkFrame | Horror Streaming Companion</title>
+  <link rel="apple-touch-icon" href="icon.png?v=2">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='30' fill='%23050406'/%3E%3Ccircle cx='91' cy='30' r='25' fill='%23d80f22' opacity='.9'/%3E%3Cpath d='M27 35h55a15 15 0 0 1 15 15v42a15 15 0 0 1-15 15H27a15 15 0 0 1-15-15V50a15 15 0 0 1 15-15Z' fill='%23100d12' stroke='%23ff2b3d' stroke-width='6'/%3E%3Cpath d='M47 52 77 71 47 90Z' fill='%23f8f3f5'/%3E%3C/svg%3E">
+  <style>
+    :root {
+      --void: #050406;
+      --black: #09070a;
+      --black-2: #100d12;
+      --blood: #d80f22;
+      --blood-2: #ff2b3d;
+      --rust: #7e0915;
+      --steel: #aab0bb;
+      --muted: #737684;
+      --panel: rgba(20, 18, 24, 0.72);
+      --panel-strong: rgba(24, 21, 28, 0.92);
+      --line: rgba(255, 255, 255, 0.09);
+      --white: #f8f3f5;
+      --green: #55e6a5;
+      --amber: #ffbd59;
+      --radius-xl: 30px;
+      --radius-lg: 22px;
+      --radius-md: 16px;
+      --shadow: 0 26px 90px rgba(0, 0, 0, 0.62);
+      --glow: 0 0 40px rgba(216, 15, 34, 0.22);
+      --safe-top: env(safe-area-inset-top);
+      --safe-bottom: env(safe-area-inset-bottom);
+      color-scheme: dark;
+      font-family: "Trebuchet MS", "Segoe UI", Verdana, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html {
+      width: 100%;
+      min-height: 100%;
+      overflow-x: hidden;
+      scroll-behavior: smooth;
+      background: var(--void);
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      color: var(--white);
+      background:
+        radial-gradient(circle at 12% -8%, rgba(216, 15, 34, 0.28), transparent 35%),
+        radial-gradient(circle at 92% 4%, rgba(105, 20, 37, 0.28), transparent 30%),
+        linear-gradient(180deg, #09070a 0%, #050406 44%, #0b0709 100%);
+      overflow-x: hidden;
+      touch-action: manipulation;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -2;
+      pointer-events: none;
+      opacity: 0.24;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+      background-size: 46px 46px;
+      mask-image: linear-gradient(to bottom, black, transparent 75%);
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      opacity: 0.18;
+      background:
+        repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 9px),
+        linear-gradient(180deg, transparent, rgba(0,0,0,0.56));
+      mix-blend-mode: overlay;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    button {
+      border: 0;
+      color: inherit;
+      cursor: pointer;
+    }
+
+    img,
+    iframe {
+      display: block;
+      max-width: 100%;
+    }
+
+    .app {
+      min-height: 100dvh;
+      padding: calc(14px + var(--safe-top)) 14px calc(92px + var(--safe-bottom));
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 80;
+      margin: calc(-14px - var(--safe-top)) -14px 12px;
+      padding: calc(14px + var(--safe-top)) 14px 12px;
+      background: linear-gradient(180deg, rgba(5,4,6,0.96), rgba(5,4,6,0.72) 74%, transparent);
+      backdrop-filter: blur(18px);
+    }
+
+    .brand-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 44px;
+      height: 44px;
+      border-radius: 15px;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at 36% 22%, #ff5966, transparent 20%),
+        linear-gradient(145deg, #d80f22, #42040a 72%);
+      box-shadow: var(--glow), inset 0 0 22px rgba(255,255,255,0.1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .brand-mark::before {
+      content: "";
+      width: 19px;
+      height: 25px;
+      border: 2px solid rgba(255,255,255,0.9);
+      border-radius: 3px;
+      box-shadow: inset 0 0 0 4px rgba(0,0,0,0.28);
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: clamp(25px, 7vw, 40px);
+      letter-spacing: -1.5px;
+      line-height: 0.9;
+    }
+
+    .brand span {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 1.8px;
+      text-transform: uppercase;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 150px;
+    }
+
+    @media (max-width: 500px) {
+      .brand span {
+        display: none !important;
+      }
+      .user-chip {
+        max-width: 90px !important;
+      }
+      .brand-row {
+        gap: 4px !important;
+      }
+      .brand-mark {
+        display: none !important;
+      }
+    }
+
+    .icon-btn,
+    .pill-btn,
+    .action-btn,
+    .nav-btn {
+      transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease, opacity 0.18s ease;
+    }
+
+    .icon-btn:active,
+    .pill-btn:active,
+    .action-btn:active,
+    .nav-btn:active,
+    .card:active {
+      transform: scale(0.97);
+    }
+
+    .icon-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid var(--line);
+      backdrop-filter: blur(14px);
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .user-chip {
+      display: none;
+      max-width: 118px;
+      height: 36px;
+      padding: 0 11px;
+      border-radius: 999px;
+      align-items: center;
+      gap: 7px;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid var(--line);
+      color: #e9e4ea;
+      font-size: 12px;
+      font-weight: 900;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    body.authenticated .user-chip {
+      display: inline-flex;
+    }
+
+    .hero {
+      min-height: 430px;
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      position: relative;
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(255,255,255,0.1);
+      background: #100d12;
+      isolation: isolate;
+    }
+
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(90deg, rgba(6,4,8,0.92) 0%, rgba(6,4,8,0.42) 54%, rgba(6,4,8,0.18) 100%),
+        linear-gradient(0deg, #080609 0%, rgba(8,6,9,0.52) 42%, transparent 90%),
+        var(--hero-bg, radial-gradient(circle at 70% 20%, #4a0a13, #09070a 55%));
+      background-size: cover;
+      background-position: center;
+      z-index: -1;
+      transform: scale(1.04);
+      filter: saturate(1.15) contrast(1.08);
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      opacity: 0.18;
+      background: repeating-linear-gradient(0deg, transparent 0 5px, rgba(255,255,255,0.06) 6px);
+      pointer-events: none;
+    }
+
+    .hero-content {
+      position: absolute;
+      left: 18px;
+      right: 18px;
+      bottom: 18px;
+      z-index: 2;
+      animation: rise 0.7s ease both;
+    }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(18px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 11px;
+      border-radius: 999px;
+      background: rgba(216,15,34,0.18);
+      border: 1px solid rgba(255,43,61,0.35);
+      color: #ffd7dc;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 1.3px;
+      text-transform: uppercase;
+      backdrop-filter: blur(12px);
+    }
+
+    .hero h2 {
+      margin: 14px 0 8px;
+      font-size: clamp(35px, 12vw, 68px);
+      line-height: 0.86;
+      letter-spacing: -2px;
+      max-width: 770px;
+      text-shadow: 0 14px 45px rgba(0,0,0,0.78);
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      align-items: center;
+      color: #d5d2d8;
+      font-size: 12px;
+      margin: 10px 0;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      min-height: 24px;
+      padding: 5px 8px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: #eee8eb;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .tag.blood {
+      background: rgba(216,15,34,0.16);
+      border-color: rgba(216,15,34,0.34);
+      color: #ffd8dc;
+    }
+
+    .hero p {
+      margin: 11px 0 16px;
+      color: #cdc9d0;
+      font-size: 14px;
+      line-height: 1.55;
+      max-width: 700px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .pill-btn,
+    .action-btn {
+      min-height: 44px;
+      padding: 0 16px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-weight: 900;
+      background: rgba(255,255,255,0.09);
+      border: 1px solid rgba(255,255,255,0.11);
+      backdrop-filter: blur(14px);
+    }
+
+    .pill-btn.primary,
+    .action-btn.active {
+      background: linear-gradient(135deg, var(--blood), #8a0713);
+      box-shadow: var(--glow);
+      border-color: rgba(255,255,255,0.14);
+    }
+
+    .quote-strip {
+      margin: 14px 0 4px;
+      padding: 15px;
+      border-radius: 22px;
+      background: rgba(255,255,255,0.055);
+      border: 1px solid var(--line);
+      color: #dcd7dc;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+      backdrop-filter: blur(18px);
+    }
+
+    .quote-strip strong {
+      display: block;
+      color: #fff;
+      margin-bottom: 6px;
+      font-size: 12px;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+    }
+
+    .section {
+      margin-top: 25px;
+    }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .section h3 {
+      margin: 0;
+      font-size: 21px;
+      letter-spacing: -0.4px;
+    }
+
+    .section small {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .row {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(142px, 40vw);
+      gap: 13px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 2px 2px 8px;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .row::-webkit-scrollbar,
+    .feed::-webkit-scrollbar,
+    .search-results::-webkit-scrollbar {
+      display: none;
+    }
+
+    .card {
+      position: relative;
+      min-height: 226px;
+      border-radius: 22px;
+      overflow: hidden;
+      scroll-snap-align: start;
+      background: #151119;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 18px 40px rgba(0,0,0,0.42);
+      cursor: pointer;
+      isolation: isolate;
+      animation: fadeIn 0.45s ease both;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .poster-art {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 70% 10%, var(--accent, #d80f22), transparent 27%),
+        linear-gradient(155deg, rgba(255,255,255,0.08), transparent 28%),
+        linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.92)),
+        var(--poster-bg, linear-gradient(145deg, #2b0b10, #070507));
+      background-size: cover;
+      background-position: center;
+      transform: scale(1.02);
+      filter: saturate(1.1) contrast(1.1);
+    }
+
+    .poster-art::before {
+      content: attr(data-initials);
+      position: absolute;
+      inset: 14px;
+      border-radius: 16px;
+      display: grid;
+      place-items: center;
+      color: rgba(255,255,255,0.09);
+      font-size: 62px;
+      font-weight: 900;
+      letter-spacing: -6px;
+      border: 1px solid rgba(255,255,255,0.07);
+      background: rgba(0,0,0,0.12);
+    }
+
+    .poster-art::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 70%;
+      background: linear-gradient(0deg, rgba(5,4,6,0.98), rgba(5,4,6,0.35), transparent);
+    }
+
+    .card-body {
+      position: absolute;
+      inset: auto 10px 10px;
+      z-index: 2;
+    }
+
+    .card h4 {
+      margin: 0 0 7px;
+      font-size: 15px;
+      line-height: 1.06;
+      letter-spacing: -0.3px;
+    }
+
+    .card .meta {
+      margin: 0;
+      gap: 5px;
+      color: #c9c5ca;
+      font-size: 10px;
+    }
+
+    .score {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 4;
+      min-width: 40px;
+      height: 30px;
+      padding: 0 9px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 900;
+      background: rgba(0,0,0,0.54);
+      border: 1px solid rgba(255,255,255,0.14);
+      backdrop-filter: blur(12px);
+    }
+
+    .type-badge {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 4;
+      padding: 7px 9px;
+      border-radius: 999px;
+      background: rgba(216,15,34,0.76);
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      box-shadow: 0 10px 28px rgba(216,15,34,0.22);
+    }
+
+    .view {
+      display: none;
+      animation: fadeIn 0.3s ease both;
+    }
+
+    .view.active {
+      display: block;
+    }
+
+    .search-panel,
+    .glass-panel {
+      padding: 15px;
+      border-radius: 26px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(22px);
+    }
+
+    .search-box {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 54px;
+      padding: 0 14px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .search-box input {
+      width: 100%;
+      border: 0;
+      outline: 0;
+      color: #fff;
+      background: transparent;
+      font-size: 16px;
+    }
+
+    .search-box input::placeholder {
+      color: #77727c;
+    }
+
+    .filters {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 9px;
+      margin-top: 11px;
+    }
+
+    .filters select,
+    .filters input {
+      height: 44px;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 15px;
+      background: rgba(255,255,255,0.07);
+      color: #fff;
+      outline: 0;
+      padding: 0 11px;
+    }
+
+    .filters option {
+      color: #111;
+    }
+
+    .history {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 13px 0 0;
+    }
+
+    .history button {
+      padding: 8px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      color: #ddd;
+      border: 1px solid var(--line);
+      font-size: 12px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 13px;
+    }
+
+    .list-grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .list-card {
+      min-height: 114px;
+      display: grid;
+      grid-template-columns: 82px 1fr;
+      gap: 13px;
+      padding: 10px;
+      border-radius: 22px;
+      background: rgba(255,255,255,0.055);
+      border: 1px solid var(--line);
+      cursor: pointer;
+    }
+
+    .list-card .mini-poster {
+      border-radius: 16px;
+      min-height: 94px;
+      background:
+        radial-gradient(circle at 70% 20%, var(--accent, #d80f22), transparent 30%),
+        linear-gradient(160deg, #2b0b10, #070507);
+    }
+
+    .list-card h4 {
+      margin: 4px 0 7px;
+      font-size: 16px;
+    }
+
+    .list-card p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 9px;
+      overflow-x: auto;
+      padding: 3px 0 12px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .tabs::-webkit-scrollbar {
+      display: none;
+    }
+
+    .tab {
+      white-space: nowrap;
+      min-height: 42px;
+      padding: 0 14px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.075);
+      border: 1px solid var(--line);
+      color: #d4d0d5;
+      font-weight: 800;
+      font-size: 13px;
+    }
+
+    .tab.active {
+      background: var(--blood);
+      color: #fff;
+      box-shadow: var(--glow);
+    }
+
+    .profile-card {
+      display: grid;
+      gap: 16px;
+      padding: 18px;
+      border-radius: 30px;
+      background:
+        radial-gradient(circle at 82% 8%, rgba(216,15,34,0.2), transparent 34%),
+        rgba(255,255,255,0.06);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+    }
+
+    .profile-top {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .avatar {
+      width: 78px;
+      height: 78px;
+      border-radius: 24px;
+      display: grid;
+      place-items: center;
+      font-size: 32px;
+      background:
+        radial-gradient(circle at 30% 20%, #ff6b79, transparent 24%),
+        linear-gradient(145deg, #d80f22, #15080b 70%);
+      box-shadow: var(--glow);
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .stat {
+      min-height: 74px;
+      padding: 12px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--line);
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 24px;
+      line-height: 1;
+    }
+
+    .stat span {
+      display: block;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .ranking-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .ranking-item {
+      display: grid;
+      grid-template-columns: 38px 1fr auto;
+      gap: 10px;
+      align-items: center;
+      min-height: 62px;
+      padding: 10px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.055);
+      border: 1px solid var(--line);
+      cursor: pointer;
+    }
+
+    .rank-num {
+      width: 34px;
+      height: 34px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      background: rgba(216,15,34,0.18);
+      color: #ffdce0;
+      font-weight: 900;
+    }
+
+    .calendar-item {
+      padding: 14px;
+      border-radius: 20px;
+      background: rgba(255,255,255,0.055);
+      border: 1px solid var(--line);
+      display: grid;
+      gap: 6px;
+    }
+
+    .date-chip {
+      color: #ffd3d8;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .quiz-card {
+      display: grid;
+      gap: 15px;
+      min-height: 420px;
+      padding: 19px;
+      border-radius: 30px;
+      background:
+        radial-gradient(circle at 18% 0%, rgba(255,43,61,0.2), transparent 32%),
+        rgba(255,255,255,0.06);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+    }
+
+    .quiz-options {
+      display: grid;
+      gap: 10px;
+    }
+
+    .quiz-options button {
+      min-height: 58px;
+      padding: 13px;
+      border-radius: 18px;
+      text-align: left;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid var(--line);
+      color: #fff;
+      font-weight: 800;
+    }
+
+    .feed {
+      height: calc(100dvh - 178px);
+      overflow-y: auto;
+      scroll-snap-type: y mandatory;
+      border-radius: 28px;
+      background: rgba(0,0,0,0.36);
+      border: 1px solid var(--line);
+    }
+
+    .reel {
+      position: relative;
+      min-height: calc(100dvh - 178px);
+      scroll-snap-align: start;
+      overflow: hidden;
+      display: flex;
+      align-items: end;
+      padding: 18px;
+      background:
+        linear-gradient(0deg, rgba(0,0,0,0.92), transparent 62%),
+        radial-gradient(circle at 70% 18%, var(--accent, #d80f22), transparent 32%),
+        linear-gradient(145deg, #1d0b12, #040304);
+    }
+
+    .reel::before {
+      content: attr(data-word);
+      position: absolute;
+      left: 50%;
+      top: 44%;
+      transform: translate(-50%, -50%);
+      font-size: clamp(54px, 20vw, 140px);
+      font-weight: 900;
+      letter-spacing: -8px;
+      opacity: 0.08;
+      white-space: nowrap;
+    }
+
+    .reel-content {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      z-index: 120;
+      display: none;
+      padding: calc(18px + var(--safe-top)) 14px calc(18px + var(--safe-bottom));
+      background: rgba(0,0,0,0.72);
+      backdrop-filter: blur(22px);
+      overflow-y: auto;
+    }
+
+    .auth-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 260;
+      display: none;
+      place-items: center;
+      padding: calc(22px + var(--safe-top)) 18px calc(22px + var(--safe-bottom));
+      background:
+        radial-gradient(circle at 18% 8%, rgba(216,15,34,0.28), transparent 34%),
+        radial-gradient(circle at 85% 0%, rgba(120,20,36,0.24), transparent 30%),
+        rgba(4,3,5,0.94);
+      backdrop-filter: blur(26px);
+    }
+
+    .auth-screen.open {
+      display: grid;
+    }
+
+    .auth-card {
+      width: min(430px, 100%);
+      padding: 22px;
+      border-radius: 34px;
+      background:
+        linear-gradient(145deg, rgba(255,255,255,0.1), rgba(255,255,255,0.035)),
+        rgba(12,10,15,0.88);
+      border: 1px solid rgba(255,255,255,0.13);
+      box-shadow: var(--shadow);
+    }
+
+    .auth-card h2 {
+      margin: 12px 0 8px;
+      font-size: clamp(34px, 11vw, 52px);
+      line-height: 0.9;
+      letter-spacing: -2px;
+    }
+
+    .auth-card p {
+      margin: 0 0 17px;
+      color: #b8b1bb;
+      line-height: 1.55;
+      font-size: 14px;
+    }
+
+    .auth-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin: 16px 0;
+      padding: 6px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--line);
+    }
+
+    .auth-tabs button {
+      height: 42px;
+      border-radius: 999px;
+      background: transparent;
+      color: #aaa5ad;
+      font-weight: 900;
+    }
+
+    .auth-tabs button.active {
+      background: linear-gradient(135deg, var(--blood), #8a0713);
+      color: #fff;
+      box-shadow: var(--glow);
+    }
+
+    .auth-form {
+      display: grid;
+      gap: 10px;
+    }
+
+    .auth-field {
+      display: grid;
+      gap: 7px;
+    }
+
+    .auth-field label {
+      color: #d9d3da;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+    }
+
+    .auth-field input {
+      width: 100%;
+      height: 52px;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 18px;
+      outline: 0;
+      padding: 0 14px;
+      color: #fff;
+      background: rgba(255,255,255,0.075);
+    }
+
+    .auth-field input:focus {
+      border-color: rgba(255,43,61,0.55);
+      box-shadow: 0 0 0 4px rgba(216,15,34,0.14);
+    }
+
+    .auth-error {
+      min-height: 20px;
+      color: #ff9aa5;
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1.4;
+    }
+
+    .auth-footnote {
+      display: block;
+      margin-top: 13px;
+      color: #7f7984;
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .modal.open {
+      display: block;
+    }
+
+    .detail-shell {
+      max-width: 980px;
+      margin: 0 auto;
+      border-radius: 32px;
+      overflow: hidden;
+      background: var(--panel-strong);
+      border: 1px solid rgba(255,255,255,0.12);
+      box-shadow: var(--shadow);
+      animation: rise 0.32s ease both;
+    }
+
+    .detail-banner {
+      min-height: 380px;
+      position: relative;
+      padding: 18px;
+      display: flex;
+      align-items: end;
+      background:
+        linear-gradient(0deg, #100d12 0%, rgba(16,13,18,0.62) 44%, transparent),
+        radial-gradient(circle at 74% 18%, var(--accent, #d80f22), transparent 34%),
+        linear-gradient(145deg, #270a10, #050406);
+      overflow: hidden;
+    }
+
+    .detail-banner::before {
+      content: attr(data-title);
+      position: absolute;
+      right: -4%;
+      top: 14%;
+      width: 74%;
+      font-size: clamp(54px, 18vw, 160px);
+      font-weight: 900;
+      line-height: 0.78;
+      letter-spacing: -8px;
+      opacity: 0.055;
+      text-align: right;
+    }
+
+    .detail-head {
+      display: grid;
+      grid-template-columns: 118px 1fr;
+      gap: 15px;
+      align-items: end;
+      width: 100%;
+      position: relative;
+      z-index: 2;
+    }
+
+    .detail-poster {
+      aspect-ratio: 2 / 3;
+      border-radius: 20px;
+      background:
+        radial-gradient(circle at 70% 15%, var(--accent, #d80f22), transparent 30%),
+        linear-gradient(145deg, #2b0b10, #060506);
+      border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.56);
+    }
+
+    .detail-body {
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      overflow-x: hidden;
+    }
+
+    .detail-title h2 {
+      margin: 0 0 9px;
+      font-size: clamp(28px, 8vw, 54px);
+      line-height: 0.92;
+      letter-spacing: -1.5px;
+    }
+
+    .synopsis {
+      color: #d3ced5;
+      line-height: 1.62;
+      font-size: 14px;
+    }
+
+    .trailer-box {
+      position: relative;
+      border-radius: 22px;
+      overflow: hidden;
+      background:
+        linear-gradient(145deg, rgba(216,15,34,0.22), rgba(255,255,255,0.04)),
+        rgba(0,0,0,0.5);
+      border: 1px solid var(--line);
+    }
+
+    .trailer-box iframe {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border: 0;
+      background: #000;
+    }
+
+    .trailer-poster {
+      min-height: 260px;
+      aspect-ratio: 16 / 9;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background:
+        radial-gradient(circle at 50% 40%, rgba(216,15,34,0.28), transparent 34%),
+        linear-gradient(180deg, rgba(5,4,6,0.18), rgba(5,4,6,0.88)),
+        var(--poster, #09070a);
+      background-size: cover;
+      background-position: center;
+    }
+
+    .trailer-poster::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(90deg, rgba(216,15,34,0.2), transparent 30%, rgba(0,0,0,0.44)),
+        repeating-linear-gradient(0deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 5px);
+      mix-blend-mode: screen;
+      opacity: 0.45;
+    }
+
+    .trailer-content {
+      position: relative;
+      z-index: 1;
+      width: min(520px, 100%);
+      display: grid;
+      gap: 14px;
+      justify-items: center;
+      text-align: center;
+    }
+
+    .trailer-play {
+      width: 76px;
+      height: 76px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.2);
+      color: var(--white);
+      background:
+        radial-gradient(circle at 35% 25%, rgba(255,255,255,0.22), transparent 30%),
+        linear-gradient(145deg, var(--blood), #690815);
+      box-shadow: 0 18px 55px rgba(216, 15, 34, 0.42);
+      font-size: 30px;
+      font-weight: 900;
+      cursor: pointer;
+      transition: transform 0.2s ease, filter 0.2s ease;
+    }
+
+    .trailer-play:hover {
+      transform: scale(1.04);
+      filter: brightness(1.08);
+    }
+
+    .trailer-content strong {
+      font-size: clamp(18px, 4vw, 26px);
+    }
+
+    .trailer-content small {
+      color: #d7d1da;
+      line-height: 1.45;
+    }
+
+    .trailer-fallback,
+    .trailer-inline-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .trailer-inline-actions {
+      padding: 12px;
+      background: rgba(5,4,6,0.86);
+      border-top: 1px solid var(--line);
+    }
+
+    .stills {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .still {
+      aspect-ratio: 1.55;
+      border-radius: 14px;
+      background:
+        radial-gradient(circle at var(--x, 60%) var(--y, 25%), var(--accent, #d80f22), transparent 28%),
+        linear-gradient(145deg, #241018, #070507);
+      border: 1px solid var(--line);
+    }
+
+    .bottom-nav {
+      position: fixed;
+      left: 12px;
+      right: 12px;
+      bottom: calc(10px + var(--safe-bottom));
+      z-index: 90;
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
+      padding: 8px;
+      border-radius: 28px;
+      background: rgba(16,13,18,0.78);
+      border: 1px solid rgba(255,255,255,0.11);
+      backdrop-filter: blur(22px);
+      box-shadow: 0 20px 80px rgba(0,0,0,0.62);
+    }
+
+    .nav-btn {
+      min-height: 52px;
+      border-radius: 20px;
+      display: grid;
+      place-items: center;
+      gap: 2px;
+      background: transparent;
+      color: #aaa5ad;
+      font-size: 10px;
+      font-weight: 900;
+    }
+
+    .nav-btn span {
+      font-size: 18px;
+      line-height: 1;
+    }
+
+    .nav-btn.active {
+      background: linear-gradient(145deg, rgba(216,15,34,0.92), rgba(126,9,21,0.85));
+      color: #fff;
+      box-shadow: var(--glow);
+    }
+
+    .empty,
+    .error {
+      padding: 22px;
+      border-radius: 22px;
+      background: rgba(255,255,255,0.055);
+      border: 1px solid var(--line);
+      color: #bdb7c0;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    .skeleton {
+      min-height: 220px;
+      border-radius: 22px;
+      background: linear-gradient(90deg, rgba(255,255,255,0.05), rgba(255,255,255,0.1), rgba(255,255,255,0.05));
+      background-size: 220% 100%;
+      animation: shimmer 1.1s infinite;
+    }
+
+    @keyframes shimmer {
+      to { background-position: -220% 0; }
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: calc(88px + var(--safe-bottom));
+      z-index: 200;
+      transform: translate(-50%, 20px);
+      opacity: 0;
+      pointer-events: none;
+      padding: 12px 16px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.92);
+      color: #111;
+      font-weight: 900;
+      box-shadow: 0 16px 45px rgba(0,0,0,0.45);
+      transition: 0.25s ease;
+      white-space: nowrap;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    @media (min-width: 760px) {
+      .app {
+        max-width: 1220px;
+        margin: 0 auto;
+        padding-inline: 24px;
+      }
+
+      .grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .row {
+        grid-auto-columns: minmax(170px, 190px);
+      }
+
+      .hero-content {
+        left: 34px;
+        right: 34px;
+        bottom: 34px;
+      }
+
+      .detail-head {
+        grid-template-columns: 170px 1fr;
+      }
+
+      .bottom-nav {
+        left: 50%;
+        right: auto;
+      width: min(760px, calc(100% - 24px));
+        transform: translateX(-50%);
+      }
+    }
+
+    @media (max-width: 370px) {
+      .bottom-nav {
+        grid-template-columns: repeat(4, 1fr);
+      }
+
+      .app {
+        padding-bottom: calc(154px + var(--safe-bottom));
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand-row">
+        <button class="icon-btn" data-nav="home" aria-label="Início">
+          <span>⌂</span>
+        </button>
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true"></div>
+          <div>
+            <h1>DarkFrame</h1>
+            <span>terror cinema tracker</span>
+          </div>
+        </div>
+        <div class="top-actions">
+          <span class="user-chip" id="user-chip">☠ Perfil</span>
+          <button class="icon-btn" id="random-pick" aria-label="Escolha aleatória">☠</button>
+          <button class="icon-btn" id="logout-btn" aria-label="Sair da conta">⇥</button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section id="view-home" class="view active" aria-label="Home">
+        <article id="hero" class="hero"></article>
+        <div class="quote-strip">
+          <strong>Frase da noite</strong>
+          <span id="quote-line">Carregando assombração...</span>
+        </div>
+        <div id="home-sections"></div>
+      </section>
+
+      <section id="view-search" class="view" aria-label="Busca">
+        <div class="section-head">
+          <div>
+            <h3>Buscar no escuro</h3>
+            <small>nome, ator, diretor, ano, gênero ou franquia</small>
+          </div>
+        </div>
+        <div class="search-panel">
+          <div class="search-box">
+            <span>⌕</span>
+            <input id="search-input" type="search" placeholder="Ex: Hereditário, slasher, 2018..." autocomplete="off">
+          </div>
+          <div class="filters">
+            <select id="genre-filter" aria-label="Filtrar por gênero">
+              <option value="">Todos os gêneros</option>
+            </select>
+            <input id="year-filter" inputmode="numeric" maxlength="4" placeholder="Ano">
+          </div>
+          <div class="history" id="search-history"></div>
+        </div>
+        <section class="section">
+          <div id="search-loading" class="grid" hidden>
+            <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+          </div>
+          <div id="search-results" class="grid"></div>
+        </section>
+      </section>
+
+      <section id="view-lists" class="view" aria-label="Listas">
+        <div class="section-head">
+          <div>
+            <h3>Suas listas</h3>
+            <small>salvas localmente neste aparelho</small>
+          </div>
+        </div>
+        <div class="tabs" id="list-tabs"></div>
+        <div id="list-content" class="list-grid"></div>
+      </section>
+
+      <section id="view-rankings" class="view" aria-label="Rankings">
+        <div class="section-head">
+          <div>
+            <h3>Rankings malditos</h3>
+            <small>listas rápidas para descobrir o próximo susto</small>
+          </div>
+        </div>
+        <div id="rankings-content"></div>
+      </section>
+
+      <section id="view-feed" class="view" aria-label="Feed vertical">
+        <div class="section-head">
+          <div>
+            <h3>Dark Reels</h3>
+            <small>trailers curtos, cenas famosas e recomendações rápidas</small>
+          </div>
+        </div>
+        <div id="feed" class="feed"></div>
+      </section>
+
+      <section id="view-calendar" class="view" aria-label="Calendário">
+        <div class="section-head">
+          <div>
+            <h3>Calendário sombrio</h3>
+            <small>estreias, episódios e futuros pesadelos</small>
+          </div>
+        </div>
+        <div id="calendar-content" class="list-grid"></div>
+      </section>
+
+      <section id="view-profile" class="view" aria-label="Perfil">
+        <div id="profile-content"></div>
+        <section class="section">
+          <div class="quiz-card" id="quiz-card"></div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <nav class="bottom-nav" aria-label="Navegação principal">
+    <button class="nav-btn active" data-nav="home"><span>⌂</span>Home</button>
+    <button class="nav-btn" data-nav="search"><span>⌕</span>Busca</button>
+    <button class="nav-btn" data-nav="lists"><span>▦</span>Listas</button>
+    <button class="nav-btn" data-nav="rankings"><span>★</span>Ranks</button>
+    <button class="nav-btn" data-nav="feed"><span>▣</span>Feed</button>
+    <button class="nav-btn" data-nav="calendar"><span>◷</span>Agenda</button>
+    <button class="nav-btn" data-nav="profile"><span>◉</span>Perfil</button>
+  </nav>
+
+  <section class="modal" id="detail-modal" aria-label="Detalhes">
+    <div class="detail-shell" id="detail-shell"></div>
+  </section>
+
+  <section class="auth-screen" id="auth-screen" aria-label="Login local">
+    <div class="auth-card">
+      <div class="brand" style="margin-bottom:10px">
+        <div class="brand-mark" aria-hidden="true"></div>
+        <div>
+          <h1>DarkFrame</h1>
+          <span>acesso local seguro</span>
+        </div>
+      </div>
+      <h2 id="auth-title">Entrar</h2>
+      <p id="auth-copy">Entre para liberar suas listas, histórico e recomendações neste aparelho.</p>
+      <div class="auth-tabs">
+        <button type="button" data-auth-mode="login">Entrar</button>
+        <button type="button" data-auth-mode="create">Criar conta</button>
+      </div>
+      <div class="auth-form">
+        <div class="auth-field" id="nickname-field">
+          <label for="auth-nickname">Nickname</label>
+          <input id="auth-nickname" autocomplete="nickname" placeholder="Ex: Renan">
+        </div>
+        <div class="auth-field">
+          <label for="auth-username">Usuário</label>
+          <input id="auth-username" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="ex: renan">
+        </div>
+        <div class="auth-field">
+          <label for="auth-password">Senha</label>
+          <input id="auth-password" type="password" autocomplete="current-password" placeholder="mínimo 6 caracteres">
+        </div>
+        <div class="auth-error" id="auth-error"></div>
+        <button class="pill-btn primary" id="auth-submit" type="button">Entrar</button>
+      </div>
+      <span class="auth-footnote">As informações ficam somente neste Android/navegador. A senha é salva como hash local; para login online real no futuro será preciso backend.</span>
+    </div>
+  </section>
+
+  <div class="toast" id="toast">Salvo</div>
+
+  <script>
+    "use strict";
+
+    /*
+      DarkFrame API config
+      TMDB: crie uma chave em https://www.themoviedb.org/settings/api e cole abaixo.
+      OMDb: crie uma chave em https://www.omdbapi.com/apikey.aspx e cole abaixo.
+      O app funciona sem chaves usando a base local + cache local.
+    */
+    const TMDB_API_KEY = "0313cf74b6d0064dd9985d3416f3a96a";
+    const OMDB_API_KEY = "";
+    const TMDB_BASE = "https://api.themoviedb.org/3";
+    const LEGACY_STORAGE_KEY = "darkframe-state-v1";
+    const STORAGE_PREFIX = "darkframe-state-v1:";
+    const AUTH_KEY = "darkframe-auth-v1";
+    const SESSION_KEY = "darkframe-session-v1";
+    const CACHE_KEY = "darkframe-cache-v1";
+
+    const $ = (selector, root = document) => root.querySelector(selector);
+    const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
+
+    const sessionAtBoot = loadSession();
+    const state = {
+      activeView: "home",
+      activeList: "favorites",
+      authMode: hasStoredUsers() ? "login" : "create",
+      searchTimer: null,
+      quizIndex: 0,
+      quizAnswers: [],
+      data: [],
+      auth: sessionAtBoot,
+      user: loadState(sessionAtBoot?.user),
+      cache: loadCache(),
+    };
+
+    const listLabels = {
+      favorites: "Favoritos",
+      watchlist: "Quero assistir",
+      watching: "Assistindo",
+      finished: "Finalizados",
+      disturbing: "Perturbadores",
+      deaths: "Piores mortes",
+      traumatic: "Filmes traumáticos",
+    };
+
+    const quotes = [
+      "A casa nunca fica vazia. Ela só espera a próxima visita.",
+      "Quando a câmera treme, a verdade costuma aparecer.",
+      "O monstro mais perigoso é aquele que entende você.",
+      "Nada é mais escuro do que uma porta meio aberta às três da manhã.",
+      "Todo final feliz no terror dura até a sequência.",
+      "Se a floresta ficou silenciosa, corra antes de entender o motivo.",
+      "O medo não grita primeiro. Ele respira perto do ouvido.",
+    ];
+
+    const quizQuestions = [
+      { q: "Qual medo te pega mais?", key: "fear", options: [
+        { label: "Família estranha e trauma", tags: ["Psicológico"] },
+        { label: "Entidades e possessão", tags: ["Paranormal"] },
+        { label: "Assassino mascarado", tags: ["Slasher"] },
+        { label: "Sobreviver sem saída", tags: ["Survival Horror"] },
+      ]},
+      { q: "Que ritmo combina com você?", key: "pace", options: [
+        { label: "Lento, elegante e desconfortável", tags: ["Psicológico"] },
+        { label: "Tenso do início ao fim", tags: ["Thriller"] },
+        { label: "Caótico e sangrento", tags: ["Slasher"] },
+        { label: "Realista, câmera na mão", tags: ["Found Footage"] },
+      ]},
+      { q: "Quanto sangue está liberado?", key: "violence", options: [
+        { label: "Pouco, quero paranoia", tags: ["Psicológico"] },
+        { label: "Médio, se fizer sentido", tags: ["Paranormal", "Thriller"] },
+        { label: "Muito, sem piedade", tags: ["Slasher", "Survival Horror"] },
+        { label: "Quase nada, só tensão", tags: ["Found Footage"] },
+      ]},
+      { q: "Você prefere o mal vindo de onde?", key: "evil", options: [
+        { label: "Da mente humana", tags: ["Psicológico", "Thriller"] },
+        { label: "Do além", tags: ["Paranormal"] },
+        { label: "De uma lenda urbana", tags: ["Found Footage"] },
+        { label: "De um predador real", tags: ["Survival Horror", "Slasher"] },
+      ]},
+    ];
+
+    const localLibrary = [
+      {
+        id: "hereditary",
+        title: "Hereditário",
+        original: "Hereditary",
+        type: "Filme",
+        year: 2018,
+        duration: "2h 07min",
+        rating: 8.4,
+        age: "16+",
+        genres: ["Psicológico", "Paranormal", "Drama"],
+        franchise: "A24",
+        director: "Ari Aster",
+        cast: ["Toni Collette", "Alex Wolff", "Milly Shapiro", "Gabriel Byrne"],
+        mood: ["perturbador", "lento", "trauma"],
+        synopsis: "Depois da morte da avó, uma família começa a descobrir segredos herdados que transformam luto em um ritual de horror sufocante.",
+        trailer: "V6wWKNij_1M",
+        calendar: "Disponível para maratona de clássicos modernos",
+        accent: "#e23b45",
+        bg: "linear-gradient(145deg, #421018, #12070a 58%, #050406)",
+      },
+      {
+        id: "the-witch",
+        title: "A Bruxa",
+        original: "The Witch",
+        type: "Filme",
+        year: 2015,
+        duration: "1h 32min",
+        rating: 8.1,
+        age: "16+",
+        genres: ["Folk Horror", "Psicológico", "Paranormal"],
+        franchise: "A24",
+        director: "Robert Eggers",
+        cast: ["Anya Taylor-Joy", "Ralph Ineson", "Kate Dickie"],
+        mood: ["oculto", "lento", "atmosférico"],
+        synopsis: "Na Nova Inglaterra do século XVII, uma família isolada na floresta mergulha em fanatismo, suspeita e presença demoníaca.",
+        trailer: "iQXmlf3Sefg",
+        calendar: "Especial bruxaria",
+        accent: "#a46a3f",
+        bg: "linear-gradient(145deg, #352216, #090706 60%, #020202)",
+      },
+      {
+        id: "get-out",
+        title: "Corra!",
+        original: "Get Out",
+        type: "Filme",
+        year: 2017,
+        duration: "1h 44min",
+        rating: 8.5,
+        age: "14+",
+        genres: ["Thriller", "Psicológico", "Suspense"],
+        franchise: "Jordan Peele",
+        director: "Jordan Peele",
+        cast: ["Daniel Kaluuya", "Allison Williams", "Lakeith Stanfield"],
+        mood: ["social", "paranoia", "tenso"],
+        synopsis: "Um encontro familiar aparentemente cordial revela uma conspiração assustadora sobre corpo, identidade e controle.",
+        trailer: "DzfpyUB60YY",
+        calendar: "Sessão thriller social",
+        accent: "#6b86ff",
+        bg: "linear-gradient(145deg, #111e3f, #07070b 62%, #030305)",
+      },
+      {
+        id: "the-conjuring",
+        title: "Invocação do Mal",
+        original: "The Conjuring",
+        type: "Filme",
+        year: 2013,
+        duration: "1h 52min",
+        rating: 8.0,
+        age: "14+",
+        genres: ["Paranormal", "Casa Assombrada", "Suspense"],
+        franchise: "The Conjuring Universe",
+        director: "James Wan",
+        cast: ["Vera Farmiga", "Patrick Wilson", "Lili Taylor"],
+        mood: ["entidade", "jumpscare", "investigação"],
+        synopsis: "Dois investigadores paranormais enfrentam uma presença maligna que domina uma casa e ameaça destruir uma família.",
+        trailer: "k10ETZ41q5o",
+        calendar: "Maratona paranormal",
+        accent: "#b7c1d6",
+        bg: "linear-gradient(145deg, #223044, #0a0c10 60%, #030405)",
+      },
+      {
+        id: "scream",
+        title: "Pânico",
+        original: "Scream",
+        type: "Filme",
+        year: 1996,
+        duration: "1h 51min",
+        rating: 8.2,
+        age: "16+",
+        genres: ["Slasher", "Mistério", "Suspense"],
+        franchise: "Scream",
+        director: "Wes Craven",
+        cast: ["Neve Campbell", "Courteney Cox", "David Arquette", "Skeet Ulrich"],
+        mood: ["metalinguagem", "assassino", "rápido"],
+        synopsis: "Uma cidade pequena vira palco de assassinatos brutais cometidos por alguém obcecado pelas regras dos filmes de terror.",
+        trailer: "i3J6ACKQ7K0",
+        calendar: "Noite slasher",
+        accent: "#f5f5f5",
+        bg: "linear-gradient(145deg, #2c2b31, #08080b 62%, #000)",
+      },
+      {
+        id: "halloween",
+        title: "Halloween",
+        original: "Halloween",
+        type: "Filme",
+        year: 1978,
+        duration: "1h 31min",
+        rating: 8.0,
+        age: "16+",
+        genres: ["Slasher", "Clássico", "Survival Horror"],
+        franchise: "Halloween",
+        director: "John Carpenter",
+        cast: ["Jamie Lee Curtis", "Donald Pleasence", "Nick Castle"],
+        mood: ["máscara", "clássico", "perseguição"],
+        synopsis: "Michael Myers retorna à noite de Halloween, transformando ruas suburbanas em um tabuleiro de caça silencioso.",
+        trailer: "T5ke9IPTIJQ",
+        calendar: "31 de outubro eterno",
+        accent: "#ff8b2b",
+        bg: "linear-gradient(145deg, #4a1c04, #090605 64%, #000)",
+      },
+      {
+        id: "blair-witch",
+        title: "A Bruxa de Blair",
+        original: "The Blair Witch Project",
+        type: "Filme",
+        year: 1999,
+        duration: "1h 21min",
+        rating: 7.7,
+        age: "14+",
+        genres: ["Found Footage", "Paranormal", "Survival Horror"],
+        franchise: "Blair Witch",
+        director: "Daniel Myrick, Eduardo Sánchez",
+        cast: ["Heather Donahue", "Joshua Leonard", "Michael C. Williams"],
+        mood: ["floresta", "realista", "perdido"],
+        synopsis: "Três estudantes entram na floresta para documentar uma lenda local. O que volta é apenas a gravação do desespero.",
+        trailer: "a_Hw4bAUj8A",
+        calendar: "Semana found footage",
+        accent: "#4f7045",
+        bg: "linear-gradient(145deg, #1d321d, #080b07 62%, #020302)",
+      },
+      {
+        id: "rec",
+        title: "[REC]",
+        original: "[REC]",
+        type: "Filme",
+        year: 2007,
+        duration: "1h 18min",
+        rating: 8.0,
+        age: "16+",
+        genres: ["Found Footage", "Survival Horror", "Infecção"],
+        franchise: "[REC]",
+        director: "Jaume Balagueró, Paco Plaza",
+        cast: ["Manuela Velasco", "Ferran Terraza", "Jorge-Yamam Serrano"],
+        mood: ["câmera", "claustrofóbico", "contaminação"],
+        synopsis: "Uma repórter acompanha bombeiros em um prédio isolado por uma infecção brutal. A câmera registra cada andar rumo ao inferno.",
+        trailer: "KLizS5GFBQI",
+        calendar: "Especial câmera na mão",
+        accent: "#4cff93",
+        bg: "linear-gradient(145deg, #0d3c25, #050806 64%, #010201)",
+      },
+      {
+        id: "the-descent",
+        title: "Abismo do Medo",
+        original: "The Descent",
+        type: "Filme",
+        year: 2005,
+        duration: "1h 39min",
+        rating: 8.1,
+        age: "16+",
+        genres: ["Survival Horror", "Monstros", "Suspense"],
+        franchise: "The Descent",
+        director: "Neil Marshall",
+        cast: ["Shauna Macdonald", "Natalie Mendoza", "Alex Reid"],
+        mood: ["caverna", "claustrofobia", "monstros"],
+        synopsis: "Uma expedição em cavernas se transforma em pesadelo quando o grupo descobre criaturas famintas no escuro.",
+        trailer: "CSYg7Z1KS_I",
+        calendar: "Sessão sobrevivência",
+        accent: "#7c4dff",
+        bg: "linear-gradient(145deg, #24164c, #07050b 64%, #010102)",
+      },
+      {
+        id: "midsommar",
+        title: "Midsommar",
+        original: "Midsommar",
+        type: "Filme",
+        year: 2019,
+        duration: "2h 28min",
+        rating: 8.0,
+        age: "18+",
+        genres: ["Folk Horror", "Psicológico", "Culto"],
+        franchise: "A24",
+        director: "Ari Aster",
+        cast: ["Florence Pugh", "Jack Reynor", "Will Poulter"],
+        mood: ["culto", "luz do dia", "trauma"],
+        synopsis: "Um festival sueco banhado por sol revela tradições cada vez mais violentas e uma catarse emocional devastadora.",
+        trailer: "1Vnghdsjmd0",
+        calendar: "Terror à luz do dia",
+        accent: "#ffd166",
+        bg: "linear-gradient(145deg, #5d4d14, #171207 60%, #050403)",
+      },
+      {
+        id: "the-babadook",
+        title: "O Babadook",
+        original: "The Babadook",
+        type: "Filme",
+        year: 2014,
+        duration: "1h 34min",
+        rating: 7.8,
+        age: "14+",
+        genres: ["Psicológico", "Paranormal", "Drama"],
+        franchise: "Independente",
+        director: "Jennifer Kent",
+        cast: ["Essie Davis", "Noah Wiseman", "Hayley McElhinney"],
+        mood: ["luto", "monstro", "casa"],
+        synopsis: "Uma mãe exausta e seu filho encontram um livro infantil que parece libertar uma presença impossível de ignorar.",
+        trailer: "k5WQZzDRVtw",
+        calendar: "Noite de monstros interiores",
+        accent: "#9ea4ad",
+        bg: "linear-gradient(145deg, #353942, #09090b 62%, #020203)",
+      },
+      {
+        id: "sinister",
+        title: "A Entidade",
+        original: "Sinister",
+        type: "Filme",
+        year: 2012,
+        duration: "1h 50min",
+        rating: 7.6,
+        age: "16+",
+        genres: ["Paranormal", "Found Footage", "Mistério"],
+        franchise: "Sinister",
+        director: "Scott Derrickson",
+        cast: ["Ethan Hawke", "Juliet Rylance", "James Ransone"],
+        mood: ["fitas", "entidade", "investigação"],
+        synopsis: "Um escritor encontra filmes caseiros de assassinatos e percebe que a entidade por trás deles pode estar olhando de volta.",
+        trailer: "_kbQAJR9YWQ",
+        calendar: "Arquivo amaldiçoado",
+        accent: "#c18b44",
+        bg: "linear-gradient(145deg, #3e2b12, #0b0805 64%, #020201)",
+      },
+      {
+        id: "the-ring",
+        title: "O Chamado",
+        original: "The Ring",
+        type: "Filme",
+        year: 2002,
+        duration: "1h 55min",
+        rating: 7.7,
+        age: "14+",
+        genres: ["Paranormal", "Mistério", "Clássico"],
+        franchise: "The Ring",
+        director: "Gore Verbinski",
+        cast: ["Naomi Watts", "Martin Henderson", "Daveigh Chase"],
+        mood: ["maldição", "fita", "investigação"],
+        synopsis: "Uma fita amaldiçoada dá sete dias de vida a quem assiste. A investigação revela uma tragédia que ainda respira.",
+        trailer: "yzR2GY-ew8I",
+        calendar: "Sete dias de medo",
+        accent: "#5cc8ff",
+        bg: "linear-gradient(145deg, #12364a, #05090b 62%, #010202)",
+      },
+      {
+        id: "psycho",
+        title: "Psicose",
+        original: "Psycho",
+        type: "Filme",
+        year: 1960,
+        duration: "1h 49min",
+        rating: 8.7,
+        age: "14+",
+        genres: ["Thriller", "Psicológico", "Clássico"],
+        franchise: "Bates",
+        director: "Alfred Hitchcock",
+        cast: ["Anthony Perkins", "Janet Leigh", "Vera Miles"],
+        mood: ["hotel", "clássico", "mente"],
+        synopsis: "Uma fuga termina no Motel Bates, onde hospitalidade, culpa e identidade se misturam em uma das sombras mais famosas do cinema.",
+        trailer: "NG3-GlvKPcg",
+        calendar: "Clássicos eternos",
+        accent: "#d7d7d7",
+        bg: "linear-gradient(145deg, #3a3a3a, #090909 62%, #000)",
+      },
+      {
+        id: "alien",
+        title: "Alien, o Oitavo Passageiro",
+        original: "Alien",
+        type: "Filme",
+        year: 1979,
+        duration: "1h 57min",
+        rating: 8.8,
+        age: "14+",
+        genres: ["Survival Horror", "Sci-Fi", "Monstros"],
+        franchise: "Alien",
+        director: "Ridley Scott",
+        cast: ["Sigourney Weaver", "Tom Skerritt", "Ian Holm"],
+        mood: ["espaço", "monstro", "isolamento"],
+        synopsis: "No silêncio do espaço, uma tripulação descobre que existe algo a bordo. E ele é o predador perfeito.",
+        trailer: "LjLamj-b0I8",
+        calendar: "Horror espacial",
+        accent: "#8affd2",
+        bg: "linear-gradient(145deg, #12382f, #030807 64%, #000)",
+      },
+      {
+        id: "the-thing",
+        title: "O Enigma de Outro Mundo",
+        original: "The Thing",
+        type: "Filme",
+        year: 1982,
+        duration: "1h 49min",
+        rating: 8.6,
+        age: "16+",
+        genres: ["Survival Horror", "Monstros", "Paranoia"],
+        franchise: "The Thing",
+        director: "John Carpenter",
+        cast: ["Kurt Russell", "Keith David", "Wilford Brimley"],
+        mood: ["neve", "paranoia", "criatura"],
+        synopsis: "Em uma base isolada na Antártida, uma criatura capaz de imitar qualquer pessoa transforma confiança em sentença de morte.",
+        trailer: "5ftmr17M-a4",
+        calendar: "Inverno paranoico",
+        accent: "#b8ecff",
+        bg: "linear-gradient(145deg, #234553, #06090b 64%, #010202)",
+      },
+      {
+        id: "haunting-hill-house",
+        title: "A Maldição da Residência Hill",
+        original: "The Haunting of Hill House",
+        type: "Série",
+        year: 2018,
+        duration: "1 temporada",
+        rating: 8.6,
+        age: "16+",
+        genres: ["Série", "Paranormal", "Drama"],
+        franchise: "Mike Flanagan",
+        director: "Mike Flanagan",
+        cast: ["Victoria Pedretti", "Oliver Jackson-Cohen", "Carla Gugino"],
+        mood: ["família", "fantasmas", "melancólico"],
+        synopsis: "Irmãos traumatizados por uma casa assombrada retornam às memórias que moldaram suas vidas e suas perdas.",
+        trailer: "3eqxXqJDmcY",
+        calendar: "Episódios para maratonar",
+        accent: "#7f9cff",
+        bg: "linear-gradient(145deg, #182448, #08080e 64%, #020203)",
+      },
+      {
+        id: "midnight-mass",
+        title: "Missa da Meia-Noite",
+        original: "Midnight Mass",
+        type: "Série",
+        year: 2021,
+        duration: "1 temporada",
+        rating: 8.4,
+        age: "16+",
+        genres: ["Série", "Paranormal", "Folk Horror"],
+        franchise: "Mike Flanagan",
+        director: "Mike Flanagan",
+        cast: ["Hamish Linklater", "Kate Siegel", "Zach Gilford"],
+        mood: ["fé", "ilha", "milagre"],
+        synopsis: "Uma pequena ilha recebe um novo padre e uma sequência de milagres que talvez sejam outra coisa usando linguagem sagrada.",
+        trailer: "yvuAWVzP6wI",
+        calendar: "Série com episódios novos no radar",
+        accent: "#d1a452",
+        bg: "linear-gradient(145deg, #4a3210, #0b0804 64%, #030201)",
+      },
+      {
+        id: "marianne",
+        title: "Marianne",
+        original: "Marianne",
+        type: "Série",
+        year: 2019,
+        duration: "1 temporada",
+        rating: 7.9,
+        age: "16+",
+        genres: ["Série", "Paranormal", "Bruxaria"],
+        franchise: "Independente",
+        director: "Samuel Bodin",
+        cast: ["Victoire Du Bois", "Lucie Boujenah", "Tiphaine Daviot"],
+        mood: ["bruxa", "francês", "maldição"],
+        synopsis: "Uma escritora de terror percebe que a entidade dos seus livros pode não ter sido inventada.",
+        trailer: "q99hib0zS2M",
+        calendar: "Série assustadora da semana",
+        accent: "#6a70ff",
+        bg: "linear-gradient(145deg, #201953, #080711 64%, #020204)",
+      },
+      {
+        id: "yellowjackets",
+        title: "Yellowjackets",
+        original: "Yellowjackets",
+        type: "Série",
+        year: 2021,
+        duration: "3 temporadas",
+        rating: 8.0,
+        age: "16+",
+        genres: ["Série", "Survival Horror", "Thriller"],
+        franchise: "Yellowjackets",
+        director: "Ashley Lyle, Bart Nickerson",
+        cast: ["Melanie Lynskey", "Sophie Thatcher", "Christina Ricci"],
+        mood: ["sobrevivência", "culto", "passado"],
+        synopsis: "Um time de futebol feminino sobrevive a uma queda de avião. Décadas depois, o que aconteceu na floresta ainda cobra preço.",
+        trailer: "mX22D65TqAs",
+        calendar: "Episódios novos em breve",
+        accent: "#f4c542",
+        bg: "linear-gradient(145deg, #4f3f12, #0a0904 64%, #020201)",
+      },
+      {
+        id: "it-follows",
+        title: "Corrente do Mal",
+        original: "It Follows",
+        type: "Filme",
+        year: 2014,
+        duration: "1h 40min",
+        rating: 7.8,
+        age: "16+",
+        genres: ["Paranormal", "Psicológico", "Suspense"],
+        franchise: "Independente",
+        director: "David Robert Mitchell",
+        cast: ["Maika Monroe", "Keir Gilchrist", "Olivia Luccardi"],
+        mood: ["maldição", "perseguição", "sintetizador"],
+        synopsis: "Uma presença lenta e implacável passa de pessoa para pessoa, transformando qualquer desconhecido em ameaça.",
+        trailer: "HkZYbOH0ujw",
+        calendar: "Perseguições sobrenaturais",
+        accent: "#ff5fa2",
+        bg: "linear-gradient(145deg, #4c1630, #09050b 64%, #020102)",
+      },
+    ];
+
+    const calendarItems = [
+      { date: "Esta semana", title: "Estreias da semana", text: "Use a busca com TMDB para puxar próximos lançamentos reais quando inserir sua chave de API." },
+      { date: "Em breve", title: "Séries com episódios novos", text: "Yellowjackets, antologias sombrias e minisséries paranormais ficam destacadas aqui." },
+      { date: "Futuro", title: "Filmes futuros", text: "O calendário já está pronto para receber datas vindas da API e cache local." },
+      { date: "Maratona", title: "Noite Found Footage", text: "Blair Witch, [REC], fitas malditas e terror de câmera tremida." },
+    ];
+
+    function defaultUserState(nickname = "Usuário") {
+      return {
+        nickname,
+        lists: {
+          favorites: [],
+          watchlist: [],
+          watching: [],
+          finished: [],
+          disturbing: [],
+          deaths: [],
+          traumatic: [],
+        },
+        continue: {},
+        recent: [],
+        genreHits: {},
+        searchHistory: [],
+        ranking: [],
+      };
+    }
+
+    function loadAuth() {
+      try {
+        const auth = JSON.parse(localStorage.getItem(AUTH_KEY)) || {};
+        return { users: {}, ...auth };
+      } catch {
+        return { users: {} };
+      }
+    }
+
+    function saveAuth(auth) {
+      localStorage.setItem(AUTH_KEY, JSON.stringify(auth));
+    }
+
+    function hasStoredUsers() {
+      return Object.keys(loadAuth().users || {}).length > 0;
+    }
+
+    function loadSession() {
+      try {
+        const session = JSON.parse(localStorage.getItem(SESSION_KEY));
+        if (!session?.user) return null;
+        const auth = loadAuth();
+        return auth.users?.[session.user] ? session : null;
+      } catch {
+        return null;
+      }
+    }
+
+    function saveSession(session) {
+      if (session) localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+      else localStorage.removeItem(SESSION_KEY);
+    }
+
+    function cleanUsername(value) {
+      return normalize(value).replace(/[^a-z0-9._-]/g, "").slice(0, 32);
+    }
+
+    function userStorageKey(username) {
+      return `${STORAGE_PREFIX}${username}`;
+    }
+
+    function loadState(username) {
+      const authUser = username ? loadAuth().users?.[username] : null;
+      const base = defaultUserState(authUser?.nickname || "Usuário");
+      if (!username) return base;
+      try {
+        const saved = JSON.parse(localStorage.getItem(userStorageKey(username)) || "null");
+        if (saved) return { ...base, ...saved, nickname: authUser?.nickname || saved.nickname || base.nickname };
+        const legacy = JSON.parse(localStorage.getItem(LEGACY_STORAGE_KEY) || "null");
+        if (legacy) return { ...base, ...legacy, nickname: authUser?.nickname || legacy.nickname || base.nickname };
+        return base;
+      } catch {
+        return base;
+      }
+    }
+
+    function saveState() {
+      if (!state.auth?.user) return;
+      state.user.nickname = state.auth.nickname || state.user.nickname || "Usuário";
+      localStorage.setItem(userStorageKey(state.auth.user), JSON.stringify(state.user));
+    }
+
+    function loadCache() {
+      try {
+        return JSON.parse(localStorage.getItem(CACHE_KEY)) || {};
+      } catch {
+        return {};
+      }
+    }
+
+    function saveCache() {
+      localStorage.setItem(CACHE_KEY, JSON.stringify(state.cache));
+    }
+
+    function bytesToBase64(bytes) {
+      return btoa(String.fromCharCode(...new Uint8Array(bytes)));
+    }
+
+    function base64ToBytes(base64) {
+      return Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+    }
+
+    function randomSalt() {
+      const salt = new Uint8Array(16);
+      crypto.getRandomValues(salt);
+      return bytesToBase64(salt);
+    }
+
+    async function hashPassword(password, salt) {
+      if (!crypto?.subtle) {
+        return btoa(unescape(encodeURIComponent(password + salt)));
+      }
+      const encoder = new TextEncoder();
+      const key = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, ["deriveBits"]);
+      const bits = await crypto.subtle.deriveBits(
+        { name: "PBKDF2", salt: base64ToBytes(salt), iterations: 120000, hash: "SHA-256" },
+        key,
+        256
+      );
+      return bytesToBase64(bits);
+    }
+
+    function setAuthError(message = "") {
+      $("#auth-error").textContent = message;
+    }
+
+    async function createLocalAccount() {
+      const nickname = $("#auth-nickname").value.trim() || "Usuário";
+      const username = cleanUsername($("#auth-username").value);
+      const password = $("#auth-password").value;
+      if (nickname.length < 2) throw new Error("Informe um nickname com pelo menos 2 letras.");
+      if (username.length < 3) throw new Error("O usuário precisa ter pelo menos 3 caracteres.");
+      if (password.length < 6) throw new Error("A senha precisa ter pelo menos 6 caracteres.");
+
+      const auth = loadAuth();
+      if (auth.users[username]) throw new Error("Esse usuário já existe neste aparelho.");
+      const salt = randomSalt();
+      const passwordHash = await hashPassword(password, salt);
+      auth.users[username] = {
+        username,
+        nickname,
+        salt,
+        passwordHash,
+        createdAt: new Date().toISOString(),
+      };
+      saveAuth(auth);
+      state.auth = { user: username, nickname };
+      saveSession(state.auth);
+      state.user = loadState(username);
+      state.user.nickname = nickname;
+      seedDemoProgress();
+      saveState();
+    }
+
+    async function loginLocalAccount() {
+      const username = cleanUsername($("#auth-username").value);
+      const password = $("#auth-password").value;
+      const authUser = loadAuth().users?.[username];
+      if (!authUser) throw new Error("Usuário não encontrado neste aparelho.");
+      const passwordHash = await hashPassword(password, authUser.salt);
+      if (passwordHash !== authUser.passwordHash) throw new Error("Senha incorreta.");
+      state.auth = { user: username, nickname: authUser.nickname };
+      saveSession(state.auth);
+      state.user = loadState(username);
+      seedDemoProgress();
+    }
+
+    async function handleAuthSubmit() {
+      const button = $("#auth-submit");
+      setAuthError("");
+      button.disabled = true;
+      button.textContent = state.authMode === "create" ? "Criando..." : "Entrando...";
+      try {
+        if (state.authMode === "create") await createLocalAccount();
+        else await loginLocalAccount();
+        $("#auth-password").value = "";
+        renderAuth();
+        renderAll();
+        toast(state.authMode === "create" ? "Conta criada neste aparelho" : "Login realizado");
+      } catch (error) {
+        setAuthError(error.message || "Não foi possível entrar.");
+      } finally {
+        button.disabled = false;
+        renderAuth();
+      }
+    }
+
+    function logoutLocalAccount() {
+      saveSession(null);
+      state.auth = null;
+      state.authMode = hasStoredUsers() ? "login" : "create";
+      state.user = defaultUserState();
+      closeDetail();
+      renderAuth();
+      toast("Sessão encerrada");
+    }
+
+    function renderAuth() {
+      const isLogged = Boolean(state.auth?.user);
+      document.body.classList.toggle("authenticated", isLogged);
+      $("#auth-screen").classList.toggle("open", !isLogged);
+      $("#user-chip").textContent = isLogged ? `☠ ${state.auth.nickname || state.auth.user}` : "☠ Perfil";
+      $("#logout-btn").style.display = isLogged ? "grid" : "none";
+      if (isLogged) return;
+
+      const hasUsers = hasStoredUsers();
+      if (!hasUsers) state.authMode = "create";
+      const creating = state.authMode === "create";
+      $("#auth-title").textContent = creating ? "Criar conta local" : "Entrar";
+      $("#auth-copy").textContent = creating
+        ? "Crie seu acesso para proteger listas, histórico e recomendações salvas neste celular."
+        : "Entre para liberar suas listas, histórico e recomendações neste aparelho.";
+      $("#nickname-field").style.display = creating ? "grid" : "none";
+      $("#auth-submit").textContent = creating ? "Criar conta" : "Entrar";
+      $$("[data-auth-mode]").forEach((button) => {
+        button.classList.toggle("active", button.dataset.authMode === state.authMode);
+        button.disabled = !hasUsers && button.dataset.authMode === "login";
+      });
+    }
+
+    function toast(message) {
+      const node = $("#toast");
+      node.textContent = message;
+      node.classList.add("show");
+      clearTimeout(toast._timer);
+      toast._timer = setTimeout(() => node.classList.remove("show"), 1700);
+    }
+
+    function initials(title) {
+      return title.split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]).join("").toUpperCase();
+    }
+
+    function itemById(id) {
+      return state.data.find((item) => item.id === id);
+    }
+
+    function itemStyle(item) {
+      return `--accent:${item.accent};--poster-bg:${item.bg};--hero-bg:${item.bg}`;
+    }
+
+    function youtubeThumb(item, quality = "hqdefault") {
+      return item.trailer ? `https://i.ytimg.com/vi/${item.trailer}/${quality}.jpg` : "";
+    }
+
+    function posterUrl(item) {
+      return item.posterPath || youtubeThumb(item, "hqdefault");
+    }
+
+    function backdropUrl(item) {
+      return item.backdropPath || youtubeThumb(item, "hqdefault");
+    }
+
+    function posterBackground(item, shade = "rgba(5,4,6,0.76)") {
+      const src = posterUrl(item);
+      return src ? `background-image:linear-gradient(0deg, rgba(5,4,6,0.88), ${shade}), url('${src}');background-size:cover;background-position:center;` : "";
+    }
+
+    function backdropBackground(item, shade = "rgba(5,4,6,0.34)") {
+      const src = backdropUrl(item);
+      return src ? `background-image:linear-gradient(0deg, rgba(5,4,6,0.9), ${shade}), url('${src}');background-size:cover;background-position:center;` : "";
+    }
+
+    function haptic(ms = 16) {
+      if (navigator.vibrate) navigator.vibrate(ms);
+    }
+
+    function normalize(text) {
+      return String(text || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    }
+
+    function uniqueGenres() {
+      return [...new Set(state.data.flatMap((item) => item.genres))].sort();
+    }
+
+    function trackGenre(item) {
+      item.genres.forEach((genre) => {
+        state.user.genreHits[genre] = (state.user.genreHits[genre] || 0) + 1;
+      });
+      saveState();
+    }
+
+    function addRecent(id) {
+      state.user.recent = [id, ...state.user.recent.filter((entry) => entry !== id)].slice(0, 12);
+      saveState();
+    }
+
+    function setContinue(id, patch = {}) {
+      state.user.continue[id] = {
+        id,
+        season: patch.season || state.user.continue[id]?.season || 1,
+        episode: patch.episode || state.user.continue[id]?.episode || 1,
+        progress: patch.progress ?? state.user.continue[id]?.progress ?? 18,
+        lastAccess: new Date().toISOString(),
+      };
+      if (!state.user.lists.watching.includes(id)) state.user.lists.watching.push(id);
+      saveState();
+    }
+
+    function toggleList(listKey, id) {
+      const list = state.user.lists[listKey];
+      const index = list.indexOf(id);
+      if (index >= 0) {
+        list.splice(index, 1);
+        toast(`${listLabels[listKey]} removido`);
+      } else {
+        list.push(id);
+        toast(`Adicionado em ${listLabels[listKey]}`);
+      }
+      if (listKey === "watching") setContinue(id);
+      if (listKey === "finished") delete state.user.continue[id];
+      saveState();
+      renderAll();
+    }
+
+    async function getTmdbTrending() {
+      if (!TMDB_API_KEY) return [];
+      const cacheName = "tmdb-horror-trending";
+      const cached = state.cache[cacheName];
+      const maxAge = 1000 * 60 * 60 * 12;
+      if (cached && Date.now() - cached.at < maxAge) return cached.data;
+
+      try {
+        const url = `${TMDB_BASE}/discover/movie?api_key=${TMDB_API_KEY}&language=pt-BR&sort_by=popularity.desc&with_genres=27,53&include_adult=false&page=1`;
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("TMDB indisponível");
+        const json = await response.json();
+        const data = (json.results || []).slice(0, 12).map((movie) => ({
+          id: `tmdb-${movie.id}`,
+          title: movie.title,
+          original: movie.original_title,
+          type: "Filme",
+          year: Number((movie.release_date || "0").slice(0, 4)) || "Novo",
+          duration: "TMDB",
+          rating: Number(movie.vote_average || 0).toFixed(1),
+          age: "Verificar",
+          genres: ["Terror", "Thriller"],
+          franchise: "TMDB",
+          director: "Consultar detalhes",
+          cast: ["Elenco via API"],
+          mood: ["api", "popular"],
+          synopsis: movie.overview || "Sinopse ainda não disponível em português.",
+          trailer: "",
+          calendar: movie.release_date || "Data a confirmar",
+          accent: "#d80f22",
+          bg: `linear-gradient(145deg, #3b0b12, #09070a 62%, #000)`,
+          posterPath: movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : "",
+          backdropPath: movie.backdrop_path ? `https://image.tmdb.org/t/p/w1280${movie.backdrop_path}` : "",
+        }));
+        state.cache[cacheName] = { at: Date.now(), data };
+        saveCache();
+        return data;
+      } catch (error) {
+        console.warn(error);
+        return [];
+      }
+    }
+
+    function card(item, wide = false) {
+      return `
+        <article class="card" data-open="${item.id}" style="${itemStyle(item)};${wide ? "min-height:250px" : ""}">
+          <div class="poster-art" data-initials="${initials(item.title)}" style="${posterBackground(item, "rgba(5,4,6,0.18)")}"></div>
+          <div class="type-badge">${item.type}</div>
+          <div class="score">★ ${item.rating}</div>
+          <div class="card-body">
+            <h4>${item.title}</h4>
+            <div class="meta">
+              <span>${item.year}</span>
+              <span>•</span>
+              <span>${item.genres[0]}</span>
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+    function listCard(item, progress) {
+      return `
+        <article class="list-card" data-open="${item.id}" style="${itemStyle(item)}">
+          <div class="mini-poster" style="${posterBackground(item, "rgba(5,4,6,0.2)")}"></div>
+          <div>
+            <div class="meta"><span>${item.type}</span><span>•</span><span>${item.year}</span><span>•</span><span>★ ${item.rating}</span></div>
+            <h4>${item.title}</h4>
+            ${progress ? `<div class="tag blood">T${progress.season} E${progress.episode} • ${progress.progress}%</div>` : `<p>${item.synopsis.slice(0, 118)}...</p>`}
+          </div>
+        </article>
+      `;
+    }
+
+    function section(title, items, subtitle = "") {
+      if (!items.length) return "";
+      return `
+        <section class="section">
+          <div class="section-head">
+            <div>
+              <h3>${title}</h3>
+              ${subtitle ? `<small>${subtitle}</small>` : ""}
+            </div>
+          </div>
+          <div class="row">${items.map((item) => card(item)).join("")}</div>
+        </section>
+      `;
+    }
+
+    function byGenre(name) {
+      return state.data.filter((item) => item.genres.some((genre) => normalize(genre).includes(normalize(name))));
+    }
+
+    function recommended() {
+      const recent = state.user.recent.map(itemById).filter(Boolean);
+      const favoriteGenres = Object.entries(state.user.genreHits).sort((a, b) => b[1] - a[1]).map(([genre]) => genre);
+      const ids = new Set([...state.user.lists.favorites, ...state.user.recent]);
+      const sourceGenres = favoriteGenres.length ? favoriteGenres : recent.flatMap((item) => item.genres);
+      const recs = state.data
+        .filter((item) => !ids.has(item.id))
+        .map((item) => ({
+          item,
+          score: item.genres.reduce((sum, genre) => sum + (sourceGenres.includes(genre) ? 4 : 0), 0) + item.rating,
+        }))
+        .sort((a, b) => b.score - a.score)
+        .map((entry) => entry.item);
+      return recs.length ? recs.slice(0, 12) : state.data.slice().sort((a, b) => b.rating - a.rating).slice(0, 12);
+    }
+
+    function renderHero() {
+      const heroItem = state.data.find((item) => item.id === "hereditary") || state.data[0];
+      const hero = $("#hero");
+      hero.style.cssText = `${itemStyle(heroItem)};${backdropBackground(heroItem, "rgba(5,4,6,0.18)")}`;
+      hero.innerHTML = `
+        <div class="hero-content">
+          <span class="eyebrow">Em alta no DarkFrame</span>
+          <h2>${heroItem.title}</h2>
+          <div class="meta">
+            <span class="tag blood">★ ${heroItem.rating}</span>
+            <span class="tag">${heroItem.year}</span>
+            <span class="tag">${heroItem.age}</span>
+            <span class="tag">${heroItem.duration}</span>
+            <span class="tag">${heroItem.genres.slice(0, 2).join(" • ")}</span>
+          </div>
+          <p>${heroItem.synopsis}</p>
+          <div class="actions">
+            <button class="pill-btn primary" data-open="${heroItem.id}">▶ Ver detalhes</button>
+            <button class="pill-btn" data-list="watchlist" data-id="${heroItem.id}">＋ Quero assistir</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderHome() {
+      renderHero();
+      $("#quote-line").textContent = quotes[Math.floor(Math.random() * quotes.length)];
+      const recentItems = state.user.recent.map(itemById).filter(Boolean);
+      const continueItems = Object.values(state.user.continue).map((entry) => itemById(entry.id)).filter(Boolean);
+      $("#home-sections").innerHTML = [
+        section("Em alta", state.data.slice().sort((a, b) => b.rating - a.rating).slice(0, 12), "o que mais assombra a comunidade"),
+        section("Lançamentos", state.data.filter((item) => item.year >= 2018).slice(0, 12), "terror moderno e premium"),
+        section("Terror psicológico", byGenre("Psicológico").slice(0, 10)),
+        section("Paranormal", byGenre("Paranormal").slice(0, 10)),
+        section("Slasher", byGenre("Slasher").slice(0, 10)),
+        section("Found Footage", byGenre("Found Footage").slice(0, 10)),
+        section("Survival Horror", byGenre("Survival Horror").slice(0, 10)),
+        section("Clássicos do terror", byGenre("Clássico").slice(0, 10)),
+        section("Séries assustadoras", state.data.filter((item) => item.type === "Série")),
+        section("Recomendados", recommended()),
+        section("Últimos vistos", recentItems),
+        section("Continue assistindo", continueItems),
+      ].join("");
+    }
+
+    function renderSearch() {
+      const genreFilter = $("#genre-filter");
+      if (!genreFilter.dataset.ready) {
+        genreFilter.innerHTML = `<option value="">Todos os gêneros</option>${uniqueGenres().map((genre) => `<option value="${genre}">${genre}</option>`).join("")}`;
+        genreFilter.dataset.ready = "true";
+      }
+      renderHistory();
+      runSearch();
+    }
+
+    function renderHistory() {
+      const history = $("#search-history");
+      history.innerHTML = state.user.searchHistory.length
+        ? `${state.user.searchHistory.map((term) => `<button data-history="${term}">${term}</button>`).join("")}<button data-clear-history>Limpar histórico</button>`
+        : `<span class="tag">Sem histórico ainda</span>`;
+    }
+
+    function searchMatches(item, term, genre, year) {
+      const haystack = normalize([
+        item.title,
+        item.original,
+        item.director,
+        item.year,
+        item.franchise,
+        item.genres.join(" "),
+        item.cast.join(" "),
+        item.mood.join(" "),
+      ].join(" "));
+      return (!term || haystack.includes(normalize(term)))
+        && (!genre || item.genres.includes(genre))
+        && (!year || String(item.year).includes(String(year)));
+    }
+
+    function runSearch(save = false) {
+      const term = $("#search-input").value.trim();
+      const genre = $("#genre-filter").value;
+      const year = $("#year-filter").value.trim();
+      const loading = $("#search-loading");
+      const results = $("#search-results");
+      loading.hidden = false;
+      results.innerHTML = "";
+
+      clearTimeout(state.searchTimer);
+      state.searchTimer = setTimeout(() => {
+        const found = state.data.filter((item) => searchMatches(item, term, genre, year));
+        loading.hidden = true;
+        if (save && term) {
+          state.user.searchHistory = [term, ...state.user.searchHistory.filter((entry) => entry !== term)].slice(0, 8);
+          saveState();
+          renderHistory();
+        }
+        results.innerHTML = found.length
+          ? found.map((item) => card(item, true)).join("")
+          : `<div class="empty" style="grid-column:1/-1">Nada encontrado nas sombras. Tente outro nome, ator, diretor, ano, gênero ou franquia.</div>`;
+      }, 380);
+    }
+
+    function renderLists() {
+      $("#list-tabs").innerHTML = Object.entries(listLabels)
+        .map(([key, label]) => `<button class="tab ${state.activeList === key ? "active" : ""}" data-list-tab="${key}">${label}</button>`)
+        .join("");
+      const ids = state.user.lists[state.activeList] || [];
+      const items = ids.map(itemById).filter(Boolean);
+      $("#list-content").innerHTML = items.length
+        ? items.map((item) => listCard(item, state.user.continue[item.id])).join("")
+        : `<div class="empty">Lista vazia. Abra um título e salve em "${listLabels[state.activeList]}".</div>`;
+    }
+
+    function renderRankings() {
+      const groups = [
+        ["Mais assustadores", state.data.slice().sort((a, b) => b.rating - a.rating)],
+        ["Mais perturbadores", state.data.filter((item) => item.mood.includes("trauma") || item.mood.includes("perturbador") || item.genres.includes("Psicológico"))],
+        ["Melhores finais", ["the-thing", "psycho", "get-out", "the-witch", "hereditary"].map(itemById).filter(Boolean)],
+        ["Melhores monstros", byGenre("Monstros")],
+        ["Melhores slashers", byGenre("Slasher")],
+        ["Melhores terror psicológico", byGenre("Psicológico")],
+        ["Melhores found footage", byGenre("Found Footage")],
+      ];
+      $("#rankings-content").innerHTML = groups.map(([title, items]) => `
+        <section class="section">
+          <div class="section-head"><h3>${title}</h3></div>
+          <div class="ranking-list">
+            ${items.slice(0, 7).map((item, index) => `
+              <article class="ranking-item" data-open="${item.id}">
+                <div class="rank-num">${index + 1}</div>
+                <div>
+                  <strong>${item.title}</strong>
+                  <div class="meta"><span>${item.year}</span><span>•</span><span>${item.genres[0]}</span></div>
+                </div>
+                <span>★ ${item.rating}</span>
+              </article>
+            `).join("")}
+          </div>
+        </section>
+      `).join("");
+    }
+
+    async function getTmdbUpcoming() {
+      try {
+        const res = await fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_API_KEY}&with_genres=27&primary_release_date.gte=${new Date().toISOString().split('T')[0]}&sort_by=primary_release_date.asc`);
+        const data = await res.json();
+        return data.results.slice(0, 8).map(m => ({
+          date: new Date(m.release_date).toLocaleDateString('pt-BR', {month:'short', day:'numeric'}),
+          title: m.title,
+          text: `Cinema • Estreia breve`,
+          id: null
+        }));
+      } catch { return []; }
+    }
+
+    async function renderCalendar() {
+      const dynamic = state.data.filter((item) => item.year >= 2019).slice(0, 8).map((item) => ({
+        date: item.calendar,
+        title: item.title,
+        text: `${item.type} • ${item.genres.join(", ")} • ${item.duration}`,
+        id: item.id,
+      }));
+      
+      const render = (items) => {
+        $("#calendar-content").innerHTML = items.map((event) => {
+          if (event.image) {
+            return `
+              <article class="calendar-item" ${event.id ? `data-open="${event.id}"` : ""} style="background-image: url('${event.image}'); background-size: cover; background-position: center; position: relative; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; min-height: 160px; display: flex; flex-direction: column; justify-content: flex-end; padding: 16px; cursor: pointer;">
+                <div style="position: absolute; inset: 0; background: linear-gradient(0deg, rgba(5,4,6,0.95) 0%, rgba(5,4,6,0.5) 70%, transparent 100%); z-index: 1;"></div>
+                <div style="position: relative; z-index: 2;">
+                  <span class="date-chip" style="background: var(--primary); color: #fff; margin-bottom: 8px; display: inline-flex; align-items: center; gap: 4px; border: none; font-weight: 800;">\u2620 ${event.date}</span>
+                  <strong style="font-size: 19px; display: block; margin-bottom: 6px; text-shadow: 0 2px 4px rgba(0,0,0,0.8);">${event.title}</strong>
+                  <span style="color:#d8d8d8; font-size: 13px; line-height:1.4; text-shadow: 0 1px 2px rgba(0,0,0,0.8); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${event.text}</span>
+                </div>
+              </article>
+            `;
+          }
+          return `
+            <article class="calendar-item" ${event.id ? `data-open="${event.id}"` : ""}>
+              <span class="date-chip">\u2620 ${event.date}</span>
+              <strong>${event.title}</strong>
+              <span style="color:var(--muted);line-height:1.45">${event.text}</span>
+            </article>
+          `;
+        }).join("");
+      };
+
+      // Render default items immediately
+      render([...calendarItems, ...dynamic]);
+
+      // If TMDB API is active, fetch real upcoming horror movies
+      if (typeof TMDB_API_KEY !== 'undefined' && TMDB_API_KEY) {
+        const upcoming = await getTmdbUpcoming();
+        if (upcoming && upcoming.length > 0) {
+          render([...upcoming, ...dynamic]);
+        }
+      }
+    }
+
+    function renderFeed() {
+      $("#feed").innerHTML = state.data.slice(0, 12).map((item) => `
+        <article class="reel" data-word="${item.original}" style="${itemStyle(item)}">
+          <div style="position:absolute;inset:0;opacity:.58;${backdropBackground(item, "rgba(0,0,0,0.22)")}"></div>
+          <div class="reel-content">
+            <span class="eyebrow">${item.genres[0]} • Dark Reel</span>
+            <h2 style="margin:12px 0 8px;font-size:clamp(34px,12vw,74px);line-height:.88">${item.title}</h2>
+            <p style="color:#d6d1d8;line-height:1.52">${item.synopsis.slice(0, 160)}...</p>
+            <div class="actions">
+              <button class="pill-btn primary" data-open="${item.id}">Abrir</button>
+              <button class="pill-btn" data-list="watchlist" data-id="${item.id}">Salvar</button>
+            </div>
+          </div>
+        </article>
+      `).join("");
+    }
+
+    function favoriteGenre() {
+      return Object.entries(state.user.genreHits).sort((a, b) => b[1] - a[1])[0]?.[0] || "Ainda desconhecido";
+    }
+
+    function renderProfile() {
+      const totalRecent = state.user.recent.length;
+      $("#profile-content").innerHTML = `
+        <section class="profile-card">
+          <div class="profile-top">
+            <div class="avatar">☠</div>
+            <div>
+              <h3 style="margin:0;font-size:28px">${state.user.nickname}</h3>
+              <span class="tag blood">Membro DarkFrame</span>
+            </div>
+          </div>
+          <div class="stat-grid">
+            <div class="stat"><strong>${state.user.lists.favorites.length}</strong><span>favoritos</span></div>
+            <div class="stat"><strong>${state.user.lists.watchlist.length}</strong><span>quero assistir</span></div>
+            <div class="stat"><strong>${state.user.lists.watching.length}</strong><span>assistindo</span></div>
+            <div class="stat"><strong>${state.user.lists.finished.length}</strong><span>finalizados</span></div>
+            <div class="stat"><strong>${totalRecent}</strong><span>últimos vistos</span></div>
+            <div class="stat"><strong style="font-size:17px">${favoriteGenre()}</strong><span>gênero favorito</span></div>
+          </div>
+          <div class="glass-panel" style="box-shadow:none">
+            <strong>Ranking pessoal</strong>
+            <div class="ranking-list" style="margin-top:10px">
+              ${state.user.lists.favorites.map(itemById).filter(Boolean).slice(0, 5).map((item, index) => `
+                <div class="ranking-item" data-open="${item.id}">
+                  <div class="rank-num">${index + 1}</div><strong>${item.title}</strong><span>★ ${item.rating}</span>
+                </div>
+              `).join("") || `<div class="empty">Favorite títulos para montar seu ranking.</div>`}
+            </div>
+          </div>
+        </section>
+      `;
+      renderQuiz();
+    }
+
+    function renderQuiz(resultItems = null) {
+      const quiz = $("#quiz-card");
+      if (resultItems) {
+        quiz.innerHTML = `
+          <span class="eyebrow">Resultado do quiz</span>
+          <h3 style="margin:0;font-size:28px">Seu medo ideal combina com:</h3>
+          <div class="grid">${resultItems.map((item) => card(item, true)).join("")}</div>
+          <button class="pill-btn primary" id="restart-quiz">Refazer quiz</button>
+        `;
+        return;
+      }
+      const q = quizQuestions[state.quizIndex];
+      quiz.innerHTML = `
+        <span class="eyebrow">Quiz</span>
+        <h3 style="margin:0;font-size:28px">Qual filme de terror combina com você?</h3>
+        <p style="margin:0;color:var(--muted)">Pergunta ${state.quizIndex + 1} de ${quizQuestions.length}</p>
+        <h4 style="font-size:20px;margin:0">${q.q}</h4>
+        <div class="quiz-options">
+          ${q.options.map((option, index) => `<button data-quiz="${index}">${option.label}</button>`).join("")}
+        </div>
+      `;
+    }
+
+    function finishQuiz() {
+      const tags = state.quizAnswers.flatMap((answer) => answer.tags);
+      const picks = state.data
+        .map((item) => ({
+          item,
+          score: item.genres.reduce((sum, genre) => sum + (tags.includes(genre) ? 4 : 0), 0)
+            + item.mood.reduce((sum, mood) => sum + (tags.some((tag) => normalize(mood).includes(normalize(tag))) ? 1 : 0), 0)
+            + item.rating,
+        }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 4)
+        .map((entry) => entry.item);
+      renderQuiz(picks);
+    }
+
+    function detailButtons(item) {
+      return Object.entries(listLabels).slice(0, 4).map(([key, label]) => {
+        const active = state.user.lists[key].includes(item.id);
+        return `<button class="action-btn ${active ? "active" : ""}" data-list="${key}" data-id="${item.id}">${active ? "✓" : "＋"} ${label}</button>`;
+      }).join("");
+    }
+
+    function youtubeWatchUrl(item) {
+      if (item.trailer) return `https://www.youtube.com/watch?v=${encodeURIComponent(item.trailer)}`;
+      return `https://www.youtube.com/results?search_query=${encodeURIComponent(`${item.original} trailer horror`)}`;
+    }
+
+    function trailerSrc(item) {
+      if (!item.trailer) return "";
+      const origin = encodeURIComponent(location.origin || "http://127.0.0.1");
+      const referrer = encodeURIComponent(location.href);
+      return `https://www.youtube.com/embed/${encodeURIComponent(item.trailer)}?rel=0&modestbranding=1&playsinline=1&enablejsapi=1&origin=${origin}&widget_referrer=${referrer}`;
+    }
+
+    function trailerCard(item) {
+      const thumb = backdropUrl(item) || posterUrl(item);
+      const action = item.trailer
+        ? `<button class="trailer-play" data-play-trailer="${item.id}" aria-label="Reproduzir trailer de ${item.title}">▶</button>`
+        : `<a class="pill-btn primary" href="${youtubeWatchUrl(item)}" target="_blank" rel="noopener noreferrer">Buscar trailer</a>`;
+      return `
+        <div class="trailer-box" data-trailer-box="${item.id}">
+          <div class="trailer-poster" style="--poster:url('${thumb}')">
+            <div class="trailer-content">
+              ${action}
+              <strong>Trailer de ${item.title}</strong>
+              <small>Toque para carregar o player dentro do app. Se o YouTube bloquear o embed neste aparelho, use o botão de backup.</small>
+              <div class="trailer-fallback">
+                <a class="pill-btn" href="${youtubeWatchUrl(item)}" target="_blank" rel="noopener noreferrer">Abrir no YouTube</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function playTrailer(id) {
+      const item = itemById(id);
+      const box = document.querySelector(`[data-trailer-box="${id}"]`);
+      if (!item || !box) return;
+      if (!item.trailer) {
+        window.open(youtubeWatchUrl(item), "_blank", "noopener,noreferrer");
+        return;
+      }
+      box.innerHTML = `
+        <iframe
+          loading="lazy"
+          allowfullscreen
+          referrerpolicy="strict-origin-when-cross-origin"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          title="Trailer de ${item.title}"
+          src="${trailerSrc(item)}&autoplay=1">
+        </iframe>
+        <div class="trailer-inline-actions">
+          <a class="pill-btn" href="${youtubeWatchUrl(item)}" target="_blank" rel="noopener noreferrer">Abrir no YouTube</a>
+        </div>
+      `;
+    }
+
+    function openDetail(id) {
+      const item = itemById(id);
+      if (!item) return;
+      addRecent(id);
+      trackGenre(item);
+      const similar = state.data
+        .filter((entry) => entry.id !== id && entry.genres.some((genre) => item.genres.includes(genre)))
+        .sort((a, b) => b.rating - a.rating)
+        .slice(0, 8);
+      $("#detail-shell").innerHTML = `
+        <div class="detail-banner" data-title="${item.original}" style="${itemStyle(item)};${backdropBackground(item, "rgba(5,4,6,0.22)")}">
+          <button class="icon-btn" id="close-detail" style="position:absolute;top:14px;right:14px;z-index:8">×</button>
+          <div class="detail-head">
+            <div class="detail-poster" style="${itemStyle(item)};${posterBackground(item, "rgba(5,4,6,0.08)")}"></div>
+            <div class="detail-title">
+              <span class="eyebrow">${item.type} • ${item.genres[0]}</span>
+              <h2>${item.title}</h2>
+              <div class="meta">
+                <span class="tag blood">★ ${item.rating}</span>
+                <span class="tag">${item.year}</span>
+                <span class="tag">${item.duration}</span>
+                <span class="tag">${item.age}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="detail-body">
+          <div class="actions">${detailButtons(item)}<button class="action-btn" id="share-title">↗ Compartilhar</button></div>
+          <p class="synopsis">${item.synopsis}</p>
+          <div>
+            ${item.genres.map((genre) => `<span class="tag">${genre}</span>`).join(" ")}
+          </div>
+          <div class="glass-panel" style="box-shadow:none">
+            <strong>Elenco e direção</strong>
+            <p style="color:var(--muted);line-height:1.55;margin-bottom:0">Direção: ${item.director}<br>Elenco: ${item.cast.join(", ")}</p>
+          </div>
+          <div class="glass-panel" style="box-shadow:none">
+            <strong>Continue assistindo</strong>
+            <div class="actions" style="margin-top:12px">
+              <button class="pill-btn" data-progress="${item.id}" data-pct="25">25%</button>
+              <button class="pill-btn" data-progress="${item.id}" data-pct="50">50%</button>
+              <button class="pill-btn" data-progress="${item.id}" data-pct="75">75%</button>
+            </div>
+          </div>
+          ${trailerCard(item)}
+          <div class="stills">
+            <div class="still" style="${itemStyle(item)};${backdropBackground(item, "rgba(5,4,6,0.12)")};--x:22%;--y:22%"></div>
+            <div class="still" style="${itemStyle(item)};${backdropBackground(item, "rgba(5,4,6,0.28)")};--x:70%;--y:34%"></div>
+            <div class="still" style="${itemStyle(item)};${backdropBackground(item, "rgba(5,4,6,0.44)")};--x:45%;--y:70%"></div>
+          </div>
+          <section class="section">
+            <div class="section-head"><h3>Recomendações similares</h3></div>
+            <div class="row">${similar.map((entry) => card(entry)).join("")}</div>
+          </section>
+        </div>
+      `;
+      $("#detail-modal").classList.add("open");
+      renderAll();
+    }
+
+    function closeDetail() {
+      $("#detail-modal").classList.remove("open");
+      $("#detail-shell").innerHTML = "";
+    }
+
+    function navigate(view) {
+      state.activeView = view;
+      $$(".view").forEach((node) => node.classList.toggle("active", node.id === `view-${view}`));
+      $$(".nav-btn").forEach((button) => button.classList.toggle("active", button.dataset.nav === view));
+      haptic(10);
+      renderAll();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function renderAll() {
+      if (state.activeView === "home") renderHome();
+      if (state.activeView === "search") renderSearch();
+      if (state.activeView === "lists") renderLists();
+      if (state.activeView === "rankings") renderRankings();
+      if (state.activeView === "feed") renderFeed();
+      if (state.activeView === "calendar") renderCalendar();
+      if (state.activeView === "profile") renderProfile();
+    }
+
+    function bindEvents() {
+      document.addEventListener("click", (event) => {
+        const authMode = event.target.closest("[data-auth-mode]");
+        if (authMode) {
+          state.authMode = authMode.dataset.authMode;
+          setAuthError("");
+          renderAuth();
+          return;
+        }
+
+        if (event.target.closest("#auth-submit")) {
+          handleAuthSubmit();
+          return;
+        }
+
+        if (event.target.closest("#logout-btn")) {
+          logoutLocalAccount();
+          return;
+        }
+
+        const nav = event.target.closest("[data-nav]");
+        if (nav) navigate(nav.dataset.nav);
+
+        const open = event.target.closest("[data-open]");
+        if (open) openDetail(open.dataset.open);
+
+        const trailer = event.target.closest("[data-play-trailer]");
+        if (trailer) {
+          event.stopPropagation();
+          playTrailer(trailer.dataset.playTrailer);
+          return;
+        }
+
+        const list = event.target.closest("[data-list]");
+        if (list) {
+          event.stopPropagation();
+          toggleList(list.dataset.list, list.dataset.id);
+        }
+
+        const tab = event.target.closest("[data-list-tab]");
+        if (tab) {
+          state.activeList = tab.dataset.listTab;
+          renderLists();
+        }
+
+        const history = event.target.closest("[data-history]");
+        if (history) {
+          $("#search-input").value = history.dataset.history;
+          runSearch();
+        }
+
+        if (event.target.closest("[data-clear-history]")) {
+          state.user.searchHistory = [];
+          saveState();
+          renderHistory();
+        }
+
+        const quiz = event.target.closest("[data-quiz]");
+        if (quiz) {
+          const q = quizQuestions[state.quizIndex];
+          state.quizAnswers.push(q.options[Number(quiz.dataset.quiz)]);
+          state.quizIndex += 1;
+          haptic(25);
+          if (state.quizIndex >= quizQuestions.length) finishQuiz();
+          else renderQuiz();
+        }
+
+        if (event.target.id === "restart-quiz") {
+          state.quizIndex = 0;
+          state.quizAnswers = [];
+          renderQuiz();
+        }
+
+        if (event.target.id === "close-detail" || event.target.id === "detail-modal") closeDetail();
+
+        if (event.target.id === "share-title") {
+          const title = $(".detail-title h2")?.textContent || "DarkFrame";
+          if (navigator.share) navigator.share({ title: "DarkFrame", text: `Estou vendo ${title} no DarkFrame.` }).catch(() => {});
+          else navigator.clipboard?.writeText(`Estou vendo ${title} no DarkFrame.`);
+          toast("Compartilhamento preparado");
+        }
+
+        const progress = event.target.closest("[data-progress]");
+        if (progress) {
+          setContinue(progress.dataset.progress, { progress: Number(progress.dataset.pct) });
+          toast(`Progresso salvo em ${progress.dataset.pct}%`);
+          renderAll();
+        }
+      });
+
+      $("#search-input").addEventListener("input", () => runSearch());
+      $("#search-input").addEventListener("keydown", (event) => {
+        if (event.key === "Enter") runSearch(true);
+      });
+      $("#genre-filter").addEventListener("change", () => runSearch());
+      $("#year-filter").addEventListener("input", () => runSearch());
+      $("#random-pick").addEventListener("click", () => {
+        const pick = state.data[Math.floor(Math.random() * state.data.length)];
+        openDetail(pick.id);
+      });
+      ["auth-nickname", "auth-username", "auth-password"].forEach((id) => {
+        $(`#${id}`).addEventListener("keydown", (event) => {
+          if (event.key === "Enter") handleAuthSubmit();
+        });
+      });
+    }
+
+    function setupManifest() {
+      const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><defs><linearGradient id='g' x1='0' x2='1' y1='0' y2='1'><stop stop-color='%23d80f22'/><stop offset='1' stop-color='%23050406'/></linearGradient></defs><rect width='512' height='512' rx='112' fill='url(%23g)'/><rect x='150' y='106' width='212' height='300' rx='18' fill='none' stroke='%23fff' stroke-width='26'/><path d='M178 154h156M178 226h156M178 298h156' stroke='%23fff' stroke-opacity='.55' stroke-width='18'/></svg>`;
+      const icon = `data:image/svg+xml,${encodeURIComponent(svg)}`;
+      const manifest = {
+        name: "DarkFrame",
+        short_name: "DarkFrame",
+        description: "App premium para filmes e séries de terror, suspense e thriller psicológico.",
+        start_url: ".",
+        scope: ".",
+        display: "standalone",
+        display_override: ["fullscreen", "standalone"],
+        orientation: "portrait",
+        background_color: "#050406",
+        theme_color: "#09070a",
+        categories: ["entertainment", "movies", "games"],
+        icons: [
+          { src: icon, sizes: "192x192", type: "image/svg+xml", purpose: "any maskable" },
+          { src: icon, sizes: "512x512", type: "image/svg+xml", purpose: "any maskable" },
+        ],
+      };
+      const link = document.createElement("link");
+      link.rel = "manifest";
+      link.href = `data:application/manifest+json,${encodeURIComponent(JSON.stringify(manifest))}`;
+      document.head.appendChild(link);
+      const apple = document.createElement("link");
+      apple.rel = "apple-touch-icon";
+      apple.href = icon;
+      document.head.appendChild(apple);
+    }
+
+    function seedDemoProgress() {
+      if (!state.user.recent.length) {
+        state.user.recent = ["hereditary", "the-witch", "scream"];
+      }
+      if (!Object.keys(state.user.continue).length) {
+        setContinue("haunting-hill-house", { season: 1, episode: 6, progress: 62 });
+        setContinue("yellowjackets", { season: 2, episode: 3, progress: 38 });
+      }
+      saveState();
+    }
+
+    async function getTmdbUpcoming() {
+      if (!TMDB_API_KEY) return [];
+      const cacheName = "tmdb-horror-upcoming-v2";
+      const cached = state.cache[cacheName];
+      const maxAge = 1000 * 60 * 60 * 12;
+      if (cached && Date.now() - cached.at < maxAge) return cached.data;
+
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const nextMonth = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const url = `${TMDB_BASE}/discover/movie?api_key=${TMDB_API_KEY}&language=pt-BR&sort_by=popularity.desc&with_genres=27,53&primary_release_date.gte=${today}&primary_release_date.lte=${nextMonth}&include_adult=false&page=1`;
+        
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("TMDB indispon\u00EDvel");
+        const json = await response.json();
+        
+        const data = (json.results || []).slice(0, 8).map((movie) => {
+          const [y, m, d] = (movie.release_date || "").split("-");
+          return {
+            date: (d && m) ? `${d}/${m}` : "Em breve",
+            title: movie.title,
+            text: `Lan\u00E7amento \u2022 ${movie.overview ? movie.overview.substring(0, 90) + '...' : 'Sinopse dispon\u00EDvel em breve no TMDB.'}`,
+            id: `tmdb-${movie.id}`,
+            image: movie.backdrop_path ? `https://image.tmdb.org/t/p/w780${movie.backdrop_path}` : (movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : null)
+          };
+        });
+        
+        state.cache[cacheName] = { at: Date.now(), data };
+        saveCache();
+        return data;
+      } catch (error) {
+        console.warn(error);
+        return [];
+      }
+    }
+
+    async function init() {
+      setupManifest();
+      state.data = [...localLibrary];
+      const tmdbItems = await getTmdbTrending();
+      if (tmdbItems.length) state.data = [...tmdbItems, ...state.data];
+      bindEvents();
+      if (state.auth?.user) seedDemoProgress();
+      renderAll();
+      renderAuth();
+    }
+
+    init();
+  </script>
+</body>
+</html>

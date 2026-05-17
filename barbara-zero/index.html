@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Bárbara Zero – Jogo Infantil Educativo</title>
+  <meta name="description" content="Jogo infantil educativo de casinha, decoração e leitura. Ideal para crianças de 4 a 7 anos.">
+  <meta name="theme-color" content="#ff6d83">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Barbara Zero">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="msapplication-TileColor" content="#ff6d83">
+  <meta name="format-detection" content="telephone=no">
+  <link rel="manifest" href="manifest.webmanifest?v=2">
+  <link rel="icon" type="image/svg+xml" href="assets/icons/app-icon.svg?v=1">
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/icons/apple-touch-icon.png?v=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=30">
+</head>
+<body>
+  <!-- LOADING SCREEN PROFISSIONAL -->
+  <div id="loading-screen">
+    <div class="loading-orb"></div>
+    <div class="loading-logo">Bárbara Zero</div>
+    <div class="loading-subtitle">carregando casinha...</div>
+    <div class="loading-bar"><div class="loading-bar-fill"></div></div>
+  </div>
+
+  <!-- OFFLINE SCREEN -->
+  <div id="offline-screen">
+    <div class="offline-icon">📶</div>
+    <div class="offline-title">Sem conexão</div>
+    <p class="offline-text">Algumas coisas podem não aparecer sem internet.</p>
+    <button id="offline-dismiss" class="soft-btn" type="button">Continuar mesmo assim</button>
+  </div>
+
+  <div id="app">
+    <div id="play-screen">
+      <div id="top-capsule">
+        <button id="map-btn" class="capsule-btn yellow" type="button" aria-label="Abrir mapa da cidade">🗺️</button>
+        <button id="sound-btn" class="capsule-btn white" type="button" aria-label="Ligar som">🔊</button>
+        <div id="room-tabs"></div>
+        <button id="open-quiz" class="capsule-btn pink" type="button" aria-label="Abrir desafio de leitura">🎒</button>
+        <button id="gift-btn" class="capsule-btn white" type="button" aria-label="Presente surpresa">🎁</button>
+      </div>
+
+      <div id="status-pill">
+        <span class="status-chip sun">⭐</span>
+        <span id="star-count">1</span>
+        <button id="progress-btn" class="status-action" type="button">Progresso</button>
+        <button id="about-btn" class="status-action" type="button">Sobre</button>
+        <span class="status-chip room">🏠</span>
+      </div>
+
+      <div id="scene-stage">
+        <div class="stage-sky">
+          <div class="sky-panel left"></div>
+          <div class="sky-panel right"></div>
+        </div>
+        <div class="stage-band"></div>
+        <div id="scene-layer"></div>
+        <div id="actor-layer"></div>
+        <div class="stage-street">
+          <div class="street-code">B0123</div>
+        </div>
+        <div class="stage-base"></div>
+      </div>
+
+      <div id="drawer">
+        <button id="drawer-toggle" class="drawer-handle" type="button" aria-label="Recolher bandeja de itens" aria-expanded="true"></button>
+        <div id="drawer-cats">
+          <button class="drawer-cat active" data-cat="moveis" type="button">Móveis</button>
+          <button class="drawer-cat" data-cat="pessoas" type="button">Pessoas</button>
+          <button class="drawer-cat" data-cat="pets" type="button">Pets</button>
+          <button class="drawer-cat" data-cat="comidas" type="button">Comidas</button>
+        </div>
+        <div class="drawer-row">
+          <button id="drawer-prev" class="drawer-arrow" type="button" aria-label="Anterior">‹</button>
+          <div id="drawer-cards"></div>
+          <button id="drawer-next" class="drawer-arrow" type="button" aria-label="Próximo">›</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAP MODAL -->
+    <div id="map-modal" role="dialog" aria-label="Mapa da cidade">
+      <div class="map-card">
+        <div class="map-title">Escolha um lugar</div>
+        <div id="map-grid"></div>
+      </div>
+    </div>
+
+    <!-- QUIZ MODAL -->
+    <div id="quiz-modal" role="dialog" aria-label="Desafio de leitura">
+      <div class="quiz-card">
+        <div class="quiz-mascot">🦉</div>
+        <div class="quiz-title">Desafio de leitura</div>
+        <div id="quiz-question"></div>
+        <div id="quiz-options"></div>
+        <div id="quiz-write" hidden>
+          <input id="quiz-answer" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Escreva aqui" enterkeyhint="done">
+          <button id="quiz-submit" type="button">Responder</button>
+        </div>
+        <div id="quiz-feedback"></div>
+        <div class="quiz-actions">
+          <button id="quiz-repeat" class="soft-btn" type="button">🔊 Ouvir</button>
+          <button id="quiz-close" class="soft-btn" type="button">Fechar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROGRESS MODAL -->
+    <div id="progress-modal" role="dialog" aria-label="Progresso">
+      <div class="info-card">
+        <div class="info-title">🏆 Progresso</div>
+        <div id="progress-summary"></div>
+        <div id="achievement-list"></div>
+        <button id="progress-close" class="soft-btn" type="button">Fechar</button>
+      </div>
+    </div>
+
+    <!-- ABOUT MODAL -->
+    <div id="about-modal" role="dialog" aria-label="Sobre o jogo">
+      <div class="info-card">
+        <div class="info-title">Sobre</div>
+        <p>Bárbara Zero é um jogo infantil educativo de casinha, decoração e leitura.</p>
+        <p>Versão <span id="app-version">1.1.0</span></p>
+        <p>Feito com 💖 por Renan Pires</p>
+        <a class="privacy-link" href="privacy.html">Política de privacidade</a>
+        <button id="about-close" class="soft-btn" type="button">Fechar</button>
+      </div>
+    </div>
+
+    <!-- AD BANNER PLACEHOLDER (future use) -->
+    <div id="ad-banner-container" style="display:none;"></div>
+
+    <div id="error-banner"></div>
+    <div id="toast"></div>
+  </div>
+
+  <script src="capacitor.js"></script>
+  <script src="script.js?v=30"></script>
+</body>
+</html>
