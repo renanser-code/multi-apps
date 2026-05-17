@@ -1607,6 +1607,8 @@
         calendar: "Disponível para maratona de clássicos modernos",
         accent: "#e23b45",
         bg: "linear-gradient(145deg, #421018, #12070a 58%, #050406)",
+        posterPath: "assets/hereditary.jpg",
+        backdropPath: "assets/hereditary.jpg",
       },
       {
         id: "the-witch",
@@ -2270,13 +2272,13 @@
     }
 
     function posterBackground(item, shade = "rgba(5,4,6,0.76)") {
-      const src = posterUrl(item);
-      return src ? `background-image:linear-gradient(0deg, rgba(5,4,6,0.88), ${shade}), url('${src}');background-size:cover;background-position:center;` : "";
+      const src = posterUrl(item) || "assets/fallback-horror.jpg";
+      return `background-image:linear-gradient(0deg, rgba(5,4,6,0.88), ${shade}), url('${src}'), url('assets/fallback-horror.jpg');background-size:cover;background-position:center;`;
     }
 
     function backdropBackground(item, shade = "rgba(5,4,6,0.34)") {
-      const src = backdropUrl(item);
-      return src ? `background-image:linear-gradient(0deg, rgba(5,4,6,0.9), ${shade}), url('${src}');background-size:cover;background-position:center;` : "";
+      const src = backdropUrl(item) || "assets/fallback-horror.jpg";
+      return `background-image:linear-gradient(0deg, rgba(5,4,6,0.9), ${shade}), url('${src}'), url('assets/fallback-horror.jpg');background-size:cover;background-position:center;`;
     }
 
     function haptic(ms = 16) {
