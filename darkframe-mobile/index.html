@@ -1,6 +1,15 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
+  <!-- Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-COLOCAR_AQUI"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-COLOCAR_AQUI');
+  </script>
+
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#09070a">
@@ -10,6 +19,7 @@
   <title>DarkFrame | Horror Streaming Companion</title>
   <link rel="apple-touch-icon" href="icon.png?v=2">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='30' fill='%23050406'/%3E%3Ccircle cx='91' cy='30' r='25' fill='%23d80f22' opacity='.9'/%3E%3Cpath d='M27 35h55a15 15 0 0 1 15 15v42a15 15 0 0 1-15 15H27a15 15 0 0 1-15-15V50a15 15 0 0 1 15-15Z' fill='%23100d12' stroke='%23ff2b3d' stroke-width='6'/%3E%3Cpath d='M47 52 77 71 47 90Z' fill='%23f8f3f5'/%3E%3C/svg%3E">
+  <link rel="manifest" href="manifest.json">
   <style>
     :root {
       --void: #050406;
@@ -1450,6 +1460,9 @@
         <section class="section">
           <div class="quiz-card" id="quiz-card"></div>
         </section>
+        <div style="text-align: center; margin-top: 2rem; padding: 1rem; opacity: 0.8; font-size: 0.75rem; border-top: 1px solid var(--line); color: var(--muted); line-height: 1.4;">
+          <p>Este aplicativo utiliza métricas anônimas de acesso para melhorar a experiência do usuário. Não coletamos dados pessoais sensíveis.</p>
+        </div>
       </section>
     </main>
   </div>
@@ -1508,6 +1521,24 @@
   <script>
     "use strict";
 
+    // --- UNIFIED GA4 METRICS TRACKING HELPER ---
+    function trackEvent(eventName, params = {}) {
+      try {
+        if (typeof gtag === 'function') {
+          gtag('event', eventName, {
+            ...params,
+            app_name: 'DarkFrameMobile',
+            platform: window.AndroidBridge ? 'Android Native' : 'PWA Web'
+          });
+          console.log(`[Analytics] Evento '${eventName}' enviado com sucesso:`, params);
+        } else {
+          console.warn(`[Analytics] gtag não está disponível para o evento '${eventName}'`);
+        }
+      } catch (e) {
+        console.error(`[Analytics] Erro ao enviar evento '${eventName}':`, e);
+      }
+    }
+
     /*
       DarkFrame API config
       TMDB: crie uma chave em https://www.themoviedb.org/settings/api e cole abaixo.
@@ -1532,6 +1563,7 @@
       activeList: "favorites",
       authMode: hasStoredUsers() ? "login" : "create",
       searchTimer: null,
+      lastSearchTerm: "",
       quizIndex: 0,
       quizAnswers: [],
       data: [],
@@ -2320,6 +2352,24 @@
     function toggleList(listKey, id) {
       const list = state.user.lists[listKey];
       const index = list.indexOf(id);
+      const exists = index >= 0;
+      const item = itemById(id);
+      
+      // GA4 favorite_click
+      if (listKey === "favorites") {
+        trackEvent('favorite_click', {
+          recipe_id: id,
+          recipe_name: item ? item.title : id,
+          action: exists ? 'remove' : 'add'
+        });
+      } else {
+        trackEvent('category_click', {
+          category: listKey,
+          action: exists ? 'remove' : 'add',
+          anime_title: item ? item.title : id
+        });
+      }
+
       if (index >= 0) {
         list.splice(index, 1);
         toast(`${listLabels[listKey]} removido`);
@@ -2528,6 +2578,13 @@
       const results = $("#search-results");
       loading.hidden = false;
       results.innerHTML = "";
+
+      // GA4 search tracking
+      if (term && term.length >= 3 && term !== state.lastSearchTerm) {
+        state.lastSearchTerm = term;
+        trackEvent('search_anime', { search_term: term });
+        trackEvent('search', { search_term: term });
+      }
 
       clearTimeout(state.searchTimer);
       state.searchTimer = setTimeout(() => {
@@ -2800,6 +2857,7 @@
     function openDetail(id) {
       const item = itemById(id);
       if (!item) return;
+      trackEvent('anime_view', { anime_id: id, anime_title: item.title, category: item.type });
       addRecent(id);
       trackGenre(item);
       const similar = state.data
@@ -2864,6 +2922,7 @@
 
     function navigate(view) {
       state.activeView = view;
+      trackEvent('page_view', { page_path: `/${view}`, page_title: view });
       $$(".view").forEach((node) => node.classList.toggle("active", node.id === `view-${view}`));
       $$(".nav-btn").forEach((button) => button.classList.toggle("active", button.dataset.nav === view));
       haptic(10);
@@ -3066,7 +3125,38 @@
     }
 
     async function init() {
+      trackEvent('app_open');
       setupManifest();
+      
+      // Registro do Service Worker Estável & Atualização Automática
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./service-worker.js').then((reg) => {
+            console.log('[PWA] Service Worker registrado com escopo:', reg.scope);
+            
+            // Verifica atualizações de versão
+            reg.addEventListener('updatefound', () => {
+              const newWorker = reg.installing;
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  showPwaUpdateToast();
+                }
+              });
+            });
+          }).catch((err) => {
+            console.error('[PWA] Erro ao registrar Service Worker:', err);
+          });
+        });
+
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (!refreshing) {
+            refreshing = true;
+            window.location.reload();
+          }
+        });
+      }
+
       state.data = [...localLibrary];
       const tmdbItems = await getTmdbTrending();
       if (tmdbItems.length) state.data = [...tmdbItems, ...state.data];
@@ -3074,6 +3164,37 @@
       if (state.auth?.user) seedDemoProgress();
       renderAll();
       renderAuth();
+    }
+
+    function showPwaUpdateToast() {
+      const toastEl = document.createElement('div');
+      toastEl.id = 'pwa-update-banner';
+      toastEl.innerHTML = `
+        <div style="position: fixed; bottom: 85px; left: 50%; transform: translateX(-50%); 
+                    background: #d80f22; color: white; padding: 12px 20px; border-radius: 12px; 
+                    box-shadow: 0 10px 30px rgba(216, 15, 34, 0.35); font-family: 'Trebuchet MS', sans-serif; 
+                    font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 12px; 
+                    z-index: 9999; animation: pwaSlideUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+          <span>☠ Nova versão disponível!</span>
+          <button onclick="window.location.reload()" style="background: white; color: #d80f22; border: none; 
+                           padding: 6px 12px; border-radius: 8px; font-weight: bold; cursor: pointer;
+                           font-family: 'Trebuchet MS', sans-serif;">
+            Atualizar
+          </button>
+        </div>
+      `;
+      if (!document.getElementById('pwa-update-style')) {
+        const style = document.createElement('style');
+        style.id = 'pwa-update-style';
+        style.textContent = `
+          @keyframes pwaSlideUp {
+            from { transform: translate(-50%, 50px); opacity: 0; }
+            to { transform: translate(-50%, 0); opacity: 1; }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+      document.body.appendChild(toastEl);
     }
 
     init();

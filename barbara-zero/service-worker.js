@@ -1,11 +1,11 @@
-const CACHE_NAME = "barbara-zero-v30";
+const CACHE_NAME = "barbara-zero-cache-v1";
 
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./style.css?v=30",
   "./script.js?v=30",
-  "./manifest.webmanifest?v=2",
+  "./manifest.json",
   "./privacy.html",
   "./assets/icons/app-icon.svg?v=1",
   "./assets/icons/apple-touch-icon.png?v=1",

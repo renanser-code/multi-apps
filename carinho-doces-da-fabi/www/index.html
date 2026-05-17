@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <!-- Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-COLOCAR_AQUI"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-COLOCAR_AQUI');
+  </script>
+
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#ff8fa3">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Carinho Doces da Fabi">
+  <link rel="icon" type="image/png" href="assets/logo.png">
+  <link rel="apple-touch-icon" href="assets/logo.png">
+  <link rel="manifest" href="manifest.json">
+  <title>Carinho Doces da Fabi</title>
+  
+  <!-- Fontes Premium -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  
+  <!-- Estilos Externos -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Splash Screen Inicial -->
+  <div id="splash-screen" class="splash-screen">
+    <div class="splash-content">
+      <div class="splash-logo-wrapper">
+        <div class="splash-logo" style="border-radius: 50%; overflow: hidden; padding: 0;">
+          <!-- Real Logo Confeitaria -->
+          <img src="assets/logo.png" alt="Logo Carinho Doces da Fabi" class="cupcake-icon" style="width: 100%; height: 100%; object-fit: cover;">
+        </div>
+      </div>
+      <h1 class="splash-title">Carinho</h1>
+      <span class="splash-subtitle">Doces da Fabi</span>
+      <div class="splash-spinner"></div>
+    </div>
+  </div>
+
+  <div class="app-container">
+    
+    <!-- Top Bar Principal -->
+    <header class="topbar">
+      <div class="topbar-content">
+        <div class="brand">
+          <div class="brand-icon" style="border-radius: 50%; overflow: hidden; border: 1.5px solid var(--primary-dark); padding: 0;">
+            <img src="assets/logo.png" alt="Logo" class="mini-cupcake" style="width: 100%; height: 100%; object-fit: cover;">
+          </div>
+          <div class="brand-text">
+            <h1>Carinho</h1>
+            <span>Doces da Fabi</span>
+          </div>
+        </div>
+        <div class="top-actions">
+          <button class="icon-btn search-trigger" onclick="switchTab('search')" aria-label="Pesquisar">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          </button>
+          <button class="icon-btn favorite-trigger" onclick="toggleFavoritesOnly()" id="top-fav-btn" aria-label="Ver Favoritos">
+            <svg class="icon heart-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="app-main">
+
+      <!-- VIEW: HOME -->
+      <section id="view-home" class="view active">
+        <!-- Banner Principal (Receita em Destaque) -->
+        <div class="hero-banner" id="featured-recipe-banner" onclick="openRecipeDetail(12)">
+          <div class="hero-overlay"></div>
+          <div class="hero-badge">Destaque da Fabi</div>
+          <div class="hero-content">
+            <h2 class="hero-title">Bolo de Ninho com Morango</h2>
+            <p class="hero-desc">Um bolo incrivelmente fofinho com recheio cremoso de Leite Ninho e morangos frescos suculentos.</p>
+            <div class="hero-meta">
+              <span class="meta-tag"><svg class="meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg> 60 min</span>
+              <span class="meta-tag"><svg class="meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg> Especial</span>
+              <span class="meta-tag level-facil"><svg class="meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 22 22 22"></polygon></svg> Médio</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Seção de Filtro por Categorias -->
+        <div class="section-container">
+          <h3 class="section-title">Categorias</h3>
+          <div class="categories-scroll" id="categories-container">
+            <!-- Gerado dinamicamente no app.js -->
+          </div>
+        </div>
+
+        <!-- Seção de Encomenda Rápida Geral (Fora das Receitas) -->
+        <div class="section-container">
+          <div class="home-order-card">
+            <h4 class="home-order-title"><span>🎁</span> Encomendas da Fabi</h4>
+            <p class="home-order-desc">
+              Deseja pedir bolos decorados, docinhos personalizados ou fazer uma encomenda especial para seu evento? Converse diretamente com a Fabi no WhatsApp! 💕
+            </p>
+            <div class="home-order-buttons">
+              <button onclick="openGeneralOrder()" class="home-order-btn-primary" aria-label="Encomendar pelo WhatsApp">
+                <span>💬</span> WhatsApp da Fabi
+              </button>
+              <button onclick="switchTab('about')" class="home-order-btn-secondary" aria-label="Ver Outros Contatos">
+                <span>👩‍🍳</span> Contatos
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Seção de Lista de Receitas -->
+        <div class="section-container">
+          <div class="section-header">
+            <h3 class="section-title" id="recipe-list-title">Receitas Artesanais</h3>
+            <span class="section-subtitle" id="recipe-count">12 delícias</span>
+          </div>
+          
+          <!-- Grid de Cards de Receita -->
+          <div class="recipes-grid" id="recipes-container">
+            <!-- Gerado dinamicamente no app.js -->
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW: BUSCA -->
+      <section id="view-search" class="view">
+        <div class="search-wrap">
+          <div class="search-bar-container">
+            <div class="search-box">
+              <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input type="text" id="search-input" placeholder="Pesquise por doce, ingrediente ou categoria..." oninput="handleSearch(this.value)" autocomplete="off">
+              <button class="clear-search-btn" id="clear-search-btn" onclick="clearSearch()" style="display:none;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Sugestões Rápidas de Busca -->
+          <div class="search-tags-container">
+            <span class="search-tags-label">Buscas Populares:</span>
+            <div class="search-tags">
+              <button class="search-tag-chip" onclick="applySearchTag('chocolate')">Chocolate</button>
+              <button class="search-tag-chip" onclick="applySearchTag('bolo')">Bolos</button>
+              <button class="search-tag-chip" onclick="applySearchTag('morango')">Morango</button>
+              <button class="search-tag-chip" onclick="applySearchTag('rápido')">Rápido</button>
+              <button class="search-tag-chip" onclick="applySearchTag('limão')">Limão</button>
+              <button class="search-tag-chip" onclick="applySearchTag('coco')">Coco</button>
+            </div>
+          </div>
+
+          <div class="search-results-header">
+            <h3 class="section-title" id="search-results-title">Resultados da Busca</h3>
+            <span class="section-subtitle" id="search-results-count">0 encontrados</span>
+          </div>
+
+          <!-- Grid de Resultados da Busca -->
+          <div class="recipes-grid" id="search-results-container">
+            <!-- Gerado dinamicamente no app.js -->
+          </div>
+          
+          <!-- Estado Vazio da Busca -->
+          <div class="empty-state" id="search-empty-state" style="display: none;">
+            <div class="empty-icon">🍰</div>
+            <h4>Nenhum docinho encontrado</h4>
+            <p>Tente buscar por termos diferentes ou use nossas buscas populares acima!</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW: HISTÓRIAS DOS DOCES -->
+      <section id="view-stories" class="view">
+        <div class="stories-header">
+          <h2 class="stories-main-title">Histórias Doces</h2>
+          <p class="stories-main-desc">Descubra as curiosidades, origens e segredos apaixonantes por trás dos maiores clássicos da nossa confeitaria.</p>
+        </div>
+        
+        <!-- Lista de Histórias de Doces -->
+        <div class="stories-list" id="stories-container">
+          <!-- Gerado dinamicamente no app.js -->
+        </div>
+      </section>
+
+      <!-- VIEW: SOBRE -->
+      <section id="view-about" class="view">
+        <div class="about-card">
+          <div class="about-hero">
+            <div class="about-logo-wrapper" style="border-radius: 50%; overflow: hidden; background: var(--white); box-shadow: var(--shadow-strong); border: 2.5px solid var(--primary-dark); padding: 0; width: 100px; height: 100px; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center;">
+              <img src="assets/logo.png" alt="Logo Carinho Doces da Fabi" class="about-cupcake" style="width: 100%; height: 100%; object-fit: cover;">
+            </div>
+            <h2 class="about-brand-title">Carinho Doces da Fabi</h2>
+            <p class="about-brand-tagline">Confeitaria Artesanal Feita com Amor</p>
+          </div>
+          
+          <div class="about-body">
+            <p class="about-text">
+              “Na Carinho Doces da Fabi, cada receita é preparada com amor, cuidado e aquele toque especial de carinho que transforma simples ingredientes em momentos doces e inesquecíveis.”
+            </p>
+            <div class="about-divider">
+              <span class="divider-dot"></span>
+              <span class="divider-line"></span>
+              <span class="divider-dot"></span>
+            </div>
+            <p class="about-subtext">
+              Criamos esta vitrine interativa com nossas melhores receitas familiares e segredos profissionais para que você possa levar o aconchego de um doce artesanal para sua casa.
+            </p>
+          </div>
+        </div>
+
+        <!-- Seção de Canais de Atendimento / Redes Sociais -->
+        <div class="section-container">
+          <h3 class="section-title">Fale Conosco & Redes Sociais</h3>
+          
+          <div class="contact-channels">
+            <!-- Whatsapp Link -->
+            <a href="https://wa.me/5511997020827?text=Ol%C3%A1%20Fabi!%20Vim%20pelo%20seu%20aplicativo%20de%20receitas!" class="contact-card whatsapp" target="_blank" rel="noopener">
+              <div class="contact-icon-wrapper">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="contact-icon"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+              </div>
+              <div class="contact-info">
+                <h4>WhatsApp da Fabi</h4>
+                <p>Encomendas e dúvidas: (11) 99702-0827</p>
+              </div>
+              <svg class="arrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </a>
+
+            <!-- Instagram Link -->
+            <a href="https://instagram.com/carinhodocesdafabi" class="contact-card instagram" target="_blank" rel="noopener">
+              <div class="contact-icon-wrapper">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="contact-icon"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+              </div>
+              <div class="contact-info">
+                <h4>Instagram Oficial</h4>
+                <p>Acompanhe nossos bastidores: @carinhodocesdafabi</p>
+              </div>
+              <svg class="arrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </a>
+
+            <!-- Address Info (Navegação Física) -->
+            <div class="contact-card address">
+              <div class="contact-icon-wrapper">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="contact-icon"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+              </div>
+              <div class="contact-info">
+                <h4>Nosso Atelier Doce</h4>
+                <p>Rua dos Doces Clássicos, 123 - Jardins, São Paulo/SP</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Créditos Técnicos -->
+        <div class="about-footer">
+          <p>Carinho Doces da Fabi v1.0.0</p>
+          <span>Desenvolvido com carinho para o Google Play Store</span>
+          <p style="font-size: 11px; margin-top: 10px; opacity: 0.85; max-width: 280px; margin-left: auto; margin-right: auto; line-height: 1.4;">
+            Este aplicativo utiliza métricas anônimas de acesso para melhorar a experiência do usuário. Não coletamos dados pessoais sensíveis.
+          </p>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Bottom Navigation Bar -->
+    <nav class="bottom-nav">
+      <div class="nav-content">
+        <button class="nav-btn active" id="nav-home" onclick="switchTab('home')">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+          <span class="nav-label">Início</span>
+        </button>
+        <button class="nav-btn" id="nav-search" onclick="switchTab('search')">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <span class="nav-label">Buscar</span>
+        </button>
+        <button class="nav-btn" id="nav-stories" onclick="switchTab('stories')">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+          <span class="nav-label">Histórias</span>
+        </button>
+        <button class="nav-btn" id="nav-about" onclick="switchTab('about')">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          <span class="nav-label">Sobre</span>
+        </button>
+      </div>
+    </nav>
+
+    <!-- DETALHE DA RECEITA: MODAL TELA CHEIA -->
+    <div id="recipe-detail-modal" class="recipe-modal">
+      <div class="modal-wrapper">
+        <!-- Banner da Foto -->
+        <div class="modal-banner" id="modal-banner-bg">
+          <div class="modal-banner-overlay"></div>
+          <div class="modal-header-actions">
+            <button class="modal-action-btn close-btn" onclick="closeRecipeDetail()" aria-label="Fechar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+            <div class="modal-right-actions">
+              <button class="modal-action-btn fav-btn" id="modal-fav-btn" onclick="toggleFavoriteCurrent()" aria-label="Favoritar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="heart-icon"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+              </button>
+              <button class="modal-action-btn share-btn" onclick="shareRecipeCurrent()" aria-label="Compartilhar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+              </button>
+            </div>
+          </div>
+          
+          <div class="modal-banner-content">
+            <span class="modal-recipe-category" id="modal-recipe-category">Categoria</span>
+            <h2 class="modal-recipe-title" id="modal-recipe-title">Título do Doce</h2>
+            <p class="modal-recipe-desc" id="modal-recipe-desc">Descrição breve e deliciosa.</p>
+          </div>
+        </div>
+
+        <!-- Conteúdo Interno da Receita -->
+        <div class="modal-body">
+          
+          <!-- Ficha Técnica (Badges) -->
+          <div class="recipe-specs">
+            <div class="spec-card">
+              <span class="spec-icon">⏱️</span>
+              <span class="spec-label">Tempo</span>
+              <strong class="spec-value" id="modal-recipe-time">45 min</strong>
+            </div>
+            <div class="spec-card">
+              <span class="spec-icon">🍽️</span>
+              <span class="spec-label">Rendimento</span>
+              <strong class="spec-value" id="modal-recipe-yield">10 porções</strong>
+            </div>
+            <div class="spec-card">
+              <span class="spec-icon">⭐</span>
+              <span class="spec-label">Dificuldade</span>
+              <strong class="spec-value" id="modal-recipe-difficulty">Fácil</strong>
+            </div>
+          </div>
+
+          <!-- Abas internas: Preparo ou Curiosidades -->
+          <div class="modal-tabs">
+            <button class="modal-tab active" onclick="switchModalTab('recipe')" id="modal-tab-recipe">Receita</button>
+            <button class="modal-tab" onclick="switchModalTab('story')" id="modal-tab-story">História & Curiosidades</button>
+          </div>
+
+          <!-- ABA 1: RECEITA COMPLETA -->
+          <div class="modal-tab-content active" id="modal-tab-content-recipe">
+            <!-- Ingredientes -->
+            <div class="ingredients-section">
+              <h3 class="detail-section-title"><span class="title-decor">🥚</span> Ingredientes</h3>
+              <ul class="ingredients-list" id="modal-recipe-ingredients">
+                <!-- Preenchido no app.js -->
+              </ul>
+            </div>
+
+            <!-- Modo de Preparo -->
+            <div class="prep-section">
+              <h3 class="detail-section-title"><span class="title-decor">🥣</span> Modo de Preparo</h3>
+              <ol class="prep-steps" id="modal-recipe-steps">
+                <!-- Preenchido no app.js -->
+              </ol>
+            </div>
+
+            <!-- Dicas da Fabi (Destaque super delicado com detalhes dourados) -->
+            <div class="fabi-tips-card">
+              <div class="tips-header">
+                <span class="tips-fabi-avatar">👩‍🍳</span>
+                <div>
+                  <h4>Dica de Ouro da Fabi</h4>
+                  <span>Segredo de Confeitaria</span>
+                </div>
+              </div>
+              <p class="tips-text" id="modal-recipe-tip">
+                Dica super especial para seu doce ficar divino e irresistível!
+              </p>
+            </div>
+
+            <!-- Acompanhamento Sugerido -->
+            <div class="accompaniment-card">
+              <h4>☕ Sugestão de Acompanhamento</h4>
+              <p id="modal-recipe-accompaniment">Serve muito bem acompanhado com um café coado bem quentinho ou chá de jasmim.</p>
+            </div>
+          </div>
+
+          <!-- ABA 2: CURIOSIDADES E HISTÓRIA -->
+          <div class="modal-tab-content" id="modal-tab-content-story">
+            <div class="sweet-history-box">
+              <div class="history-illustration">📖</div>
+              <h3 class="history-box-title">Por Trás da Receita</h3>
+              <p class="history-box-text" id="modal-recipe-history">
+                A história por trás da origem desta receita deliciosa e como ela se tornou um clássico inestimável de nossa confeitaria...
+              </p>
+              
+              <div class="history-divider">✨</div>
+              
+              <h4 class="curiosity-box-title">💡 Sabia Disso?</h4>
+              <p class="curiosity-box-text" id="modal-recipe-curiosity">
+                Uma curiosidade cativante sobre este doce que vai te surpreender e trazer um sorriso para sua mesa!
+              </p>
+            </div>
+          </div>
+          
+          <!-- SEÇÃO: FAZER ENCOMENDA (CTA Premium) -->
+          <div class="order-section">
+            <h3 class="order-title">Gostou desse doce?</h3>
+            <p class="order-subtitle">Faça sua encomenda diretamente com a Carinho Doces da Fabi 💕</p>
+            
+            <div class="order-actions">
+              <!-- Botão WhatsApp -->
+              <button id="order-btn-whatsapp" class="order-btn order-whatsapp">
+                <span class="btn-icon">💬</span>
+                <span class="btn-text">Pedir pelo WhatsApp</span>
+              </button>
+              
+              <!-- Botão Instagram -->
+              <button id="order-btn-instagram" class="order-btn order-instagram">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="btn-svg"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+                <span class="btn-text">Pedir pelo Instagram</span>
+              </button>
+              
+              <!-- Botão E-mail -->
+              <button id="order-btn-email" class="order-btn order-email">
+                <span class="btn-icon">✉️</span>
+                <span class="btn-text">Pedir por E-mail</span>
+              </button>
+            </div>
+            
+            <div class="order-footer-actions">
+              <!-- Botão Adicionar aos Favoritos Secundário -->
+              <button class="footer-action-btn order-fav-toggle" onclick="toggleFavoriteCurrent()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="heart-icon"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+                <span id="order-fav-text">Salvar nos Favoritos</span>
+              </button>
+              
+              <!-- Botão Compartilhar Receita Secundário -->
+              <button class="footer-action-btn order-share" onclick="shareRecipeCurrent()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+                <span>Compartilhar Receita</span>
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Botão Flutuante de Encomendas Geral (WhatsApp) -->
+    <button id="floating-order-btn" class="floating-order-btn" onclick="openGeneralOrder()" aria-label="Fazer Encomenda Especial">
+      <span class="floating-icon">💬</span>
+      <span class="floating-text">Pedir Doce</span>
+    </button>
+
+  </div>
+
+  <!-- Scripts -->
+  <script src="app.js"></script>
+  <script>
+    // Registro do Service Worker Estável & Atualização Automática
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js').then((reg) => {
+          console.log('[PWA] Service Worker registrado com escopo:', reg.scope);
+          
+          // Verifica atualizações de versão
+          reg.addEventListener('updatefound', () => {
+            const newWorker = reg.installing;
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                showPwaUpdateToast();
+              }
+            });
+          });
+        }).catch((err) => {
+          console.error('[PWA] Erro ao registrar Service Worker:', err);
+        });
+      });
+
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+          refreshing = true;
+          window.location.reload();
+        }
+      });
+    }
+
+    function showPwaUpdateToast() {
+      const toastEl = document.createElement('div');
+      toastEl.id = 'pwa-update-banner';
+      toastEl.innerHTML = `
+        <div style="position: fixed; bottom: 85px; left: 50%; transform: translateX(-50%); 
+                    background: #E85D9E; color: white; padding: 12px 20px; border-radius: 12px; 
+                    box-shadow: 0 10px 30px rgba(232, 93, 158, 0.35); font-family: 'Outfit', sans-serif; 
+                    font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 12px; 
+                    z-index: 9999; animation: pwaSlideUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+          <span>🍰 Nova versão disponível!</span>
+          <button onclick="window.location.reload()" style="background: white; color: #E85D9E; border: none; 
+                           padding: 6px 12px; border-radius: 8px; font-weight: bold; cursor: pointer;
+                           font-family: 'Outfit', sans-serif;">
+            Atualizar
+          </button>
+        </div>
+      `;
+      if (!document.getElementById('pwa-update-style')) {
+        const style = document.createElement('style');
+        style.id = 'pwa-update-style';
+        style.textContent = `
+          @keyframes pwaSlideUp {
+            from { transform: translate(-50%, 50px); opacity: 0; }
+            to { transform: translate(-50%, 0); opacity: 1; }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+      document.body.appendChild(toastEl);
+    }
+  </script>
+</body>
+</html>

@@ -1,6 +1,15 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-COLOCAR_AQUI"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-COLOCAR_AQUI');
+    </script>
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -404,6 +413,9 @@
                 <div class="stat-card"><div class="stat-value" id="st-com">0</div><div class="stat-label">Finalizados</div></div>
                 <div class="stat-card"><div class="stat-value" id="st-pla">0</div><div class="stat-label">Planejados</div></div>
             </div>
+            <div style="text-align: center; margin-top: 2rem; padding: 1rem; opacity: 0.8; font-size: 0.75rem; border-top: 1px solid rgba(255,255,255,0.05); color: var(--text-dim); line-height: 1.4;">
+                <p>Este aplicativo utiliza métricas anônimas de acesso para melhorar a experiência do usuário. Não coletamos dados pessoais sensíveis.</p>
+            </div>
         </div>
     </main>
 
@@ -424,6 +436,24 @@
     </div>
 
     <script>
+        // --- UNIFIED GA4 METRICS TRACKING HELPER ---
+        function trackEvent(eventName, params = {}) {
+            try {
+                if (typeof gtag === 'function') {
+                    gtag('event', eventName, {
+                        ...params,
+                        app_name: 'AnimeHubMobile',
+                        platform: window.AndroidBridge ? 'Android Native' : 'PWA Web'
+                    });
+                    console.log(`[Analytics] Evento '${eventName}' enviado com sucesso:`, params);
+                } else {
+                    console.warn(`[Analytics] gtag não está disponível para o evento '${eventName}'`);
+                }
+            } catch (e) {
+                console.error(`[Analytics] Erro ao enviar evento '${eventName}':`, e);
+            }
+        }
+
         // --- CORE & STATE ---
         const API_URL = 'https://api.jikan.moe/v4';
         
@@ -453,6 +483,7 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             lucide.createIcons();
+            trackEvent('app_open');
             
             if (currentUser) {
                 document.getElementById('view-auth').classList.add('hidden');
@@ -600,6 +631,7 @@
 
         // --- VIEWS ---
         function switchView(viewName) {
+            trackEvent('page_view', { page_path: `/${viewName}`, page_title: viewName });
             document.querySelectorAll('.view-content').forEach(v => v.classList.remove('active'));
             document.getElementById(`view-${viewName}`).classList.add('active');
             document.querySelectorAll('.nav-btn').forEach(b => {
@@ -621,6 +653,7 @@
             
             document.querySelectorAll('.list-tab').forEach(tab => {
                 tab.onclick = () => {
+                    trackEvent('category_click', { category: tab.dataset.list });
                     document.querySelectorAll('.list-tab').forEach(t => t.classList.remove('active'));
                     tab.classList.add('active');
                     state.currentList = tab.dataset.list;
@@ -630,6 +663,7 @@
 
             document.querySelectorAll('.day-btn').forEach(btn => {
                 btn.onclick = () => {
+                    trackEvent('category_click', { category: btn.dataset.day });
                     document.querySelectorAll('.day-btn').forEach(t => t.classList.remove('active'));
                     btn.classList.add('active');
                     state.currentDay = btn.dataset.day;
@@ -694,6 +728,7 @@
             try {
                 const res = await fetchAPI(`/anime/${id}/full`);
                 const anime = res.data;
+                trackEvent('anime_view', { anime_id: anime.mal_id, anime_title: anime.title, category: anime.type });
                 saveHistory(anime);
 
                 let headerMedia = `<img src="${anime.images.jpg.large_image_url}">`;
@@ -843,6 +878,21 @@
             const minAnime = { mal_id: anime.mal_id, title: anime.title, images: anime.images };
             const exists = isInList(id, listName);
 
+            // GA4 tracking: favorite_click
+            if (listName === 'favorites') {
+                trackEvent('favorite_click', {
+                    recipe_id: id,
+                    recipe_name: anime.title,
+                    action: exists ? 'remove' : 'add'
+                });
+            } else {
+                trackEvent('category_click', {
+                    category: listName,
+                    action: exists ? 'remove' : 'add',
+                    anime_title: anime.title
+                });
+            }
+
             if (listName !== 'favorites' && !exists) {
                 ['watching', 'planned', 'completed', 'dropped'].forEach(l => {
                     state.lists[l] = state.lists[l].filter(a => a.mal_id !== id);
@@ -946,6 +996,8 @@
         }
 
         async function performSearch(query) {
+            trackEvent('search_anime', { search_term: query });
+            trackEvent('search', { search_term: query });
             document.getElementById('searchHistoryBox').classList.add('hidden');
             const grid = document.getElementById('searchGrid');
             const loader = document.getElementById('searchLoader');
@@ -1010,6 +1062,66 @@
                 } catch { result += chunk + " "; }
             }
             return result.trim() || text;
+        }
+
+        // Registro do Service Worker Estável & Atualização Automática
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./service-worker.js').then((reg) => {
+                    console.log('[PWA] Service Worker registrado com escopo:', reg.scope);
+                    
+                    // Verifica atualizações de versão
+                    reg.addEventListener('updatefound', () => {
+                        const newWorker = reg.installing;
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                showPwaUpdateToast();
+                            }
+                        });
+                    });
+                }).catch((err) => {
+                    console.error('[PWA] Erro ao registrar Service Worker:', err);
+                });
+            });
+
+            let refreshing = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (!refreshing) {
+                    refreshing = true;
+                    window.location.reload();
+                }
+            });
+        }
+
+        function showPwaUpdateToast() {
+            const toastEl = document.createElement('div');
+            toastEl.id = 'pwa-update-banner';
+            toastEl.innerHTML = `
+                <div style="position: fixed; bottom: 85px; left: 50%; transform: translateX(-50%); 
+                            background: #8b5cf6; color: white; padding: 12px 20px; border-radius: 12px; 
+                            box-shadow: 0 10px 30px rgba(139, 92, 246, 0.35); font-family: 'Inter', sans-serif; 
+                            font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 12px; 
+                            z-index: 9999; animation: pwaSlideUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+                    <span>🦄 Nova versão disponível!</span>
+                    <button onclick="window.location.reload()" style="background: white; color: #8b5cf6; border: none; 
+                                     padding: 6px 12px; border-radius: 8px; font-weight: bold; cursor: pointer;
+                                     font-family: 'Inter', sans-serif;">
+                        Atualizar
+                    </button>
+                </div>
+            `;
+            if (!document.getElementById('pwa-update-style')) {
+                const style = document.createElement('style');
+                style.id = 'pwa-update-style';
+                style.textContent = `
+                    @keyframes pwaSlideUp {
+                        from { transform: translate(-50%, 50px); opacity: 0; }
+                        to { transform: translate(-50%, 0); opacity: 1; }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+            document.body.appendChild(toastEl);
         }
     </script>
 </body>

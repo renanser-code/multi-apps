@@ -1,0 +1,43 @@
+{
+  "id": "/multi-apps/barbara-zero/",
+  "name": "Bárbara Zero – Jogo Educativo Infantil",
+  "short_name": "Bárbara Zero",
+  "description": "Jogo infantil educativo de casinha, decoração e leitura. Ideal para crianças de 4 a 7 anos.",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "start_url": "/multi-apps/barbara-zero/",
+  "scope": "/multi-apps/barbara-zero/",
+  "display": "standalone",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "portrait",
+  "background_color": "#fff0f8",
+  "theme_color": "#ff6d83",
+  "categories": ["education", "kids", "games"],
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

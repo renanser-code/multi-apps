@@ -1,3 +1,21 @@
+// --- UNIFIED GA4 METRICS TRACKING HELPER ---
+function trackEvent(eventName, params = {}) {
+  try {
+    if (typeof gtag === 'function') {
+      gtag('event', eventName, {
+        ...params,
+        app_name: 'Barbara Zero',
+        platform: window.Capacitor ? 'Capacitor Native' : 'PWA Web'
+      });
+      console.log(`[Analytics] Evento '${eventName}' enviado com sucesso:`, params);
+    } else {
+      console.warn(`[Analytics] gtag não está disponível para o evento '${eventName}'`);
+    }
+  } catch (e) {
+    console.error(`[Analytics] Erro ao enviar evento '${eventName}':`, e);
+  }
+}
+
 const roomTabs = document.getElementById("room-tabs");
 const sceneStage = document.getElementById("scene-stage");
 const sceneLayer = document.getElementById("scene-layer");
@@ -350,6 +368,7 @@ function saveProgress() {
 
 function unlockAchievement(id, label) {
   if (progress.achievements.some((entry) => entry.id === id)) return;
+  trackEvent('game_over', { achievement_id: id, achievement_label: label });
   progress.achievements.push({ id, label, at: new Date().toISOString() });
   stats.stars += 3;
   starCount.textContent = String(stats.stars);
@@ -401,10 +420,61 @@ function updateProgressPanel() {
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js").catch(() => {
+    navigator.serviceWorker.register("./service-worker.js").then((reg) => {
+      console.log("[PWA SW] Barbara Zero registrado com sucesso!");
+      
+      // Monitora atualizações
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            showPwaUpdateToast();
+          }
+        });
+      });
+    }).catch(() => {
       showError("Modo offline indisponivel neste navegador.");
     });
   });
+
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!refreshing) {
+      refreshing = true;
+      window.location.reload();
+    }
+  });
+}
+
+function showPwaUpdateToast() {
+  const toastEl = document.createElement('div');
+  toastEl.id = 'pwa-update-banner';
+  toastEl.innerHTML = `
+    <div style="position: fixed; bottom: 85px; left: 50%; transform: translateX(-50%); 
+                background: #ff6d83; color: white; padding: 12px 20px; border-radius: 12px; 
+                box-shadow: 0 10px 30px rgba(255, 109, 131, 0.35); font-family: 'Fredoka', sans-serif; 
+                font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 12px; 
+                z-index: 9999; animation: pwaSlideUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+      <span>🦉 Nova versão disponível!</span>
+      <button onclick="window.location.reload()" style="background: white; color: #ff6d83; border: none; 
+                       padding: 6px 12px; border-radius: 8px; font-weight: bold; cursor: pointer;
+                       font-family: 'Fredoka', sans-serif;">
+        Atualizar
+      </button>
+    </div>
+  `;
+  if (!document.getElementById('pwa-update-style')) {
+    const style = document.createElement('style');
+    style.id = 'pwa-update-style';
+    style.textContent = `
+      @keyframes pwaSlideUp {
+        from { transform: translate(-50%, 50px); opacity: 0; }
+        to { transform: translate(-50%, 0); opacity: 1; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+  document.body.appendChild(toastEl);
 }
 
 function watchCriticalAssets() {
@@ -896,6 +966,7 @@ function isCorrectAnswer(quiz, value) {
 
 function completeQuizSuccess() {
   const successAction = pendingQuizAction;
+  trackEvent('level_complete', { stars_earned: 2, current_stars: stats.stars + 2 });
   stats.stars += 2;
   progress.quizzes += 1;
   progress.correct += 1;
@@ -1433,6 +1504,8 @@ if (giftBtnOriginal) {
 
 const _origOpenPlace = openPlace;
 openPlace = function(name, meta) {
+  trackEvent('level_start', { place_name: name });
+  trackEvent('page_view', { page_path: `/place/${name}`, page_title: name });
   _origOpenPlace(name, meta);
   tryShowInterstitial();
 };
@@ -1444,6 +1517,8 @@ function requestFullscreen() {
 }
 
 function hideLoadingScreen() {
+  trackEvent('app_open');
+  trackEvent('game_start');
   setTimeout(() => {
     loadingScreen.classList.add("hide");
     initCapacitor();

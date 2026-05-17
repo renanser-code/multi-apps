@@ -1,0 +1,36 @@
+# Node dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Capacitor files
+capacitor.config.json.bak
+
+# Android build files and artifacts
+.gradle/
+build/
+android/app/build/
+android/.gradle/
+android/local.properties
+android/captures/
+.externalNativeBuild/
+.cxx/
+
+# Log files
+*.log
+*.gz
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE config files
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
