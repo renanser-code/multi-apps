@@ -145,13 +145,6 @@ function generate104Matches() {
         currentDate.setDate(currentDate.getDate() + 1);
       }
 
-      // Pre-simulate realistic initial goals based on rating
-      const ratingDiff = pair.home.rating - pair.away.rating;
-      let homeScore = Math.floor(Math.random() * 3);
-      let awayScore = Math.floor(Math.random() * 3);
-      if (ratingDiff > 1.5) homeScore += 1;
-      if (ratingDiff < -1.5) awayScore += 1;
-
       MATCHES.push({
         id: matchId++,
         phase: "grupos",
@@ -160,14 +153,15 @@ function generate104Matches() {
         awayTeam: pair.away.name,
         homeFlag: pair.home.flag,
         awayFlag: pair.away.flag,
-        homeScore: homeScore,
-        awayScore: awayScore,
+        homeScore: null,
+        awayScore: null,
         date: dateStr,
         localTime: localTime,
         brtTime: brtTime,
         stadium: stadium.name,
         city: stadium.city,
-        status: "finished" // pre-populated with realistic simulator state
+        status: "scheduled",
+        winner: null
       });
     });
   });
@@ -191,7 +185,8 @@ function generate104Matches() {
       brtTime: `${17 - stadium.timezone}:00`,
       stadium: stadium.name,
       city: stadium.city,
-      status: "upcoming"
+      status: "scheduled",
+      winner: null
     });
   }
 
@@ -212,7 +207,8 @@ function generate104Matches() {
       brtTime: `${18 - stadium.timezone}:00`,
       stadium: stadium.name,
       city: stadium.city,
-      status: "upcoming"
+      status: "scheduled",
+      winner: null
     });
   }
 
@@ -233,7 +229,8 @@ function generate104Matches() {
       brtTime: `${16 - stadium.timezone}:00`,
       stadium: stadium.name,
       city: stadium.city,
-      status: "upcoming"
+      status: "scheduled",
+      winner: null
     });
   }
 
@@ -254,7 +251,8 @@ function generate104Matches() {
       brtTime: `${19 - stadium.timezone}:00`,
       stadium: stadium.name,
       city: stadium.city,
-      status: "upcoming"
+      status: "scheduled",
+      winner: null
     });
   }
 
@@ -274,7 +272,8 @@ function generate104Matches() {
     brtTime: `${15 - stadium3rd.timezone}:00`,
     stadium: stadium3rd.name,
     city: stadium3rd.city,
-    status: "upcoming"
+    status: "scheduled",
+    winner: null
   });
 
   // 2.6 Grande Final - July 19
@@ -293,7 +292,8 @@ function generate104Matches() {
     brtTime: `${16 - stadiumFinal.timezone}:00`,
     stadium: stadiumFinal.name,
     city: stadiumFinal.city,
-    status: "upcoming"
+    status: "scheduled",
+    winner: null
   });
 }
 
@@ -304,11 +304,13 @@ function savePredictionsToStorage() {
 
 function loadPredictionsFromStorage() {
   const stored = localStorage.getItem("copa_2026_matches");
-  if (stored) {
+  const isClean = localStorage.getItem("copacenter_clean_slate_v2");
+  if (stored && isClean) {
     MATCHES = JSON.parse(stored);
   } else {
     generate104Matches();
     savePredictionsToStorage();
+    localStorage.setItem("copacenter_clean_slate_v2", "true");
   }
 }
 
@@ -947,9 +949,9 @@ function renderGroupMatchesSimulator(groupLetter) {
         </div>
         
         <div class="prediction-inputs" style="margin: 0 4px;">
-          <input type="number" min="0" max="99" value="${m.homeScore}" data-match-id="${m.id}" data-side="home" aria-label="Placar Mandante">
+          <input type="number" min="0" max="99" value="${m.homeScore !== null ? m.homeScore : ''}" data-match-id="${m.id}" data-side="home" aria-label="Placar Mandante" placeholder="-">
           <span>x</span>
-          <input type="number" min="0" max="99" value="${m.awayScore}" data-match-id="${m.id}" data-side="away" aria-label="Placar Visitante">
+          <input type="number" min="0" max="99" value="${m.awayScore !== null ? m.awayScore : ''}" data-match-id="${m.id}" data-side="away" aria-label="Placar Visitante" placeholder="-">
         </div>
         
         <div class="team-display right">
@@ -969,12 +971,20 @@ function renderGroupMatchesSimulator(groupLetter) {
       input.addEventListener("change", (e) => {
         const matchId = parseInt(input.getAttribute("data-match-id"));
         const side = input.getAttribute("data-side");
-        const val = parseInt(e.target.value);
+        const valStr = e.target.value.trim();
+        const val = parseInt(valStr);
         
         const matchObj = MATCHES.find(m => m.id === matchId);
         if (matchObj) {
-          if (side === "home") matchObj.homeScore = isNaN(val) ? 0 : val;
-          if (side === "away") matchObj.awayScore = isNaN(val) ? 0 : val;
+          if (side === "home") matchObj.homeScore = valStr === "" || isNaN(val) ? null : val;
+          if (side === "away") matchObj.awayScore = valStr === "" || isNaN(val) ? null : val;
+          
+          if (matchObj.homeScore !== null && matchObj.awayScore !== null) {
+            matchObj.status = "finished";
+          } else {
+            matchObj.status = "scheduled";
+          }
+          
           savePredictionsToStorage();
           
           // Re-render only table and standings
@@ -1005,9 +1015,17 @@ function renderKnockoutBracket() {
   const groupRunners = {};
   
   groupsList.forEach(letter => {
-    const sorted = calculateGroupStats(letter);
-    groupWinners[letter] = sorted[0];
-    groupRunners[letter] = sorted[1];
+    const groupMatches = MATCHES.filter(m => m.phase === "grupos" && m.group === letter);
+    const hasSimulated = groupMatches.some(m => m.homeScore !== null && m.awayScore !== null);
+    
+    if (hasSimulated) {
+      const sorted = calculateGroupStats(letter);
+      groupWinners[letter] = sorted[0];
+      groupRunners[letter] = sorted[1];
+    } else {
+      groupWinners[letter] = null;
+      groupRunners[letter] = null;
+    }
   });
 
   // Dynamically feed the Round of 32 (16 matches) inside MATCHES database
@@ -1509,7 +1527,7 @@ function handleAuthSubmit() {
       email: email,
       nickname: nickname || "Competidor Arena",
       favTeam: favTeam || "Brasil",
-      score: 160, // realistic mock score
+      score: 0, 
       inviteCode: `MZ-${Math.floor(1000 + Math.random() * 9000)}`
     };
     
@@ -1605,9 +1623,9 @@ function renderPredictionMatches() {
         </div>
         
         <div class="prediction-inputs" style="margin: 0 4px;">
-          <input type="number" min="0" max="99" value="0" id="predict-home-${m.id}" aria-label="Palpite Mandante">
+          <input type="number" min="0" max="99" value="" id="predict-home-${m.id}" aria-label="Palpite Mandante" placeholder="-">
           <span>x</span>
-          <input type="number" min="0" max="99" value="0" id="predict-away-${m.id}" aria-label="Palpite Visitante">
+          <input type="number" min="0" max="99" value="" id="predict-away-${m.id}" aria-label="Palpite Visitante" placeholder="-">
         </div>
         
         <div class="team-display right">
@@ -1623,8 +1641,16 @@ function renderPredictionMatches() {
 }
 
 function submitMatchPrediction(matchId) {
-  const homeScore = parseInt(document.getElementById(`predict-home-${matchId}`).value) || 0;
-  const awayScore = parseInt(document.getElementById(`predict-away-${matchId}`).value) || 0;
+  const homeVal = document.getElementById(`predict-home-${matchId}`).value.trim();
+  const awayVal = document.getElementById(`predict-away-${matchId}`).value.trim();
+
+  if (homeVal === "" || awayVal === "") {
+    showToast("Por favor, preencha ambos os placares antes de salvar seu palpite!");
+    return;
+  }
+
+  const homeScore = parseInt(homeVal);
+  const awayScore = parseInt(awayVal);
 
   // Save to telemetry
   trackGAEvent("prediction_submit", { match_id: matchId, prediction: `${homeScore}x${awayScore}` });
@@ -1637,10 +1663,10 @@ function renderGlobalLeaderboard() {
   if (!container) return;
 
   const mockUsers = [
-    { name: "Fabi Confeiteira", team: "Brasil 🇧🇷", score: 280 },
-    { name: "Renan Pires", team: "Brasil 🇧🇷", score: 240 },
-    { name: "Claudio Goleiro", team: "Alemanha 🇩🇪", score: 190 },
-    { name: "Juliana Neto", team: "Argentina 🇦🇷", score: 160 }
+    { name: "Fabi Confeiteira", team: "Brasil 🇧🇷", score: 0 },
+    { name: "Renan Pires", team: "Brasil 🇧🇷", score: 0 },
+    { name: "Claudio Goleiro", team: "Alemanha 🇩🇪", score: 0 },
+    { name: "Juliana Neto", team: "Argentina 🇦🇷", score: 0 }
   ];
 
   if (authenticatedUser) {
@@ -1760,12 +1786,12 @@ function showPrivateGroupDetails(grp) {
     <div class="leaderboard-item">
       <div class="rank-badge">2</div>
       <div class="rank-user-info"><span class="name">Fabi Confeiteira</span></div>
-      <div class="rank-score">140 pts</div>
+      <div class="rank-score">0 pts</div>
     </div>
     <div class="leaderboard-item">
       <div class="rank-badge">3</div>
       <div class="rank-user-info"><span class="name">Claudio Goleiro</span></div>
-      <div class="rank-score">110 pts</div>
+      <div class="rank-score">0 pts</div>
     </div>
   `;
 
@@ -1823,18 +1849,28 @@ window.addEventListener("DOMContentLoaded", () => {
     highlights.forEach(m => {
       const card = document.createElement("div");
       card.className = "glass-panel match-card";
+      
+      const isScheduled = m.homeScore === null || m.awayScore === null;
+      const statusBadge = isScheduled 
+        ? `<span class="match-status upcoming">Agendado</span>`
+        : `<span class="match-status finished">Finalizado</span>`;
+        
+      const scoreDisplay = isScheduled
+        ? m.localTime
+        : `${m.homeScore} - ${m.awayScore}`;
+
       card.innerHTML = `
         <div class="match-header">
           <span>Grupo ${m.group} • Rodada ${m.id}</span>
-          <span class="match-status live">Ao Vivo</span>
+          ${statusBadge}
         </div>
         <div class="match-teams" onclick="navigateTo('matches')">
           <div class="team-display left">
             <span class="team-name" style="font-size:12.5px;">${m.homeTeam}</span>
             <span class="team-flag" style="font-size:22px;">${m.homeFlag}</span>
           </div>
-          <div class="score-display">
-            ${m.homeScore} - ${m.awayScore}
+          <div class="score-display ${isScheduled ? 'upcoming' : ''}">
+            ${scoreDisplay}
           </div>
           <div class="team-display right">
             <span class="team-flag" style="font-size:22px;">${m.awayFlag}</span>
