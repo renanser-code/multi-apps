@@ -54,7 +54,7 @@
         </div>
       </div>
       <div class="top-actions">
-        <span id="sandbox-badge" class="sandbox-alert">Sandbox Local</span>
+        <span id="sandbox-badge" class="sandbox-alert">Modo Local</span>
         <div id="header-user-badge" class="user-badge" onclick="navigateTo('social')">
           <span class="user-avatar-emoji">👤</span>
           <span id="header-username" class="user-name-text">Acessar</span>
@@ -139,14 +139,90 @@
           </div>
         </div>
 
+        <!-- Advanced Filters Panel -->
+        <div class="glass-panel" style="padding: 16px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 12px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;" onclick="toggleAdvancedFilters()">
+            <h3 style="font-size: 14px; font-weight: 800; display: flex; align-items: center; gap: 8px; margin: 0;">
+              <i data-lucide="sliders-horizontal" style="width: 16px; height: 16px; stroke: var(--primary);"></i>
+              Filtros Avançados de Confrontos
+            </h3>
+            <span id="filters-toggle-icon" style="font-size: 12px; color: var(--text-muted); font-weight: bold;">Expandir ▾</span>
+          </div>
+          
+          <div id="advanced-filters-box" style="display: none; flex-direction: column; gap: 12px; border-top: 1px solid var(--line); padding-top: 12px;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label style="font-size: 11px; margin-bottom: 4px; display: block; font-weight: bold; color: var(--text-muted);">Buscar por Seleção</label>
+                <input type="text" id="filter-team-input" placeholder="Ex: Brasil, Portugal..." oninput="applyFilters()" style="padding: 8px; font-size: 12.5px; width: 100%; box-sizing: border-box; background: var(--bg-card); color: #fff; border: 1px solid var(--line); border-radius: var(--radius-sm);">
+              </div>
+              
+              <div class="form-group" style="margin-bottom: 0;">
+                <label style="font-size: 11px; margin-bottom: 4px; display: block; font-weight: bold; color: var(--text-muted);">Filtrar por Grupo</label>
+                <select id="filter-group-select" onchange="applyFilters()" style="padding: 8px; font-size: 12.5px; width: 100%; box-sizing: border-box; background: var(--bg-card); color: #fff; border: 1px solid var(--line); border-radius: var(--radius-sm);">
+                  <option value="all">Todos os Grupos</option>
+                  <option value="A">Grupo A</option>
+                  <option value="B">Grupo B</option>
+                  <option value="C">Grupo C</option>
+                  <option value="D">Grupo D</option>
+                  <option value="E">Grupo E</option>
+                  <option value="F">Grupo F</option>
+                  <option value="G">Grupo G</option>
+                  <option value="H">Grupo H</option>
+                  <option value="I">Grupo I</option>
+                  <option value="J">Grupo J</option>
+                  <option value="K">Grupo K</option>
+                  <option value="L">Grupo L</option>
+                </select>
+              </div>
+              
+              <div class="form-group" style="margin-bottom: 0;">
+                <label style="font-size: 11px; margin-bottom: 4px; display: block; font-weight: bold; color: var(--text-muted);">Filtrar por Estádio</label>
+                <select id="filter-stadium-select" onchange="applyFilters()" style="padding: 8px; font-size: 12.5px; width: 100%; box-sizing: border-box; background: var(--bg-card); color: #fff; border: 1px solid var(--line); border-radius: var(--radius-sm);">
+                  <option value="all">Todos os Estádios</option>
+                </select>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 0;">
+                <label style="font-size: 11px; margin-bottom: 4px; display: block; font-weight: bold; color: var(--text-muted);">Filtrar por País Sede</label>
+                <select id="filter-country-select" onchange="applyFilters()" style="padding: 8px; font-size: 12.5px; width: 100%; box-sizing: border-box; background: var(--bg-card); color: #fff; border: 1px solid var(--line); border-radius: var(--radius-sm);">
+                  <option value="all">Todos os Países</option>
+                  <option value="EUA">Estados Unidos 🇺🇸</option>
+                  <option value="México">México 🇲🇽</option>
+                  <option value="Canadá">Canadá 🇨🇦</option>
+                </select>
+              </div>
+              
+              <div class="form-group" style="margin-bottom: 0;">
+                <label style="font-size: 11px; margin-bottom: 4px; display: block; font-weight: bold; color: var(--text-muted);">Rodada (Fase de Grupos)</label>
+                <select id="filter-round-select" onchange="applyFilters()" style="padding: 8px; font-size: 12.5px; width: 100%; box-sizing: border-box; background: var(--bg-card); color: #fff; border: 1px solid var(--line); border-radius: var(--radius-sm);">
+                  <option value="all">Todas as Rodadas</option>
+                  <option value="1">Rodada 1</option>
+                  <option value="2">Rodada 2</option>
+                  <option value="3">Rodada 3</option>
+                </select>
+              </div>
+
+              <div style="display: flex; align-items: flex-end; gap: 8px; grid-column: 1/-1;">
+                <button class="btn btn-secondary btn-sm" id="btn-filter-favorites" onclick="toggleFavoritesFilter()" style="height: 38px; width: 100%; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 4px; border-radius: var(--radius-sm); cursor: pointer;">
+                  <span id="fav-filter-label">🤍 Ver Favoritos</span>
+                </button>
+                <button class="btn btn-secondary btn-sm" onclick="resetAllFilters()" style="height: 38px; font-size: 12px; font-weight: 700; border-radius: var(--radius-sm); cursor: pointer;">
+                  Limpar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Filter tabs by phase -->
         <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 20px; border-bottom: 1px solid var(--line);">
-          <button class="btn btn-primary btn-sm phase-tab active" data-phase="grupos">Grupos (72j)</button>
-          <button class="btn btn-secondary btn-sm phase-tab" data-phase="32avos">16avos (16j)</button>
-          <button class="btn btn-secondary btn-sm phase-tab" data-phase="oitavas">Oitavas (8j)</button>
-          <button class="btn btn-secondary btn-sm phase-tab" data-phase="quartas">Quartas (4j)</button>
+          <button class="btn btn-primary btn-sm phase-tab active" data-phase="all">Todos os Jogos (104j)</button>
+          <button class="btn btn-secondary btn-sm phase-tab" data-phase="grupos">Fase de Grupos (72j)</button>
+          <button class="btn btn-secondary btn-sm phase-tab" data-phase="32avos">16avos de Final (16j)</button>
+          <button class="btn btn-secondary btn-sm phase-tab" data-phase="oitavas">Oitavas de Final (8j)</button>
+          <button class="btn btn-secondary btn-sm phase-tab" data-phase="quartas">Quartas de Final (4j)</button>
           <button class="btn btn-secondary btn-sm phase-tab" data-phase="semis">Semifinais (2j)</button>
-          <button class="btn btn-secondary btn-sm phase-tab" data-phase="final">Final & 3º (2j)</button>
+          <button class="btn btn-secondary btn-sm phase-tab" data-phase="final">Finais (2j)</button>
         </div>
 
         <div id="matches-list-container" class="matches-grid">
@@ -318,7 +394,7 @@
           <div id="quiz-play-box" class="glass-panel" style="display:none; padding:20px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
               <span id="quiz-question-counter" style="font-size:11px; font-weight:800; color:var(--accent); text-transform:uppercase;">Pergunta 1 de 5</span>
-              <span id="quiz-score-badge" style="font-size:11px; font-weight:800; color:var(--primary); text-transform:uppercase;">Score: 0</span>
+              <span id="quiz-score-badge" style="font-size:11px; font-weight:800; color:var(--primary); text-transform:uppercase;">Pontuação: 0</span>
             </div>
             
             <div class="quiz-progress-bar">
@@ -492,7 +568,7 @@
             <!-- Social Router tabs -->
             <div style="display: flex; gap: 8px; border-bottom: 1px solid var(--line); padding-bottom: 8px; overflow-x: auto;">
               <button class="btn btn-primary btn-sm social-tab active" data-subview="palpites" onclick="loadSocialSubView('palpites')">Meus Palpites</button>
-              <button class="btn btn-secondary btn-sm social-tab" id="btn-social-tab-ranking" onclick="loadSocialSubView('ranking')">Leaderboard</button>
+              <button class="btn btn-secondary btn-sm social-tab" id="btn-social-tab-ranking" onclick="loadSocialSubView('ranking')">Classificação</button>
               <button class="btn btn-secondary btn-sm social-tab" id="btn-social-tab-groups" onclick="loadSocialSubView('groups')">Ligas Privadas</button>
             </div>
 

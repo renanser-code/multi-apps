@@ -149,6 +149,7 @@ function generate104Matches() {
         id: matchId++,
         phase: "grupos",
         group: groupLetter,
+        round: Math.floor(idx / 2) + 1, // Rodada 1, 2 ou 3
         homeTeam: pair.home.name,
         awayTeam: pair.away.name,
         homeFlag: pair.home.flag,
@@ -160,6 +161,7 @@ function generate104Matches() {
         brtTime: brtTime,
         stadium: stadium.name,
         city: stadium.city,
+        country: stadium.country,
         status: "scheduled",
         winner: null
       });
@@ -185,6 +187,7 @@ function generate104Matches() {
       brtTime: `${17 - stadium.timezone}:00`,
       stadium: stadium.name,
       city: stadium.city,
+      country: stadium.country,
       status: "scheduled",
       winner: null
     });
@@ -207,6 +210,7 @@ function generate104Matches() {
       brtTime: `${18 - stadium.timezone}:00`,
       stadium: stadium.name,
       city: stadium.city,
+      country: stadium.country,
       status: "scheduled",
       winner: null
     });
@@ -229,6 +233,7 @@ function generate104Matches() {
       brtTime: `${16 - stadium.timezone}:00`,
       stadium: stadium.name,
       city: stadium.city,
+      country: stadium.country,
       status: "scheduled",
       winner: null
     });
@@ -251,6 +256,7 @@ function generate104Matches() {
       brtTime: `${19 - stadium.timezone}:00`,
       stadium: stadium.name,
       city: stadium.city,
+      country: stadium.country,
       status: "scheduled",
       winner: null
     });
@@ -272,6 +278,7 @@ function generate104Matches() {
     brtTime: `${15 - stadium3rd.timezone}:00`,
     stadium: stadium3rd.name,
     city: stadium3rd.city,
+    country: stadium3rd.country,
     status: "scheduled",
     winner: null
   });
@@ -292,6 +299,7 @@ function generate104Matches() {
     brtTime: `${16 - stadiumFinal.timezone}:00`,
     stadium: stadiumFinal.name,
     city: stadiumFinal.city,
+    country: stadiumFinal.country,
     status: "scheduled",
     winner: null
   });
@@ -479,17 +487,154 @@ function startCountdown() {
 // ==========================================
 // 📅 MATCHES RENDER ENGINE (Filterable by Phase)
 // ==========================================
-function renderMatches(phase = "grupos") {
+// ==========================================
+// 📅 DYNAMIC MATCH FILTERING ENGINE (Advanced Filters & Favorites)
+// ==========================================
+let activePhase = "all"; // Default to "all" matches
+let favoritesFilterActive = false;
+let favoriteMatchesList = [];
+
+function loadFavoriteMatches() {
+  const stored = localStorage.getItem("copacenter_favorite_matches");
+  if (stored) {
+    favoriteMatchesList = JSON.parse(stored);
+  }
+}
+
+function saveFavoriteMatches() {
+  localStorage.setItem("copacenter_favorite_matches", JSON.stringify(favoriteMatchesList));
+}
+
+function toggleMatchFavorite(matchId) {
+  const idx = favoriteMatchesList.indexOf(matchId);
+  if (idx > -1) {
+    favoriteMatchesList.splice(idx, 1);
+    showToast("Confronto removido dos favoritos!");
+  } else {
+    favoriteMatchesList.push(matchId);
+    showToast("Confronto adicionado aos favoritos!");
+  }
+  saveFavoriteMatches();
+  applyFilters(); // Re-render in place
+}
+
+function toggleAdvancedFilters() {
+  const box = document.getElementById("advanced-filters-box");
+  const icon = document.getElementById("filters-toggle-icon");
+  if (!box) return;
+  
+  if (box.style.display === "none" || box.style.display === "") {
+    box.style.display = "flex";
+    if (icon) icon.innerText = "Recolher ▴";
+  } else {
+    box.style.display = "none";
+    if (icon) icon.innerText = "Expandir ▾";
+  }
+}
+
+function toggleFavoritesFilter() {
+  favoritesFilterActive = !favoritesFilterActive;
+  const btn = document.getElementById("btn-filter-favorites");
+  
+  if (favoritesFilterActive) {
+    if (btn) btn.classList.replace("btn-secondary", "btn-primary");
+    showToast("Exibindo apenas confrontos favoritados!");
+  } else {
+    if (btn) btn.classList.replace("btn-primary", "btn-secondary");
+    showToast("Exibindo todos os confrontos!");
+  }
+  
+  const label = document.getElementById("fav-filter-label");
+  if (label) {
+    label.innerText = favoritesFilterActive ? "❤️ Vendo Favoritos" : "🤍 Ver Favoritos";
+  }
+  
+  applyFilters();
+}
+
+function resetAllFilters() {
+  const teamInput = document.getElementById("filter-team-input");
+  const groupSelect = document.getElementById("filter-group-select");
+  const stadiumSelect = document.getElementById("filter-stadium-select");
+  const countrySelect = document.getElementById("filter-country-select");
+  const roundSelect = document.getElementById("filter-round-select");
+  
+  if (teamInput) teamInput.value = "";
+  if (groupSelect) groupSelect.value = "all";
+  if (stadiumSelect) stadiumSelect.value = "all";
+  if (countrySelect) countrySelect.value = "all";
+  if (roundSelect) roundSelect.value = "all";
+  
+  if (favoritesFilterActive) {
+    toggleFavoritesFilter(); // Turns it off and calls applyFilters
+  } else {
+    applyFilters();
+  }
+  showToast("Todos os filtros de confrontos foram limpos!");
+}
+
+function populateStadiumFilterSelect() {
+  const select = document.getElementById("filter-stadium-select");
+  if (!select) return;
+  
+  // Clear any existing options except first
+  select.innerHTML = '<option value="all">Todos os Estádios</option>';
+  STADIUMS.forEach(s => {
+    const opt = document.createElement("option");
+    opt.value = s.name;
+    opt.innerText = `${s.name} (${s.city})`;
+    select.appendChild(opt);
+  });
+}
+
+function applyFilters() {
   const container = document.getElementById("matches-list-container");
   if (!container) return;
   
-  container.innerHTML = "";
-  const filtered = MATCHES.filter(m => m.phase === phase);
+  const searchVal = document.getElementById("filter-team-input") ? document.getElementById("filter-team-input").value.toLowerCase().trim() : "";
+  const groupVal = document.getElementById("filter-group-select") ? document.getElementById("filter-group-select").value : "all";
+  const stadiumVal = document.getElementById("filter-stadium-select") ? document.getElementById("filter-stadium-select").value : "all";
+  const countryVal = document.getElementById("filter-country-select") ? document.getElementById("filter-country-select").value : "all";
+  const roundVal = document.getElementById("filter-round-select") ? document.getElementById("filter-round-select").value : "all";
   
+  // Filter matching games
+  const filtered = MATCHES.filter(m => {
+    // 1. Phase Filter
+    if (activePhase !== "all" && m.phase !== activePhase) return false;
+    
+    // 2. Team Search Filter
+    if (searchVal !== "") {
+      const homeMatch = m.homeTeam.toLowerCase().includes(searchVal);
+      const awayMatch = m.awayTeam.toLowerCase().includes(searchVal);
+      if (!homeMatch && !awayMatch) return false;
+    }
+    
+    // 3. Group Filter
+    if (groupVal !== "all" && m.group !== groupVal) return false;
+    
+    // 4. Stadium Filter
+    if (stadiumVal !== "all" && m.stadium !== stadiumVal) return false;
+    
+    // 5. Country Filter
+    if (countryVal !== "all") {
+      const stadiumObj = STADIUMS.find(s => s.name === m.stadium);
+      if (!stadiumObj || stadiumObj.country !== countryVal) return false;
+    }
+    
+    // 6. Round/Rodada Filter
+    if (roundVal !== "all" && String(m.round) !== roundVal) return false;
+    
+    // 7. Favorites Filter
+    if (favoritesFilterActive && !favoriteMatchesList.includes(m.id)) return false;
+    
+    return true;
+  });
+  
+  container.innerHTML = "";
   if (filtered.length === 0) {
     container.innerHTML = `
       <div class="glass-panel" style="grid-column: 1/-1; padding: 30px; text-align: center; color: var(--text-muted);">
-        Nenhum confronto programado ou simulado para esta fase ainda.
+        Nenhum confronto encontrado para os filtros selecionados.
       </div>
     `;
     return;
@@ -511,24 +656,33 @@ function renderMatches(phase = "grupos") {
     const homeScoreVal = m.homeScore !== null ? m.homeScore : "-";
     const awayScoreVal = m.awayScore !== null ? m.awayScore : "-";
     
+    const isFavorited = favoriteMatchesList.includes(m.id);
+    const favHeart = isFavorited ? "❤️" : "🤍";
+    
+    const flagHome = m.homeFlag || "🏆";
+    const flagAway = m.awayFlag || "🏆";
+    
     card.innerHTML = `
       <div class="match-header">
-        <span>Grupo ${m.group || "Eliminatórias"} • Rodada ${m.id}</span>
-        ${statusBadge}
+        <span>Grupo ${m.group || "Mata-mata"} ${m.round ? `• Rodada ${m.round}` : ""} • Jogo #${m.id}</span>
+        <div style="display:flex; align-items:center; gap:8px;">
+          ${statusBadge}
+          <button onclick="toggleMatchFavorite(${m.id})" aria-label="Favoritar Partida" style="background:none; border:none; color:inherit; font-size:16px; cursor:pointer; padding:0; line-height:1; user-select:none;">${favHeart}</button>
+        </div>
       </div>
       
       <div class="match-teams" onclick="trackGAEvent('match_view', { match_id: ${m.id}, teams: '${m.homeTeam} vs ${m.awayTeam}' })">
         <div class="team-display left">
           <span class="team-name">${m.homeTeam}</span>
-          <span class="team-flag">${m.homeFlag}</span>
+          <span class="team-flag">${flagHome}</span>
         </div>
         
-        <div class="score-display ${m.status === 'upcoming' ? 'upcoming' : ''}">
-          ${m.status === 'upcoming' ? m.localTime : `${homeScoreVal} - ${awayScoreVal}`}
+        <div class="score-display ${m.status === 'upcoming' || m.status === 'scheduled' ? 'upcoming' : ''}">
+          ${m.status === 'upcoming' || m.status === 'scheduled' ? m.localTime : `${homeScoreVal} - ${awayScoreVal}`}
         </div>
         
         <div class="team-display right">
-          <span class="team-flag">${m.awayFlag}</span>
+          <span class="team-flag">${flagAway}</span>
           <span class="team-name">${m.awayTeam}</span>
         </div>
       </div>
@@ -544,7 +698,6 @@ function renderMatches(phase = "grupos") {
         </div>
       </div>
     `;
-    
     container.appendChild(card);
   });
   
@@ -559,8 +712,9 @@ document.addEventListener("DOMContentLoaded", () => {
     tab.addEventListener("click", (e) => {
       document.querySelectorAll(".phase-tab").forEach(t => t.classList.replace("btn-primary", "btn-secondary"));
       tab.classList.replace("btn-secondary", "btn-primary");
-      const phase = tab.getAttribute("data-phase");
-      renderMatches(phase);
+      
+      activePhase = tab.getAttribute("data-phase");
+      applyFilters();
     });
   });
 });
@@ -1835,10 +1989,15 @@ function showToast(message) {
 // 🛠️ INITIALIZATION & REGISTRATION SERVICE WORKER
 // ==========================================
 window.addEventListener("DOMContentLoaded", () => {
-  // Load / initialize matches
+  // Inicializa favoritos, popula estádios e renderiza confrontos com filtros padrão
+  loadFavoriteMatches();
+  populateStadiumFilterSelect();
+  applyFilters();
+
+  // Carrega palpites salvos
   loadPredictionsFromStorage();
 
-  // Launch countdown clock
+  // Inicia contador de abertura
   startCountdown();
 
   // Load highlighting matches on home page

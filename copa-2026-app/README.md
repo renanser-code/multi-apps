@@ -108,11 +108,77 @@ git push -u origin main
 
 ---
 
-## ♻️ Como Atualizar o Aplicativo
+## ♻️ Como Atualizar o Aplicativo (PWA Cache)
 
 Para atualizar o app e garantir que os usuários recebam a nova versão imediatamente sem precisar desinstalar e reinstalar o atalho PWA:
 1. Faça as modificações necessárias nos arquivos (`index.html`, `style.css`, etc).
 2. Abra o arquivo `service-worker.js`.
 3. Altere o valor de `CACHE_NAME` no topo do arquivo para a versão seguinte (Ex: de `copacenter-cache-v1` para `copacenter-cache-v2`).
 4. Salve e envie os arquivos para o GitHub (`git commit` + `git push`).
-5. O Service Worker dos navegadores dos usuários detectará a nova assinatura de cache automaticamente, fará o download em segundo plano e exibirá um aviso elegante na tela antes de atualizar a página de forma fluida!
+5. O Service Worker dos navegadores dos usuários detectará a nova assinatura de cache automaticamente, fará o download em segundo plano e aplicará a atualização de forma fluida!
+
+---
+
+## 📅 Gerenciamento de Confrontos (Guia do Desenvolvedor)
+
+### 1. Estrutura da Base de Jogos (104 Confrontos)
+O banco de dados de partidas é gerado dinamicamente no arquivo [app.js](file:///C:/Users/Renan%20Pires/OneDrive/Aplicativos/multi-apps/copa-2026-app/app.js) através da função `generate104Matches()`. A Copa do Mundo de 2026 conta com um total de **104 jogos**:
+*   **Fase de Grupos (72 jogos)**: 12 grupos (A a L) com 4 seleções cada. Cada grupo realiza 6 partidas (`12 * 6 = 72`).
+*   **Fase Mata-Mata (32 jogos)**: 
+    *   **16avos de Final**: 16 confrontos (jogos #73 ao #88)
+    *   **Oitavas de Final**: 8 confrontos (jogos #89 ao #96)
+    *   **Quartas de Final**: 4 confrontos (jogos #97 ao #100)
+    *   **Semifinais**: 2 confrontos (jogos #101 e #102)
+    *   **Disputa do 3º Lugar**: 1 confronto (jogo #103)
+    *   **Grande Final**: 1 confronto (jogo #104)
+
+### 2. Como Atualizar Confrontos e Placares
+Cada partida é gerada como um objeto estruturado:
+```javascript
+MATCHES.push({
+  id: 1,                    // ID numérico sequencial único (1 a 104)
+  phase: "grupos",          // Fase da partida ("grupos", "32avos", "oitavas", "quartas", "semis", "final")
+  group: "A",               // Letra correspondente do grupo (A a L) ou nulo em mata-mata
+  round: 1,                 // Rodada da Fase de Grupos (1, 2 ou 3)
+  homeTeam: "Brasil",       // Nome exato da seleção mandante
+  awayTeam: "Croácia",      // Nome exato da seleção visitante
+  homeFlag: "🇧🇷",           // Bandeira/Emoji mandante
+  awayFlag: "🇭🇷",           // Bandeira/Emoji visitante
+  homeScore: null,          // Placar mandante (null se não iniciado, número se finalizado)
+  awayScore: null,          // Placar visitante (null se não iniciado, número se finalizado)
+  date: "2026-06-11",       // Data oficial da partida (Formato YYYY-MM-DD)
+  localTime: "16:00",       // Horário de início local do estádio
+  brtTime: "19:00",         // Horário convertido de Brasília (BRT)
+  stadium: "Estádio Azteca",// Nome do estádio sede
+  city: "Cidade do México", // Cidade sede
+  country: "México",        // País sede do confronto
+  status: "scheduled",      // Status do jogo ("scheduled" = agendado, "finished" = finalizado)
+  winner: null              // Vencedor (null se empate/agendado, ou nome da seleção vencedora)
+});
+```
+Para registrar um resultado oficial no código, mude o placar (`homeScore`, `awayScore`) para números inteiros e altere o `status` para `"finished"`.
+
+### 3. Como Validar a Quantidade Total de Jogos
+Você pode abrir o console do desenvolvedor do navegador (F12) e executar o seguinte comando para confirmar que a base está íntegra e contém todos os 104 jogos programados:
+```javascript
+console.log("Total de jogos cadastrados:", MATCHES.length); // Deve exibir exatamente 104
+console.log("Jogos da Fase de Grupos:", MATCHES.filter(m => m.phase === "grupos").length); // Deve exibir exatamente 72
+console.log("Jogos do Mata-Mata:", MATCHES.filter(m => m.phase !== "grupos").length); // Deve exibir exatamente 32
+```
+A interface do usuário também exibe no topo das abas de navegação da tabela a contagem oficial das partidas em cada fase (`Grupos (72j)`, `16avos (16j)`, etc.).
+
+### 4. Como Zerar Completamente os Placares e Palpites
+Caso necessite retornar o aplicativo ao estado de fábrica/zero absoluto:
+1.  **Limpeza no Script**: No arquivo [app.js](file:///C:/Users/Renan%20Pires/OneDrive/Aplicativos/multi-apps/copa-2026-app/app.js), verifique se `generate104Matches()` está gerando partidas com `homeScore: null`, `awayScore: null`, `winner: null` e `status: "scheduled"`.
+2.  **Purga de Sessões Antigas**: O aplicativo implementa migração automatizada baseada em cache de versão. Ao incrementar a chave `copacenter_clean_slate_v2` em `localStorage`, todas as contas, pontuações, placares antigos e simulações de sessões anteriores de usuários ativos nos navegadores serão automaticamente purgadas e reiniciadas do zero!
+
+### 5. Como Publicar no Monorepo Multi-Apps
+Como o aplicativo está integrado ao monorepo sob a pasta `copa-2026-app/`, siga os padrões abaixo para manter o deploy funcionando sem quebrar os caminhos relativos no GitHub Pages:
+*   **Base Path**: Sempre utilize caminhos relativos (`./style.css`, `./app.js`) nos arquivos HTML para evitar que o roteamento force caminhos na raiz do domínio principal.
+*   **Service Worker**: O Service Worker está configurado para registrar o escopo dinamicamente com base no diretório em que é carregado (`navigator.serviceWorker.register(swPath)`), permitindo que funcione perfeitamente tanto em subpastas do GitHub Pages (`https://renanser-code.github.io/multi-apps/copa-2026-app/`) quanto em servidores locais!
+*   **Comandos de deploy**:
+    ```bash
+    git add .
+    git commit -m "feat: atualizações do CopaCenter 2026"
+    git push origin main
+    ```
