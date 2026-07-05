@@ -20,6 +20,7 @@
       --rose: #ec4899;
       --cyan: #06b6d4;
       --amber: #f59e0b;
+      --indigo: #6366f1;
       --radius-xl: 30px;
       --radius-lg: 20px;
     }
@@ -173,6 +174,11 @@
       box-shadow: 0 30px 60px rgba(245, 158, 11, 0.12);
     }
 
+    .app-card.autoreframer:hover {
+      border-color: rgba(99, 102, 241, 0.4);
+      box-shadow: 0 30px 60px rgba(99, 102, 241, 0.12);
+    }
+
     .app-top {
       position: relative;
       z-index: 2;
@@ -224,6 +230,11 @@
       border: 1px solid rgba(245, 158, 11, 0.2);
     }
 
+    .autoreframer .app-icon {
+      background: linear-gradient(135deg, #1e1b4b, #312e81);
+      border: 1px solid rgba(99, 102, 241, 0.2);
+    }
+
     .app-card h2 {
       font-size: 22px;
       font-weight: 800;
@@ -263,6 +274,7 @@
     .copacenter .btn-launch { color: var(--green); }
     .tanium .btn-launch { color: var(--cyan); }
     .atlas .btn-launch { color: var(--amber); }
+    .autoreframer .btn-launch { color: var(--indigo); }
 
     .launch-arrow {
       transition: transform 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
@@ -400,6 +412,19 @@
           <div class="app-icon">🤖</div>
           <h2>Atlas AI Studio</h2>
           <p>Aplicativo desktop para download de vídeos do YouTube e SharePoint, geração automática de legendas locais via IA Whisper e tradução em tempo real.</p>
+        </div>
+        <div class="app-footer">
+          <span class="btn-launch">Ver no GitHub <span class="launch-arrow">➔</span></span>
+          <span class="tech-tag">Desktop App / Python</span>
+        </div>
+      </a>
+
+      <!-- Atlas AI 360 AutoReframer -->
+      <a href="https://github.com/renanser-code/multi-apps/tree/main/atlas-ai-360-autoreframer" class="app-card autoreframer">
+        <div class="app-top">
+          <div class="app-icon">🔄</div>
+          <h2>Atlas AI 360º AutoReframer</h2>
+          <p>Aplicativo desktop para reenquadramento automático de vídeos de 360 graus de drones FPV (DJI Avata) usando IA YOLOv8 para seguir e estabilizar sujeitos.</p>
         </div>
         <div class="app-footer">
           <span class="btn-launch">Ver no GitHub <span class="launch-arrow">➔</span></span>
