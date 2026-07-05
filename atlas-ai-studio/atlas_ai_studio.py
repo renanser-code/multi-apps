@@ -84,11 +84,14 @@ class Pipeline:
             encoding="utf-8",
             errors="replace"
         )
+        lines = []
         for line in p.stdout:
             self.log_line(line.rstrip())
+            lines.append(line)
         code = p.wait()
         if code != 0:
             raise RuntimeError(f"Comando finalizou com erro: {code}")
+        return lines
 
     def newest_mp4(self):
         videos = sorted(DOWNLOAD_DIR.glob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True)
@@ -118,8 +121,29 @@ class Pipeline:
             cmd.extend(["--cookies-from-browser", self.browser_cookies.lower()])
 
         cmd.append(url)
-        self.run(cmd)
-        video = self.newest_mp4()
+        lines = self.run(cmd)
+        
+        detected_file = None
+        for line in lines:
+            if "Destination:" in line:
+                parts = line.split("Destination:")
+                if len(parts) > 1:
+                    detected_file = parts[1].strip()
+            elif "has already been downloaded" in line:
+                parts = line.split("[download]")
+                if len(parts) > 1:
+                    filepath = parts[1].replace("has already been downloaded", "").strip()
+                    detected_file = filepath
+            elif "Merging formats into" in line:
+                parts = line.split("Merging formats into")
+                if len(parts) > 1:
+                    detected_file = parts[1].replace('"', '').strip()
+
+        if detected_file and Path(detected_file).exists():
+            video = Path(detected_file)
+        else:
+            video = self.newest_mp4()
+
         self.log_line(f"Vídeo baixado: {video}")
         return video
 
