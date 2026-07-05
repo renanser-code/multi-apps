@@ -44,8 +44,12 @@ class Pipeline:
         ffmpeg = TOOLS / "ffmpeg.exe"
         ffprobe = TOOLS / "ffprobe.exe"
 
+        # Check for yt-dlp.exe (we can still download it, but we won't run it directly)
         if not ytdlp.exists():
-            self.download_file(YTDLP_URL, ytdlp)
+            try:
+                self.download_file(YTDLP_URL, ytdlp)
+            except Exception as e:
+                self.log_line(f"Nota: Não foi possível baixar yt-dlp.exe ({e}), usando módulo Python.")
         else:
             self.log_line("yt-dlp.exe encontrado.")
 
@@ -96,11 +100,12 @@ class Pipeline:
         raise FileNotFoundError("Nenhum MP4 encontrado na pasta downloads.")
 
     def download_youtube(self, url):
-        ytdlp, ffmpeg = self.ensure_tools()
+        _, ffmpeg = self.ensure_tools()
         out_template = str(DOWNLOAD_DIR / "%(title).180s.%(ext)s")
 
+        # Run yt_dlp as a Python module to bypass Windows execution policies/Defender blocks
         cmd = [
-            ytdlp,
+            "python", "-m", "yt_dlp",
             "--ffmpeg-location", str(Path(ffmpeg).parent),
             "-f", "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/bv*+ba/b",
             "--merge-output-format", "mp4",
