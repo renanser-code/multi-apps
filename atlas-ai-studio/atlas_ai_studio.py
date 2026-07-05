@@ -169,7 +169,7 @@ class Pipeline:
         self.log_line("Na primeira execução, o modelo pode demorar para baixar.")
 
         model = WhisperModel(model_name, device="cpu", compute_type="int8")
-        kwargs = {"vad_filter": True}
+        kwargs = {"vad_filter": False}
         if language and language != "auto":
             kwargs["language"] = language
 
