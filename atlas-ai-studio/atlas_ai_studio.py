@@ -88,7 +88,6 @@ class Pipeline:
 
     def newest_mp4(self):
         videos = sorted(DOWNLOAD_DIR.glob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True)
-        # Filter out _AAC and _FINAL videos if possible, to find the newly downloaded one
         raw_videos = [v for v in videos if "_AAC" not in v.name and "_FINAL" not in v.name]
         if raw_videos:
             return raw_videos[0]
@@ -179,24 +178,15 @@ class Pipeline:
                 text = seg.text.strip()
                 if not text:
                     continue
-                f.write(f"{idx}
-{self.srt_time(seg.start)} --> {self.srt_time(seg.end)}
-{text}
-
-")
+                f.write(f"{idx}\n{self.srt_time(seg.start)} --> {self.srt_time(seg.end)}\n{text}\n\n")
                 idx += 1
 
         self.log_line(f"Legenda criada: {srt}")
         return srt
 
     def split_srt_blocks(self, content):
-        content = content.replace("
-", "
-").replace("", "
-").strip()
-        return re.split(r"
-\s*
-", content) if content else []
+        content = content.replace("\r\n", "\n").replace("\r", "\n").strip()
+        return re.split(r"\n\s*\n", content) if content else []
 
     def translate_srt(self, srt):
         srt = Path(srt)
@@ -207,8 +197,7 @@ class Pipeline:
         total = len(blocks)
 
         for pos, block in enumerate(blocks, 1):
-            lines = block.split("
-")
+            lines = block.split("\n")
             if len(lines) < 3:
                 out_blocks.append(block)
                 continue
@@ -225,20 +214,15 @@ class Pipeline:
                 self.log_line(f"Falha ao traduzir bloco {pos}: {e}")
                 translated = text
 
-            out_blocks.append(f"{number}
-{timing}
-{translated}")
+            out_blocks.append(f"{number}\n{timing}\n{translated}")
 
         out = srt.with_suffix(".pt-BR.srt")
-        out.write_text("
-
-".join(out_blocks) + "
-", encoding="utf-8")
+        out.write_text("\n\n".join(out_blocks) + "\n", encoding="utf-8")
         self.log_line(f"Legenda PT-BR criada: {out}")
         return out
 
     def ffmpeg_subtitle_path(self, srt):
-        p = str(Path(srt).resolve()).replace("\", "/")
+        p = str(Path(srt).resolve()).replace("\\", "/")
         p = p.replace(":", r"\:")
         return p
 
@@ -327,8 +311,7 @@ class App:
     def poll(self):
         try:
             while True:
-                self.log.insert("end", self.q.get_nowait() + "
-")
+                self.log.insert("end", self.q.get_nowait() + "\n")
                 self.log.see("end")
         except queue.Empty:
             pass
