@@ -44,7 +44,6 @@ class Pipeline:
         ffmpeg = TOOLS / "ffmpeg.exe"
         ffprobe = TOOLS / "ffprobe.exe"
 
-        # Check for yt-dlp.exe (we can still download it, but we won't run it directly)
         if not ytdlp.exists():
             try:
                 self.download_file(YTDLP_URL, ytdlp)
@@ -70,7 +69,7 @@ class Pipeline:
 
         return str(ytdlp), str(ffmpeg)
 
-    def run(self, cmd):
+    def run(self, cmd, cwd=None):
         self.log_line("")
         self.log_line("Executando:")
         self.log_line(" ".join(f'"{c}"' if " " in str(c) else str(c) for c in cmd))
@@ -78,6 +77,7 @@ class Pipeline:
 
         p = subprocess.Popen(
             cmd,
+            cwd=str(cwd) if cwd else None,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -103,7 +103,6 @@ class Pipeline:
         _, ffmpeg = self.ensure_tools()
         out_template = str(DOWNLOAD_DIR / "%(title).180s.%(ext)s")
 
-        # Run yt_dlp as a Python module to bypass Windows execution policies/Defender blocks
         cmd = [
             "python", "-m", "yt_dlp",
             "--ffmpeg-location", str(Path(ffmpeg).parent),
@@ -226,32 +225,40 @@ class Pipeline:
         self.log_line(f"Legenda PT-BR criada: {out}")
         return out
 
-    def ffmpeg_subtitle_path(self, srt):
-        p = str(Path(srt).resolve()).replace("\\", "/")
-        p = p.replace(":", r"\:")
-        return p
-
     def burn_subtitle(self, video, srt):
         _, ffmpeg = self.ensure_tools()
         video = Path(video)
         srt = Path(srt)
-        out = video.with_name(video.stem + "_FINAL_PTBR.mp4")
-        subtitle_path = self.ffmpeg_subtitle_path(srt)
+        
+        # Copy subtitle to a temporary file with simple name to bypass spaces, colons and single quote errors in FFmpeg path parser
+        temp_sub = video.parent / "temp_ptbr.srt"
+        shutil.copy2(srt, temp_sub)
+        
+        out_name = video.stem + "_FINAL_PTBR.mp4"
+        out_file = video.parent / out_name
 
-        self.run([
+        cmd = [
             ffmpeg, "-y",
-            "-i", str(video),
-            "-vf", f"subtitles='{subtitle_path}'",
+            "-i", video.name,
+            "-vf", "subtitles=temp_ptbr.srt",
             "-c:v", "libx264",
             "-preset", "veryfast",
             "-crf", "20",
             "-c:a", "aac",
             "-b:a", "192k",
-            str(out)
-        ])
+            out_name
+        ]
 
-        self.log_line(f"MP4 final com legenda criado: {out}")
-        return out
+        try:
+            # Run in the same directory as the video/subtitle files
+            self.run(cmd, cwd=video.parent)
+        finally:
+            # Clean up the temp subtitle
+            if temp_sub.exists():
+                temp_sub.unlink(missing_ok=True)
+
+        self.log_line(f"MP4 final com legenda criado: {out_file}")
+        return out_file
 
 class App:
     def __init__(self, root):
