@@ -266,7 +266,7 @@ class Pipeline:
             "-i", video.name,
             "-vf", "subtitles=temp_ptbr.srt",
             "-c:v", "libx264",
-            "-preset", "veryfast",
+            "-preset", "ultrafast",
             "-crf", "20",
             "-c:a", "aac",
             "-b:a", "192k",
