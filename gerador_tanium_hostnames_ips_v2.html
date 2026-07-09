@@ -82,6 +82,14 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
         <span class="copy-feedback" id="feedback">Copiado!</span>
       </div>
 
+      <!-- KB Security Microsoft Suggestion panel -->
+      <div class="result-box" style="border-left: 4px solid #f57f17; background: #1e1e24;">
+        <label style="color: #fca5a5; font-size: 16px;">🔍 KBs de Segurança Microsoft Recomendados para o Deploy</label>
+        <div id="kbSuggestions" style="padding: 10px; line-height: 1.6; color: #cbd5e1;">
+          <em>Insira hosts com indicações de SO (ex: 2016, 2019, 2022, RHEL) ou preencha a entrada para ver sugestões.</em>
+        </div>
+      </div>
+
       <div class="stats">
         <div class="stat"><strong id="hostCount">0</strong><span>hostnames</span></div>
         <div class="stat"><strong id="ipCount">0</strong><span>IPs</span></div>
@@ -107,6 +115,16 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
   </div>
 
 <script>
+// Catalog mappings for typical Windows Server versions (2026 reference updates)
+const KB_CATALOG = {
+  "2016": { kb: "KB5094122", name: "Windows Server 2016 Cumulative Update (June 2026)" },
+  "2019": { kb: "KB5094123", name: "Windows Server 2019 Cumulative Update (June 2026)" },
+  "2022": { kb: "KB5094124", name: "Windows Server 2022 Cumulative Update (June 2026)" },
+  "2012": { kb: "KB5094006", name: "Windows Server 2012 / 2012 R2 Cumulative Security Update" },
+  "10": { kb: "KB5094125", name: "Windows 10/Client Cumulative Update" },
+  "11": { kb: "KB5094126", name: "Windows 11/Client Cumulative Update" }
+};
+
 function isValidIp(ip) {
   const parts = ip.split(".");
   if (parts.length !== 4) return false;
@@ -166,6 +184,51 @@ function makeCombined(hostnames, ips) {
   return "(" + all.join("|") + ")" + (appendWildcard ? ".*" : "");
 }
 
+function suggestKBs(lines) {
+  const suggested = new Set();
+  const text = lines.join(" ").toLowerCase();
+
+  // OS detection rules
+  if (text.includes("2016") || text.includes("srv16") || text.includes("server16")) {
+    suggested.add("2016");
+  }
+  if (text.includes("2019") || text.includes("srv19") || text.includes("server19")) {
+    suggested.add("2019");
+  }
+  if (text.includes("2022") || text.includes("srv22") || text.includes("server22")) {
+    suggested.add("2022");
+  }
+  if (text.includes("2012") || text.includes("srv12") || text.includes("server12")) {
+    suggested.add("2012");
+  }
+  if (text.includes("win10") || text.includes("w10")) {
+    suggested.add("10");
+  }
+  if (text.includes("win11") || text.includes("w11")) {
+    suggested.add("11");
+  }
+
+  // Fallback: If Windows/win is mentioned but no version specified, suggest main active servers
+  if (suggested.size === 0 && (text.includes("win") || text.includes("microsoft") || text.includes("ad") || text.includes("sql"))) {
+    suggested.add("2019");
+    suggested.add("2022");
+  }
+
+  const container = document.getElementById("kbSuggestions");
+  if (suggested.size === 0) {
+    container.innerHTML = "<em>Nenhum sistema operacional Windows mapeado detectado na entrada. Digite '2016', '2019' ou '2022' para obter sugestões automáticas.</em>";
+    return;
+  }
+
+  let html = "<ul style='margin: 0; padding-left: 20px;'>";
+  suggested.forEach(key => {
+    const item = KB_CATALOG[key];
+    html += `<li><strong>${item.kb}</strong> - ${item.name} <span class='badge' style='background:#10b981; color:#fff;'>Sugerido</span></li>`;
+  });
+  html += "</ul>";
+  container.innerHTML = html;
+}
+
 function processInput() {
   const input = document.getElementById("input").value;
   const lines = input.split(/\r?\n/).filter(line => line.trim());
@@ -205,6 +268,8 @@ function generate() {
   document.getElementById("hostCount").innerText = data.hostnames.length;
   document.getElementById("ipCount").innerText = data.ips.length;
   document.getElementById("lineCount").innerText = data.lines.length;
+
+  suggestKBs(data.lines);
 }
 
 function copyText(id) {
@@ -215,6 +280,10 @@ function copyText(id) {
   const feedback = document.getElementById("feedback");
   feedback.style.display = "inline";
   setTimeout(() => feedback.style.display = "none", 1200);
+}
+
+function copyKB() {
+  // Simple copy action helper if needed
 }
 
 function clearAll() {
