@@ -225,16 +225,19 @@ function suggestKBs(lines) {
   const container = document.getElementById("kbSuggestions");
   if (suggested.size === 0) {
     container.innerHTML = "<em>Nenhum sistema operacional Windows mapeado detectado na entrada. Digite '2016', '2019' ou '2022' para obter sugestões automáticas.</em>";
-    return;
+    return [];
   }
 
   let html = "<ul style='margin: 0; padding-left: 20px;'>";
+  let items = [];
   suggested.forEach(key => {
     const item = KB_CATALOG[key];
+    items.push(item);
     html += `<li><strong>${item.kb}</strong> - ${item.name} <span class='badge' style='background:#10b981; color:#fff;'>Sugerido</span></li>`;
   });
   html += "</ul>";
   container.innerHTML = html;
+  return items;
 }
 
 function processInput() {
@@ -278,7 +281,9 @@ function generate() {
   document.getElementById("lineCount").innerText = data.lines.length;
 
   // Format dynamic corporate email template
-  let emailText = "Prezados,\n\nSegue a relação de servidores (VMs) que receberão a aplicação de patches de segurança:\n\n";
+  const suggestedKbs = suggestKBs(data.lines);
+  
+  let emailText = "Senhores, boa noite.\n\nInformamos que estamos iniciando as atividades referentes à GMUD XXX, conforme planejamento aprovado.\n\nA partir deste momento, será dado início ao processo de atualização dos servidores relacionados abaixo:\n\n";
   if (data.hostnames.length > 0) {
     data.hostnames.forEach(host => {
       emailText += `- ${host}\n`;
@@ -286,10 +291,29 @@ function generate() {
   } else {
     emailText += "[Nenhum servidor identificado]";
   }
+
+  emailText += "\nSistemas Operacionais afetados:\n";
+  if (suggestedKbs.length > 0) {
+    // Extract OS names
+    const osNames = suggestedKbs.map(item => item.name.split(" Cumulative")[0].split(" Cumulative Security")[0]);
+    osNames.forEach(os => {
+      emailText += `- ${os}\n`;
+    });
+  } else {
+    emailText += "- Windows Server / Client (Padrão)\n";
+  }
+
+  emailText += "\nPatches de segurança que serão aplicados:\n";
+  if (suggestedKbs.length > 0) {
+    suggestedKbs.forEach(item => {
+      emailText += `- ${item.kb} (${item.name})\n`;
+    });
+  } else {
+    emailText += "- Cumulative Security Updates (Tanium Patch)\n";
+  }
+
   emailText += "\nQualquer dúvida, estamos à disposição.\nAtenciosamente,\nEquipe Claranet";
   document.getElementById("emailText").value = emailText;
-
-  suggestKBs(data.lines);
 }
 
 function copyText(id) {
