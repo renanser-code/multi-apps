@@ -78,6 +78,7 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
         <button class="blue" onclick="copyText('combinedRegex')">Copiar resultado principal</button>
         <button class="success" onclick="copyText('hostnameRegex')">Copiar só hostnames</button>
         <button class="success" onclick="copyText('ipRegex')">Copiar só IPs</button>
+        <button class="blue" style="background:#8b5cf6;" onclick="copyText('emailText')">Copiar texto p/ E-mail</button>
         <button class="secondary" onclick="clearAll()">Limpar</button>
         <span class="copy-feedback" id="feedback">Copiado!</span>
       </div>
@@ -94,6 +95,13 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
         <div class="stat"><strong id="hostCount">0</strong><span>hostnames</span></div>
         <div class="stat"><strong id="ipCount">0</strong><span>IPs</span></div>
         <div class="stat"><strong id="lineCount">0</strong><span>linhas processadas</span></div>
+      </div>
+
+      <!-- Generated Email text area box -->
+      <div class="result-box" style="border-left: 4px solid #8b5cf6; background: #1a1525;">
+        <label for="emailText" style="color: #c084fc; font-size: 16px;">📧 Texto pronto para E-mail (Lista de VMs)</label>
+        <textarea id="emailText" style="min-height: 150px; font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px;" readonly></textarea>
+        <div class="hint">Este texto já vem estruturado com a lista de servidores prontos para colar na comunicação do e-mail.</div>
       </div>
 
       <div class="result-box">
@@ -268,6 +276,18 @@ function generate() {
   document.getElementById("hostCount").innerText = data.hostnames.length;
   document.getElementById("ipCount").innerText = data.ips.length;
   document.getElementById("lineCount").innerText = data.lines.length;
+
+  // Format dynamic corporate email template
+  let emailText = "Prezados,\n\nSegue a relação de servidores (VMs) que receberão a aplicação de patches de segurança:\n\n";
+  if (data.hostnames.length > 0) {
+    data.hostnames.forEach(host => {
+      emailText += `- ${host}\n`;
+    });
+  } else {
+    emailText += "[Nenhum servidor identificado]";
+  }
+  emailText += "\nQualquer dúvida, estamos à disposição.\nAtenciosamente,\nEquipe Claranet";
+  document.getElementById("emailText").value = emailText;
 
   suggestKBs(data.lines);
 }
