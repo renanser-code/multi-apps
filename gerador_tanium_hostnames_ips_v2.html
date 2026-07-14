@@ -146,17 +146,26 @@ async function loadLatestKBsFromMicrosoft() {
     const documentId = `${currentYear}-${currentMonthStr}`;
     
     const fetchDoc = async (docId) => {
-      const url = `https://api.msrc.microsoft.com/cvrf/v3.0/cvrf/${docId}`;
-      const response = await fetch(url, { headers: { "Accept": "application/json" } });
+      // Use standard CORS proxy to bypass API CORS policies if browser blocks direct fetch
+      const directUrl = `https://api.msrc.microsoft.com/cvrf/v3.0/cvrf/${docId}`;
+      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(directUrl)}`;
+      
+      let response;
+      try {
+        response = await fetch(directUrl, { headers: { "Accept": "application/json" } });
+      } catch(e) {
+        response = await fetch(proxyUrl, { headers: { "Accept": "application/json" } });
+      }
+      
       if (!response.ok) throw new Error("Document not found");
-      return await response.json();
+      return await response.ok ? await response.json() : null;
     };
 
-    let data;
+    let data = null;
     try {
       data = await fetchDoc(documentId);
     } catch (e) {
-      // If current month is not published yet, fallback to previous month
+      // Fallback to previous month if current month is not published
       const prevMonthIdx = (now.getMonth() - 1 + 12) % 12;
       const prevYear = prevMonthIdx === 11 ? currentYear - 1 : currentYear;
       const prevMonthStr = months[prevMonthIdx];
@@ -165,32 +174,70 @@ async function loadLatestKBsFromMicrosoft() {
 
     if (data && data.Vulnerability) {
       const newCatalog = { ...KB_CATALOG };
+      const docName = data.DocumentTracking.Identification.ID.Value;
       
+      // Step 1: Map Product IDs to their OS labels
+      const productMap = {};
+      if (data.ProductTree && data.ProductTree.FullProductName) {
+        data.ProductTree.FullProductName.forEach(prod => {
+          if (prod.ProductID && prod.Value) {
+            const name = prod.Value.toLowerCase();
+            const pid = prod.ProductID;
+            if (name.includes("windows server 2022")) {
+              productMap[pid] = "2022";
+            } else if (name.includes("windows server 2019")) {
+              productMap[pid] = "2019";
+            } else if (name.includes("windows server 2016")) {
+              productMap[pid] = "2016";
+            } else if (name.includes("windows server 2012 r2") || name.includes("windows server 2012")) {
+              productMap[pid] = "2012";
+            } else if (name.includes("windows 11")) {
+              productMap[pid] = "11";
+            } else if (name.includes("windows 10")) {
+              productMap[pid] = "10";
+            }
+          }
+        });
+      }
+
+      // Step 2: Extract KBs from remediations and link to their matched product categories
       data.Vulnerability.forEach(vuln => {
         if (vuln.Remediations) {
           vuln.Remediations.forEach(rem => {
             if (rem.Description && rem.Description.Value) {
               const desc = rem.Description.Value;
-              const url = rem.URL || "";
-              
               if (/^KB\d+$/i.test(desc)) {
                 const kbId = desc.toUpperCase();
                 
+                // If remediation has explicit ProductIDs, map them directly
+                if (rem.ProductID && rem.ProductID.length > 0) {
+                  rem.ProductID.forEach(pid => {
+                    const osKey = productMap[pid];
+                    if (osKey) {
+                      newCatalog[osKey] = {
+                        kb: kbId,
+                        name: `${osKey.includes("20") ? "Windows Server " : "Windows "}${osKey} Cumulative Update (${docName})`
+                      };
+                    }
+                  });
+                }
+                
+                // Fallback check on URL subject matching
+                const url = rem.URL || "";
                 if (url.includes("support.microsoft.com")) {
                   const subject = url.toLowerCase() + " " + desc.toLowerCase();
-                  
                   if (subject.includes("2022")) {
-                    newCatalog["2022"] = { kb: kbId, name: `Windows Server 2022 Cumulative Update (${data.DocumentTracking.Identification.ID.Value})` };
+                    newCatalog["2022"] = { kb: kbId, name: `Windows Server 2022 Cumulative Update (${docName})` };
                   } else if (subject.includes("2019")) {
-                    newCatalog["2019"] = { kb: kbId, name: `Windows Server 2019 Cumulative Update (${data.DocumentTracking.Identification.ID.Value})` };
+                    newCatalog["2019"] = { kb: kbId, name: `Windows Server 2019 Cumulative Update (${docName})` };
                   } else if (subject.includes("2016")) {
-                    newCatalog["2016"] = { kb: kbId, name: `Windows Server 2016 Cumulative Update (${data.DocumentTracking.Identification.ID.Value})` };
+                    newCatalog["2016"] = { kb: kbId, name: `Windows Server 2016 Cumulative Update (${docName})` };
                   } else if (subject.includes("2012")) {
-                    newCatalog["2012"] = { kb: kbId, name: `Windows Server 2012 / 2012 R2 Cumulative Security Update (${data.DocumentTracking.Identification.ID.Value})` };
+                    newCatalog["2012"] = { kb: kbId, name: `Windows Server 2012 / 2012 R2 Cumulative Security Update (${docName})` };
                   } else if (subject.includes("windows-11") || subject.includes("win11")) {
-                    newCatalog["11"] = { kb: kbId, name: `Windows 11 Cumulative Update (${data.DocumentTracking.Identification.ID.Value})` };
+                    newCatalog["11"] = { kb: kbId, name: `Windows 11 Cumulative Update (${docName})` };
                   } else if (subject.includes("windows-10") || subject.includes("win10")) {
-                    newCatalog["10"] = { kb: kbId, name: `Windows 10 Cumulative Update (${data.DocumentTracking.Identification.ID.Value})` };
+                    newCatalog["10"] = { kb: kbId, name: `Windows 10 Cumulative Update (${docName})` };
                   }
                 }
               }
