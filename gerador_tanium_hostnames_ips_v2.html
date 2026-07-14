@@ -123,15 +123,91 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
   </div>
 
 <script>
-// Catalog mappings for typical Windows Server versions (2026 reference updates)
-const KB_CATALOG = {
-  "2016": { kb: "KB5094122", name: "Windows Server 2016 Cumulative Update (June 2026)" },
-  "2019": { kb: "KB5094123", name: "Windows Server 2019 Cumulative Update (June 2026)" },
-  "2022": { kb: "KB5094128", name: "Windows Server 2022 Cumulative Update (June 2026)" },
+// Default backup catalog mapping for typical Windows Server versions (Backup for Offline / API failure)
+let KB_CATALOG = {
+  "2016": { kb: "KB5094122", name: "Windows Server 2016 Cumulative Update" },
+  "2019": { kb: "KB5094123", name: "Windows Server 2019 Cumulative Update" },
+  "2022": { kb: "KB5094128", name: "Windows Server 2022 Cumulative Update" },
   "2012": { kb: "KB5094006", name: "Windows Server 2012 / 2012 R2 Cumulative Security Update" },
   "10": { kb: "KB5094125", name: "Windows 10/Client Cumulative Update" },
   "11": { kb: "KB5094126", name: "Windows 11/Client Cumulative Update" }
 };
+
+// API Fetch state
+let isApiLoaded = false;
+
+// Async function to load current month's KBs directly from Microsoft MSRC CVRF API
+async function loadLatestKBsFromMicrosoft() {
+  try {
+    const now = new Date();
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const currentYear = now.getFullYear();
+    const currentMonthStr = months[now.getMonth()];
+    const documentId = `${currentYear}-${currentMonthStr}`;
+    
+    const fetchDoc = async (docId) => {
+      const url = `https://api.msrc.microsoft.com/cvrf/v3.0/cvrf/${docId}`;
+      const response = await fetch(url, { headers: { "Accept": "application/json" } });
+      if (!response.ok) throw new Error("Document not found");
+      return await response.json();
+    };
+
+    let data;
+    try {
+      data = await fetchDoc(documentId);
+    } catch (e) {
+      // If current month is not published yet, fallback to previous month
+      const prevMonthIdx = (now.getMonth() - 1 + 12) % 12;
+      const prevYear = prevMonthIdx === 11 ? currentYear - 1 : currentYear;
+      const prevMonthStr = months[prevMonthIdx];
+      data = await fetchDoc(`${prevYear}-${prevMonthStr}`);
+    }
+
+    if (data && data.Vulnerability) {
+      const newCatalog = { ...KB_CATALOG };
+      
+      data.Vulnerability.forEach(vuln => {
+        if (vuln.Remediations) {
+          vuln.Remediations.forEach(rem => {
+            if (rem.Description && rem.Description.Value) {
+              const desc = rem.Description.Value;
+              const url = rem.URL || "";
+              
+              if (/^KB\d+$/i.test(desc)) {
+                const kbId = desc.toUpperCase();
+                
+                if (url.includes("support.microsoft.com")) {
+                  const subject = url.toLowerCase() + " " + desc.toLowerCase();
+                  
+                  if (subject.includes("2022")) {
+                    newCatalog["2022"] = { kb: kbId, name: `Windows Server 2022 Cumulative Update (${data.DocumentTracking.Identification.ID.Value})` };
+                  } else if (subject.includes("2019")) {
+                    newCatalog["2019"] = { kb: kbId, name: `Windows Server 2019 Cumulative Update (${data.DocumentTracking.Identification.ID.Value})` };
+                  } else if (subject.includes("2016")) {
+                    newCatalog["2016"] = { kb: kbId, name: `Windows Server 2016 Cumulative Update (${data.DocumentTracking.Identification.ID.Value})` };
+                  } else if (subject.includes("2012")) {
+                    newCatalog["2012"] = { kb: kbId, name: `Windows Server 2012 / 2012 R2 Cumulative Security Update (${data.DocumentTracking.Identification.ID.Value})` };
+                  } else if (subject.includes("windows-11") || subject.includes("win11")) {
+                    newCatalog["11"] = { kb: kbId, name: `Windows 11 Cumulative Update (${data.DocumentTracking.Identification.ID.Value})` };
+                  } else if (subject.includes("windows-10") || subject.includes("win10")) {
+                    newCatalog["10"] = { kb: kbId, name: `Windows 10 Cumulative Update (${data.DocumentTracking.Identification.ID.Value})` };
+                  }
+                }
+              }
+            }
+          });
+        }
+      });
+      
+      KB_CATALOG = newCatalog;
+      isApiLoaded = true;
+      console.log("Catálogo MSRC atualizado com sucesso:", KB_CATALOG);
+      generate();
+    }
+  } catch (err) {
+    console.warn("Não foi possível carregar KBs da API, usando catálogo local estável:", err);
+  }
+}
 
 function isValidIp(ip) {
   const parts = ip.split(".");
@@ -233,7 +309,9 @@ function suggestKBs(lines) {
   suggested.forEach(key => {
     const item = KB_CATALOG[key];
     items.push(item);
-    html += `<li><strong>${item.kb}</strong> - ${item.name} <span class='badge' style='background:#10b981; color:#fff;'>Sugerido</span></li>`;
+    const badgeText = isApiLoaded ? "Live MSRC API" : "Backup Local";
+    const badgeColor = isApiLoaded ? "#8b5cf6" : "#10b981";
+    html += `<li><strong>${item.kb}</strong> - ${item.name} <span class='badge' style='background:${badgeColor}; color:#fff;'>${badgeText}</span></li>`;
   });
   html += "</ul>";
   container.innerHTML = html;
@@ -337,7 +415,10 @@ function clearAll() {
 
 document.getElementById("input").addEventListener("input", generate);
 document.querySelectorAll("input[type=checkbox]").forEach(el => el.addEventListener("change", generate));
+
+// Run initialization
 generate();
+loadLatestKBsFromMicrosoft();
 </script>
 </body>
 </html>
