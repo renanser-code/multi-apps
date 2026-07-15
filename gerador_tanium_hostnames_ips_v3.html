@@ -1202,7 +1202,7 @@ function parseGmudEmail() {
         <span style="flex:1; font-family:Consolas,monospace; font-size:13px; color:#93c5fd;">${email}</span>
         <select style="background:#1e293b; border:1px solid #334155; color:#f9fafb; border-radius:6px; padding:4px 8px; font-size:13px; cursor:pointer;">
           <option value="to" ${defaultVal==='to'?'selected':''}>Para (To)</option>
-          <option value="cc">Cópia (Cc)</option>
+          <option value="cc" ${defaultVal==='cc'?'selected':''}>Cópia (Cc)</option>
           <option value="skip">Ignorar</option>
         </select>
       `;
