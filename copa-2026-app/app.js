@@ -97,8 +97,84 @@ const TEAMS = [
   { name: "Catar", flag: "🇶🇦", group: "L", region: "Asia", rating: 7.0, coach: "Tintín Márquez", history: "1 participação (2022)", curiosity: "Bicampeões recentes da Copa da Ásia com bom jogo de conjunto." },
   { name: "Play-off Europa A", flag: "🇪🇺", group: "L", region: "Europe", rating: 7.5, coach: "UEFA repescagem", history: "A definir", curiosity: "Vaga reservada para a conclusão das dramáticas repescagens europeias." },
   { name: "Play-off Intercontinental A", flag: "🌎", group: "L", region: "Americas", rating: 7.0, coach: "FIFA repescagem", history: "A definir", curiosity: "Vencedor das eliminatórias intercontinentais finais da FIFA." },
-  { name: "Play-off Intercontinental B", flag: "🌍", group: "L", region: "World", rating: 7.0, coach: "FIFA repescagem", history: "A definir", curiosity: "Vencedor da chave B dos mata-matas globais intercontinentais." }
+  { name: "Play-off Intercontinental B", flag: "🌍", group: "L", region: "World", rating: 7.0, coach: "FIFA repescagem", history: "A definir", curiosity: "Vator de repescagem intercontinental." }
 ];
+
+// Map of Selections to their official lowercase 2-letter ISO country codes
+const TEAM_ISO_MAP = {
+  "Estados Unidos": "us",
+  "México": "mx",
+  "Canadá": "ca",
+  "Marrocos": "ma",
+  "Brasil": "br",
+  "Croácia": "hr",
+  "Camarões": "cm",
+  "Japão": "jp",
+  "Argentina": "ar",
+  "Portugal": "pt",
+  "Senegal": "sn",
+  "Uzbequistão": "uz",
+  "França": "fr",
+  "Alemanha": "de",
+  "Coreia do Sul": "kr",
+  "Jamaica": "jm",
+  "Espanha": "es",
+  "Itália": "it",
+  "Nigéria": "ng",
+  "Costa Rica": "cr",
+  "Inglaterra": "gb-eng",
+  "Holanda": "nl",
+  "Egito": "eg",
+  "Honduras": "hn",
+  "Bélgica": "be",
+  "Uruguai": "uy",
+  "Argélia": "dz",
+  "Panamá": "pa",
+  "Colômbia": "co",
+  "Equador": "ec",
+  "Tunísia": "tn",
+  "Nova Zelândia": "nz",
+  "Paraguai": "py",
+  "Chile": "cl",
+  "Costa do Marfim": "ci",
+  "Irã": "ir",
+  "Venezuela": "ve",
+  "Peru": "pe",
+  "Gana": "gh",
+  "Austrália": "au",
+  "Bolívia": "bo",
+  "Iraque": "iq",
+  "África do Sul": "za",
+  "Arábia Saudita": "sa",
+  "Catar": "qa",
+  "Play-off Europa A": "eu",
+  "Play-off Intercontinental A": "un",
+  "Play-off Intercontinental B": "un"
+};
+
+// Returns a beautiful high-resolution responsive official country flag/badge HTML element
+function getTeamFlagHTML(teamName, size = "20px") {
+  if (!teamName) return `<span style="font-size: ${size}; line-height: 1; vertical-align: middle;">⚽</span>`;
+  const cleanName = teamName.trim();
+  const iso = TEAM_ISO_MAP[cleanName];
+  
+  if (iso) {
+    return `<img src="https://flagcdn.com/w40/${iso}.png" alt="${cleanName}" class="team-flag-img" style="width: ${size}; height: auto; aspect-ratio: 3/2; object-fit: cover; border-radius: 2.5px; box-shadow: 0 1.5px 3.5px rgba(0,0,0,0.32); vertical-align: middle; display: inline-block; transition: transform 0.2s ease;" onerror="this.onerror=null; this.replaceWith('⚽')">`;
+  }
+  
+  // Custom high quality tournament placeholders
+  if (cleanName.includes("Grupo") || cleanName.includes("1º") || cleanName.includes("2º") || cleanName.includes("Classificado")) {
+    return `<span style="font-size: ${size}; line-height: 1; vertical-align: middle;" title="Vaga em disputa">🏆</span>`;
+  }
+  if (cleanName.includes("Vencedor") || cleanName.includes("Perdedor") || cleanName.includes("Semifinal")) {
+    return `<span style="font-size: ${size}; line-height: 1; vertical-align: middle;" title="Confronto pendente">⚽</span>`;
+  }
+  if (cleanName.includes("definido") || cleanName.includes("TBD")) {
+    return `<span style="font-size: ${size}; line-height: 1; vertical-align: middle;" title="A definir">❓</span>`;
+  }
+  
+  return `<span style="font-size: ${size}; line-height: 1; vertical-align: middle;">⚽</span>`;
+}
 
 // ==========================================
 // ⚽ 104 MATCHES DATABASE GENERATOR
@@ -312,13 +388,14 @@ function savePredictionsToStorage() {
 
 function loadPredictionsFromStorage() {
   const stored = localStorage.getItem("copa_2026_matches");
-  const isClean = localStorage.getItem("copacenter_clean_slate_v2");
+  const isClean = localStorage.getItem("copacenter_clean_slate_v6");
   if (stored && isClean) {
     MATCHES = JSON.parse(stored);
   } else {
+    localStorage.removeItem("copa_2026_matches");
     generate104Matches();
     savePredictionsToStorage();
-    localStorage.setItem("copacenter_clean_slate_v2", "true");
+    localStorage.setItem("copacenter_clean_slate_v6", "true");
   }
 }
 
@@ -450,7 +527,17 @@ function navigateTo(viewId) {
   if (viewId === "stadiums") renderStadiums();
   if (viewId === "teams") renderTeams();
   if (viewId === "simulator") renderSimulator();
-  if (viewId === "matches") renderMatches("grupos");
+  if (viewId === "matches") {
+    activePhase = "all";
+    document.querySelectorAll(".phase-tab").forEach(t => {
+      if (t.getAttribute("data-phase") === "all") {
+        t.classList.replace("btn-secondary", "btn-primary");
+      } else {
+        t.classList.replace("btn-primary", "btn-secondary");
+      }
+    });
+    applyFilters();
+  }
   if (viewId === "brasil") backToBrasilDashboard();
   if (viewId === "social") renderSocialPanel();
 }
@@ -659,9 +746,6 @@ function applyFilters() {
     const isFavorited = favoriteMatchesList.includes(m.id);
     const favHeart = isFavorited ? "❤️" : "🤍";
     
-    const flagHome = m.homeFlag || "🏆";
-    const flagAway = m.awayFlag || "🏆";
-    
     card.innerHTML = `
       <div class="match-header">
         <span>Grupo ${m.group || "Mata-mata"} ${m.round ? `• Rodada ${m.round}` : ""} • Jogo #${m.id}</span>
@@ -674,7 +758,7 @@ function applyFilters() {
       <div class="match-teams" onclick="trackGAEvent('match_view', { match_id: ${m.id}, teams: '${m.homeTeam} vs ${m.awayTeam}' })">
         <div class="team-display left">
           <span class="team-name">${m.homeTeam}</span>
-          <span class="team-flag">${flagHome}</span>
+          <span class="team-flag" style="display:inline-flex; align-items:center; justify-content:center;">${getTeamFlagHTML(m.homeTeam, "24px")}</span>
         </div>
         
         <div class="score-display ${m.status === 'upcoming' || m.status === 'scheduled' ? 'upcoming' : ''}">
@@ -682,7 +766,7 @@ function applyFilters() {
         </div>
         
         <div class="team-display right">
-          <span class="team-flag">${flagAway}</span>
+          <span class="team-flag" style="display:inline-flex; align-items:center; justify-content:center;">${getTeamFlagHTML(m.awayTeam, "24px")}</span>
           <span class="team-name">${m.awayTeam}</span>
         </div>
       </div>
@@ -747,7 +831,7 @@ function renderTeams() {
     card.style.gap = "14px";
     
     card.innerHTML = `
-      <span style="font-size: 36px; line-height: 1;">${t.flag}</span>
+      <span style="display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px;">${getTeamFlagHTML(t.name, "38px")}</span>
       <div>
         <h4 style="font-size: 15px; font-weight: 800; color: var(--text-main);">${t.name}</h4>
         <small style="color: var(--text-muted); font-size: 11px;">Continente: ${t.region} • Rank: ${t.rating}</small>
@@ -791,8 +875,8 @@ function showTeamDetails(teamName) {
   const body = document.getElementById("modal-team-body");
   
   titleRow.innerHTML = `
-    <span style="font-size: 42px;">${team.flag}</span>
-    <div>
+    <span style="display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px;">${getTeamFlagHTML(team.name, "44px")}</span>
+    <div style="margin-left: 10px;">
       <h3 style="font-size: 20px; font-weight: 900; color: var(--primary);">${team.name}</h3>
       <small style="color: var(--text-muted);">Grupo ${team.group} • Continente: ${team.region}</small>
     </div>
@@ -1040,8 +1124,8 @@ function renderGroupStandingsTable(groupLetter) {
     rowsHTML += `
       <tr class="${idx < 2 ? 'highlighted' : ''}">
         <td style="font-weight:800; color: var(--secondary);">${idx + 1}º</td>
-        <td class="team-cell">
-          <span style="font-size:20px; line-height:1;">${row.flag}</span>
+        <td class="team-cell" style="display: flex; align-items: center; gap: 8px;">
+          <span style="display: inline-flex; align-items: center; justify-content: center;">${getTeamFlagHTML(row.name, "22px")}</span>
           <span style="font-size:12.5px;">${row.name}</span>
         </td>
         <td><strong>${row.pts}</strong></td>
@@ -1099,7 +1183,7 @@ function renderGroupMatchesSimulator(groupLetter) {
       <div class="match-teams">
         <div class="team-display left">
           <span class="team-name" style="font-size:13px;">${m.homeTeam}</span>
-          <span class="team-flag" style="font-size:22px;">${m.homeFlag}</span>
+          <span class="team-flag" style="display: inline-flex; align-items: center; justify-content: center;">${getTeamFlagHTML(m.homeTeam, "24px")}</span>
         </div>
         
         <div class="prediction-inputs" style="margin: 0 4px;">
@@ -1109,7 +1193,7 @@ function renderGroupMatchesSimulator(groupLetter) {
         </div>
         
         <div class="team-display right">
-          <span class="team-flag" style="font-size:22px;">${m.awayFlag}</span>
+          <span class="team-flag" style="display: inline-flex; align-items: center; justify-content: center;">${getTeamFlagHTML(m.awayTeam, "24px")}</span>
           <span class="team-name" style="font-size:13px;">${m.awayTeam}</span>
         </div>
       </div>
@@ -1164,21 +1248,26 @@ function renderKnockoutBracket() {
   const container = document.getElementById("simulator-bracket-container");
   if (!container) return;
 
+  // Calculate simulated count of group matches
+  const groupMatches = MATCHES.filter(m => m.phase === "grupos");
+  const simulatedGroupCount = groupMatches.filter(m => m.homeScore !== null && m.awayScore !== null).length;
+
+  const isGroupFullySimulated = (letter) => {
+    return MATCHES.filter(m => m.phase === "grupos" && m.group === letter).every(m => m.homeScore !== null && m.awayScore !== null);
+  };
+
   // Extract simulated winners from all 12 groups A-L
   const groupWinners = {};
   const groupRunners = {};
   
   groupsList.forEach(letter => {
-    const groupMatches = MATCHES.filter(m => m.phase === "grupos" && m.group === letter);
-    const hasSimulated = groupMatches.some(m => m.homeScore !== null && m.awayScore !== null);
-    
-    if (hasSimulated) {
+    if (isGroupFullySimulated(letter)) {
       const sorted = calculateGroupStats(letter);
-      groupWinners[letter] = sorted[0];
-      groupRunners[letter] = sorted[1];
+      groupWinners[letter] = sorted[0] || { name: `1º Grupo ${letter}`, flag: "🏆" };
+      groupRunners[letter] = sorted[1] || { name: `2º Grupo ${letter}`, flag: "🏆" };
     } else {
-      groupWinners[letter] = null;
-      groupRunners[letter] = null;
+      groupWinners[letter] = { name: "Classificado ainda não definido", flag: "❓" };
+      groupRunners[letter] = { name: "Classificado ainda não definido", flag: "❓" };
     }
   });
 
@@ -1189,13 +1278,83 @@ function renderKnockoutBracket() {
       const homeLetter = groupsList[idx % 12];
       const awayLetter = groupsList[(idx + 4) % 12];
       
-      const homeTeamObj = groupWinners[homeLetter] || { name: `1º Grupo ${homeLetter}`, flag: "🏆" };
-      const awayTeamObj = groupRunners[awayLetter] || { name: `2º Grupo ${awayLetter}`, flag: "🏆" };
+      const homeTeamObj = groupWinners[homeLetter];
+      const awayTeamObj = groupRunners[awayLetter];
 
       m.homeTeam = homeTeamObj.name;
       m.homeFlag = homeTeamObj.flag;
       m.awayTeam = awayTeamObj.name;
       m.awayFlag = awayTeamObj.flag;
+    }
+  });
+
+  // Dynamic propagation of knockout winners for subsequent rounds
+  // Round of 16 (oitavas, Matches #89 to #96)
+  MATCHES.forEach(m => {
+    if (m.phase === "oitavas") {
+      const idx = m.id - 89; // idx 0 to 7
+      const matchHome = MATCHES.find(g => g.id === (73 + idx * 2));
+      const matchAway = MATCHES.find(g => g.id === (74 + idx * 2));
+      
+      m.homeTeam = (matchHome && matchHome.winner && !matchHome.winner.includes("definido")) ? matchHome.winner : `Vencedor Jogo #${73 + idx * 2}`;
+      m.homeFlag = (matchHome && matchHome.winner && !matchHome.winner.includes("definido")) ? (TEAMS.find(t => t.name === matchHome.winner)?.flag || "⚽") : "⚽";
+      m.awayTeam = (matchAway && matchAway.winner && !matchAway.winner.includes("definido")) ? matchAway.winner : `Vencedor Jogo #${74 + idx * 2}`;
+      m.awayFlag = (matchAway && matchAway.winner && !matchAway.winner.includes("definido")) ? (TEAMS.find(t => t.name === matchAway.winner)?.flag || "⚽") : "⚽";
+    }
+  });
+
+  // Quarterfinals (quartas, Matches #97 to #100)
+  MATCHES.forEach(m => {
+    if (m.phase === "quartas") {
+      const idx = m.id - 97; // idx 0 to 3
+      const matchHome = MATCHES.find(g => g.id === (89 + idx * 2));
+      const matchAway = MATCHES.find(g => g.id === (90 + idx * 2));
+      
+      m.homeTeam = (matchHome && matchHome.winner && !matchHome.winner.includes("definido")) ? matchHome.winner : `Vencedor Jogo #${89 + idx * 2}`;
+      m.homeFlag = (matchHome && matchHome.winner && !matchHome.winner.includes("definido")) ? (TEAMS.find(t => t.name === matchHome.winner)?.flag || "🏆") : "🏆";
+      m.awayTeam = (matchAway && matchAway.winner && !matchAway.winner.includes("definido")) ? matchAway.winner : `Vencedor Jogo #${90 + idx * 2}`;
+      m.awayFlag = (matchAway && matchAway.winner && !matchAway.winner.includes("definido")) ? (TEAMS.find(t => t.name === matchAway.winner)?.flag || "🏆") : "🏆";
+    }
+  });
+
+  // Semifinals (semis, Matches #101 to #102)
+  MATCHES.forEach(m => {
+    if (m.phase === "semis") {
+      const idx = m.id - 101; // idx 0 to 1
+      const matchHome = MATCHES.find(g => g.id === (97 + idx * 2));
+      const matchAway = MATCHES.find(g => g.id === (98 + idx * 2));
+      
+      m.homeTeam = (matchHome && matchHome.winner && !matchHome.winner.includes("definido")) ? matchHome.winner : `Vencedor Jogo #${97 + idx * 2}`;
+      m.homeFlag = (matchHome && matchHome.winner && !matchHome.winner.includes("definido")) ? (TEAMS.find(t => t.name === matchHome.winner)?.flag || "👑") : "👑";
+      m.awayTeam = (matchAway && matchAway.winner && !matchAway.winner.includes("definido")) ? matchAway.winner : `Vencedor Jogo #${98 + idx * 2}`;
+      m.awayFlag = (matchAway && matchAway.winner && !matchAway.winner.includes("definido")) ? (TEAMS.find(t => t.name === matchAway.winner)?.flag || "👑") : "👑";
+    }
+  });
+
+  // 3rd Place Play-off (Match #103) & Grande Final (Match #104)
+  const semi1 = MATCHES.find(g => g.id === 101);
+  const semi2 = MATCHES.find(g => g.id === 102);
+
+  MATCHES.forEach(m => {
+    if (m.id === 103) { // 3rd Place
+      let homeL = "Perdedor Semifinal 1";
+      let awayL = "Perdedor Semifinal 2";
+      if (semi1 && semi1.status === "finished" && semi1.winner && !semi1.winner.includes("definido")) {
+        homeL = semi1.winner === semi1.homeTeam ? semi1.awayTeam : semi1.homeTeam;
+      }
+      if (semi2 && semi2.status === "finished" && semi2.winner && !semi2.winner.includes("definido")) {
+        awayL = semi2.winner === semi2.homeTeam ? semi2.awayTeam : semi2.homeTeam;
+      }
+      m.homeTeam = homeL;
+      m.homeFlag = (TEAMS.find(t => t.name === homeL)?.flag || "🥉");
+      m.awayTeam = awayL;
+      m.awayFlag = (TEAMS.find(t => t.name === awayL)?.flag || "🥉");
+    }
+    if (m.id === 104) { // Final
+      m.homeTeam = (semi1 && semi1.winner && !semi1.winner.includes("definido")) ? semi1.winner : "Vencedor Semifinal 1";
+      m.homeFlag = (semi1 && semi1.winner && !semi1.winner.includes("definido")) ? (TEAMS.find(t => t.name === semi1.winner)?.flag || "🏆") : "🏆";
+      m.awayTeam = (semi2 && semi2.winner && !semi2.winner.includes("definido")) ? semi2.winner : "Vencedor Semifinal 2";
+      m.awayFlag = (semi2 && semi2.winner && !semi2.winner.includes("definido")) ? (TEAMS.find(t => t.name === semi2.winner)?.flag || "🏆") : "🏆";
     }
   });
 
@@ -1210,7 +1369,7 @@ function renderKnockoutBracket() {
   const r16Matches = MATCHES.filter(m => m.phase === "oitavas");
   const qfMatches = MATCHES.filter(m => m.phase === "quartas");
   const sfMatches = MATCHES.filter(m => m.phase === "semis");
-  const finMatches = MATCHES.filter(m => m.phase === "final");
+  const finMatches = MATCHES.filter(m => m.phase === "final" || m.id === 103); // Show finals & 3rd place together in the last column
 
   r32Matches.forEach(m => {
     r32HTML += renderBracketMatchCard(m);
@@ -1232,7 +1391,69 @@ function renderKnockoutBracket() {
     finHTML += renderBracketMatchCard(m);
   });
 
+  // Unlock Status Block
+  let unlockStatusHTML = "";
+  if (simulatedGroupCount < 72) {
+    unlockStatusHTML = `
+      <div class="glass-panel" style="padding: 16px; margin-bottom: 20px; border-left: 4px solid var(--blood); background: linear-gradient(90deg, rgba(239,68,68,0.06), transparent);">
+        <h4 style="font-size: 14px; font-weight: 800; color: var(--blood); display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+          <span style="font-size:16px;">⚠️</span> Chaveamento Bloqueado (Aguardando Simulação)
+        </h4>
+        <p style="font-size: 12px; color: var(--text-muted); line-height: 1.4; margin-bottom: 10px;">
+          Defina os resultados de todos os 72 confrontos da fase de grupos para liberar as seleções classificadas e liberar as chaves de mata-mata.
+        </p>
+        <div style="display:flex; align-items:center; justify-content:space-between; font-size:11px; margin-bottom:4px; font-weight:bold;">
+          <span>Progresso da Fase de Grupos:</span>
+          <span>${simulatedGroupCount} / 72 simulações</span>
+        </div>
+        <div style="height:6px; background:rgba(255,255,255,0.05); border-radius:3px; overflow:hidden;">
+          <div style="width:${(simulatedGroupCount/72)*100}%; height:100%; background:var(--primary); transition:width 0.3s ease;"></div>
+        </div>
+      </div>
+    `;
+  } else {
+    unlockStatusHTML = `
+      <div class="glass-panel" style="padding: 16px; margin-bottom: 20px; border-left: 4px solid var(--primary); background: linear-gradient(90deg, rgba(34,197,94,0.06), transparent);">
+        <h4 style="font-size: 14px; font-weight: 800; color: var(--primary); display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+          <span style="font-size:16px;">✅</span> Mata-Mata Desbloqueado!
+        </h4>
+        <p style="font-size: 12px; color: var(--text-muted); line-height: 1.4;">
+          Todos os 72 confrontos da fase de grupos foram simulados! Agora, preencha os placares dos chaveamentos abaixo para definir o Campeão.
+        </p>
+      </div>
+    `;
+  }
+
+  // Champion Status Block
+  const grandFinal = MATCHES.find(g => g.id === 104);
+  let championHTML = "";
+  if (grandFinal && grandFinal.status === "finished" && grandFinal.winner && !grandFinal.winner.includes("definido") && !grandFinal.winner.includes("Semifinal")) {
+    const champ = grandFinal.winner;
+    const flag = TEAMS.find(t => t.name === champ)?.flag || "🏆";
+    championHTML = `
+      <div class="glass-panel" style="padding: 16px; margin-bottom: 20px; border: 2px solid var(--secondary); background: linear-gradient(135deg, rgba(234,179,8,0.1), transparent); text-align: center;">
+        <span style="font-size: 40px;">🏆</span>
+        <h4 style="font-size: 18px; font-weight: 900; color: var(--secondary); margin-top: 8px;">Campeão do Mundo Simulado!</h4>
+        <h3 style="font-size: 26px; font-weight: 900; margin-top: 4px;">${flag} ${champ} ${flag}</h3>
+        <p style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">Simulação concluída com sucesso! Parabéns pelo seu palpite!</p>
+      </div>
+    `;
+  } else {
+    championHTML = `
+      <div class="glass-panel" style="padding: 16px; margin-bottom: 20px; border: 1px dashed var(--line); text-align: center; color: var(--text-muted);">
+        <span style="font-size: 24px;">🏆</span>
+        <h4 style="font-size: 13.5px; font-weight: 800; margin-top: 4px;">Campeão ainda não definido</h4>
+        <p style="font-size: 11.5px; margin-top: 2px;">Preencha todos os jogos do simulador para coroar o Campeão do Mundo de 2026!</p>
+      </div>
+    `;
+  }
+
   container.innerHTML = `
+    <div style="grid-column: 1 / -1; display: flex; flex-direction: column; gap: 8px;">
+      ${unlockStatusHTML}
+      ${championHTML}
+    </div>
+    
     <div class="bracket-phase">
       <h4 style="font-size:11px; text-transform:uppercase; font-weight:800; color:var(--accent); text-align:center;">16avos de Final (32)</h4>
       ${r32HTML}
@@ -1254,22 +1475,73 @@ function renderKnockoutBracket() {
       ${finHTML}
     </div>
   `;
+
+  // Listen to changes in simulation inputs for knockout bracket
+  container.querySelectorAll("input").forEach(input => {
+    input.addEventListener("change", (e) => {
+      const matchId = parseInt(input.getAttribute("data-match-id"));
+      const side = input.getAttribute("data-side");
+      const valStr = e.target.value.trim();
+      const val = parseInt(valStr);
+      
+      const matchObj = MATCHES.find(m => m.id === matchId);
+      if (matchObj) {
+        if (side === "home") matchObj.homeScore = valStr === "" || isNaN(val) ? null : val;
+        if (side === "away") matchObj.awayScore = valStr === "" || isNaN(val) ? null : val;
+        
+        if (matchObj.homeScore !== null && matchObj.awayScore !== null) {
+          matchObj.status = "finished";
+          if (matchObj.homeScore > matchObj.awayScore) {
+            matchObj.winner = matchObj.homeTeam;
+          } else if (matchObj.homeScore < matchObj.awayScore) {
+            matchObj.winner = matchObj.awayTeam;
+          } else {
+            matchObj.winner = matchObj.homeTeam; // Default winner for draw in simulation
+          }
+        } else {
+          matchObj.status = "scheduled";
+          matchObj.winner = null;
+        }
+        
+        savePredictionsToStorage();
+        renderKnockoutBracket();
+      }
+    });
+  });
 }
 
 function renderBracketMatchCard(m) {
+  const isDisabled = m.homeTeam.includes("definido") || m.awayTeam.includes("definido") || m.homeTeam.includes("Vencedor") || m.awayTeam.includes("Vencedor") || m.homeTeam.includes("Perdedor") || m.awayTeam.includes("Perdedor");
+  const homeScoreVal = m.homeScore !== null ? m.homeScore : "";
+  const awayScoreVal = m.awayScore !== null ? m.awayScore : "";
+
   return `
-    <div class="glass-panel" style="padding: 10px 14px; font-size:12px; display:flex; flex-direction:column; gap:4px;">
+    <div class="glass-panel" style="padding: 10px 14px; font-size:12px; display:flex; flex-direction:column; gap:6px;">
       <div style="font-size:9px; color:var(--text-muted); display:flex; justify-content:space-between;">
-        <span>Jogo #${m.id}</span>
+        <span>Jogo #${m.id} (${m.phase === '32avos' ? '16avos' : m.phase})</span>
         <span>${m.city}</span>
       </div>
-      <div style="display:flex; justify-content:space-between; align-items:center; font-weight:700;">
-        <span>${m.homeFlag} ${m.homeTeam.substring(0, 14)}</span>
-        <span style="font-family:monospace; color:var(--primary);">${m.homeScore !== null ? m.homeScore : "-"}</span>
+      <div style="display:flex; justify-content:space-between; align-items:center; font-weight:700; gap:8px;">
+        <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:110px; display:inline-flex; align-items:center; gap:6px;" title="${m.homeTeam}">
+          ${getTeamFlagHTML(m.homeTeam, "18px")}
+          <span>${m.homeTeam}</span>
+        </span>
+        <input type="number" min="0" max="99" value="${homeScoreVal}" 
+          data-match-id="${m.id}" data-side="home" 
+          ${isDisabled ? 'disabled' : ''} 
+          style="width:36px; height:22px; text-align:center; background:rgba(0,0,0,0.3); border:1px solid var(--line); color:#fff; border-radius:4px; font-family:monospace; font-size:11px; padding:0; outline:none;"
+          placeholder="-">
       </div>
-      <div style="display:flex; justify-content:space-between; align-items:center; font-weight:700;">
-        <span>${m.awayFlag} ${m.awayTeam.substring(0, 14)}</span>
-        <span style="font-family:monospace; color:var(--primary);">${m.awayScore !== null ? m.awayScore : "-"}</span>
+      <div style="display:flex; justify-content:space-between; align-items:center; font-weight:700; gap:8px;">
+        <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:110px; display:inline-flex; align-items:center; gap:6px;" title="${m.awayTeam}">
+          ${getTeamFlagHTML(m.awayTeam, "18px")}
+          <span>${m.awayTeam}</span>
+        </span>
+        <input type="number" min="0" max="99" value="${awayScoreVal}" 
+          data-match-id="${m.id}" data-side="away" 
+          ${isDisabled ? 'disabled' : ''} 
+          style="width:36px; height:22px; text-align:center; background:rgba(0,0,0,0.3); border:1px solid var(--line); color:#fff; border-radius:4px; font-family:monospace; font-size:11px; padding:0; outline:none;"
+          placeholder="-">
       </div>
     </div>
   `;
@@ -1773,7 +2045,7 @@ function renderPredictionMatches() {
       <div class="match-teams">
         <div class="team-display left">
           <span class="team-name" style="font-size:13px;">${m.homeTeam}</span>
-          <span class="team-flag" style="font-size:22px;">${m.homeFlag}</span>
+          <span class="team-flag" style="display: inline-flex; align-items: center; justify-content: center;">${getTeamFlagHTML(m.homeTeam, "24px")}</span>
         </div>
         
         <div class="prediction-inputs" style="margin: 0 4px;">
@@ -1783,7 +2055,7 @@ function renderPredictionMatches() {
         </div>
         
         <div class="team-display right">
-          <span class="team-flag" style="font-size:22px;">${m.awayFlag}</span>
+          <span class="team-flag" style="display: inline-flex; align-items: center; justify-content: center;">${getTeamFlagHTML(m.awayTeam, "24px")}</span>
           <span class="team-name" style="font-size:13px;">${m.awayTeam}</span>
         </div>
       </div>
@@ -2026,13 +2298,13 @@ window.addEventListener("DOMContentLoaded", () => {
         <div class="match-teams" onclick="navigateTo('matches')">
           <div class="team-display left">
             <span class="team-name" style="font-size:12.5px;">${m.homeTeam}</span>
-            <span class="team-flag" style="font-size:22px;">${m.homeFlag}</span>
+            <span class="team-flag" style="display: inline-flex; align-items: center; justify-content: center;">${getTeamFlagHTML(m.homeTeam, "24px")}</span>
           </div>
           <div class="score-display ${isScheduled ? 'upcoming' : ''}">
             ${scoreDisplay}
           </div>
           <div class="team-display right">
-            <span class="team-flag" style="font-size:22px;">${m.awayFlag}</span>
+            <span class="team-flag" style="display: inline-flex; align-items: center; justify-content: center;">${getTeamFlagHTML(m.awayTeam, "24px")}</span>
             <span class="team-name" style="font-size:12.5px;">${m.awayTeam}</span>
           </div>
         </div>

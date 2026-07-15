@@ -1,4 +1,4 @@
-const CACHE_NAME = "copacenter-cache-v2";
+const CACHE_NAME = "copacenter-cache-v6";
 const ASSETS_TO_CACHE = [
   "./",
   "./index.html",
