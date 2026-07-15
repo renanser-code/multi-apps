@@ -293,16 +293,6 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
           </div>
         </div>
 
-        <!-- Signature field -->
-        <div style="margin: 16px 0 0 0; background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 14px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-            <label for="schedSignature" style="font-size:13px; font-weight:700; color:#a5b4fc;">✍️ Assinatura do Outlook <span style="color:#64748b; font-weight:400;">(salva automaticamente)</span></label>
-            <button onclick="clearSignature()" style="background:none; border:1px solid #475569; border-radius:6px; color:#94a3b8; font-size:11px; padding:3px 8px; cursor:pointer;">Limpar</button>
-          </div>
-          <div style="font-size:12px; color:#64748b; margin-bottom:8px;">Cole aqui sua assinatura do Outlook. Ela será adicionada automaticamente ao final de cada e-mail enviado.</div>
-          <textarea id="schedSignature" placeholder="Cole sua assinatura aqui (pode ser texto simples ou HTML)..." style="min-height:80px; font-family: Consolas, monospace; font-size:12px; border-color:#334155;" oninput="saveSignature(this.value)"></textarea>
-        </div>
-
         <!-- Script preview -->
         <div style="margin: 15px 0 0 0;">
           <label style="font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">Script PowerShell gerado (pré-visualização):</label>
@@ -995,14 +985,7 @@ function buildSchedulingScript() {
   const displayDT  = d + "/" + mo + "/" + y + " as " + hh + ":" + mm;
 
   const emailContent = document.getElementById("emailText").innerHTML;
-  const signatureRaw  = document.getElementById("schedSignature").value.trim();
-  // Wrap plain-text signature in a styled div if it doesn't look like HTML
-  const signatureHtml = signatureRaw
-    ? (signatureRaw.trim().startsWith('<') ? signatureRaw : '<div style="font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#1f2937;margin-top:20px;border-top:1px solid #d1d5db;padding-top:10px;">' + signatureRaw.replace(/\n/g,'<br>') + '</div>')
-    : '';
-  // Combine email body + signature, then escape single quotes for PowerShell
-  const fullBody    = emailContent + signatureHtml;
-  const escapedHtml = fullBody.replace(/'/g, "''");
+  const escapedHtml  = emailContent.replace(/'/g, "''");
   const subject = "Inicio das Atividades - GMUD " + gmudNum;
 
   const lines = [
@@ -1018,7 +1001,12 @@ function buildSchedulingScript() {
     "    $Mail    = $Outlook.CreateItem(0)",
     "",
     "    $Mail.Subject              = '" + subject + "'",
-    "    $Mail.HTMLBody             = '" + escapedHtml + "'",
+    "    $BodyHtml                  = '" + escapedHtml + "'",
+    "    # Adicionar assinatura 'Claranet' automaticamente do Outlook",
+    "    $SigPath = [Environment]::GetFolderPath('ApplicationData') + '\\Microsoft\\Signatures\\Claranet.htm'",
+    "    $SigHtml = ''",
+    "    if (Test-Path $SigPath) { $SigHtml = Get-Content $SigPath -Raw -Encoding UTF8 }",
+    "    $Mail.HTMLBody             = $BodyHtml + $SigHtml",
     "    $Mail.To                   = '" + toAddr + "'",
     "    $Mail.CC                   = '" + ccAddr + "'",
     "    $Mail.DeferredDeliveryTime = [DateTime]'" + outlookDT + "'",
@@ -1353,28 +1341,8 @@ document.getElementById("schedGmud").addEventListener("input", () => { generate(
 // Also update preview when email body is re-generated
 const origGenerate = generate;
 
-function saveSignature(value) {
-  try { localStorage.setItem('gmud_signature', value); } catch(e) {}
-  updateScriptPreview();
-}
-
-function clearSignature() {
-  document.getElementById('schedSignature').value = '';
-  try { localStorage.removeItem('gmud_signature'); } catch(e) {}
-  updateScriptPreview();
-}
-
-function loadSavedSignature() {
-  try {
-    const saved = localStorage.getItem('gmud_signature');
-    if (saved) {
-      document.getElementById('schedSignature').value = saved;
-    }
-  } catch(e) {}
-}
 
 generate();
-loadSavedSignature();
 updateScriptPreview();
 loadLatestKBsFromMicrosoft();
 </script>
