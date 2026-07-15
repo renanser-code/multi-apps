@@ -1183,7 +1183,8 @@ function parseGmudEmail() {
     allEmailsFound.forEach((email, i) => {
       // Guess: if email is from sender domain or has claranet, set as 'skip' default
       // Otherwise put as 'to' for first, 'cc' for rest
-      const defaultVal = i === 0 ? 'to' : 'to';
+      // @claranet.com → Cc, outros domínios → Para (To)
+      const defaultVal = email.toLowerCase().includes('@claranet.com') ? 'cc' : 'to';
       const row = document.createElement('div');
       row.className = 'email-sel-row';
       row.dataset.email = email;
