@@ -1000,13 +1000,12 @@ function buildSchedulingScript() {
     "    $Outlook = New-Object -ComObject Outlook.Application",
     "    $Mail    = $Outlook.CreateItem(0)",
     "",
+    "    # Usar .Display() para o Outlook inserir a assinatura 'Claranet' automaticamente",
+    "    $Mail.Display()",
+    "    $ExistingBody = $Mail.HTMLBody",
+    "    # Inserir o corpo do comunicado ANTES da assinatura",
+    "    $Mail.HTMLBody = '" + escapedHtml + "' + $ExistingBody",
     "    $Mail.Subject              = '" + subject + "'",
-    "    $BodyHtml                  = '" + escapedHtml + "'",
-    "    # Adicionar assinatura 'Claranet' automaticamente do Outlook",
-    "    $SigPath = [Environment]::GetFolderPath('ApplicationData') + '\\Microsoft\\Signatures\\Claranet.htm'",
-    "    $SigHtml = ''",
-    "    if (Test-Path $SigPath) { $SigHtml = Get-Content $SigPath -Raw -Encoding UTF8 }",
-    "    $Mail.HTMLBody             = $BodyHtml + $SigHtml",
     "    $Mail.To                   = '" + toAddr + "'",
     "    $Mail.CC                   = '" + ccAddr + "'",
     "    $Mail.DeferredDeliveryTime = [DateTime]'" + outlookDT + "'",
@@ -1206,13 +1205,23 @@ function parseGmudEmail() {
     });
   }
 
+  // Auto-apply email classification immediately — @claranet.com → Cc, others → To
+  const autoTo = [];
+  const autoCc = [];
+  allEmailsFound.forEach(email => {
+    if (email.toLowerCase().includes('@claranet.com')) autoCc.push(email);
+    else autoTo.push(email);
+  });
+  if (autoTo.length) document.getElementById("schedTo").value = autoTo.join("; ");
+  if (autoCc.length) document.getElementById("schedCc").value = autoCc.join("; ");
+
   // Show parsed preview
   document.getElementById("previewGmud").textContent = gmudNum || "(não encontrado)";
   document.getElementById("previewDatetime").textContent = schedDate && schedTime ? `${schedDate.split('-').reverse().join('/')} às ${schedTime}` : "(não encontrado)";
   document.getElementById("previewServers").textContent = serverLines.join("\n") || "(nenhum servidor detectado)";
   document.getElementById("parsedPreview").style.display = "block";
 
-  // 7. Show feedback and re-generate
+  // Show feedback and re-generate
   const feedback = document.getElementById("parseFeedback");
   feedback.style.display = "inline";
   setTimeout(() => feedback.style.display = "none", 3000);
