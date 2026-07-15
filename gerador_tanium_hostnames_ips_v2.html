@@ -532,13 +532,9 @@ function processInput() {
     vmStatusPanel.style.display = "block";
     let listHtml = "";
     
-    const matchedHosts = new Set();
-    const matchedIps = new Set();
-    
-    // Create maps for efficient lookups
+     // Create lookup maps from CMDB database
     const cmdbHostMap = {};
     const cmdbIpMap = {};
-    
     cmdbDatabase.forEach(server => {
       if (server.HostName) {
         const key = server.HostName.toLowerCase().split(".")[0];
@@ -549,140 +545,124 @@ function processInput() {
       }
     });
 
-    // Track already processed servers to prevent duplicate rendering of status items
-    const renderedServerIds = new Set();
-    const activeVMs = [];
-    const offlineVMs = [];
-    const unknownVMs = [];
+    // We will parse the raw lines one by one to keep the association between Hostname and IP if they came from the same server
+    const detectedServers = [];
+    const processedServerIds = new Set();
+    const processedUnregisteredNames = new Set();
 
-    // Check hostnames
-    const filteredHostnames = [];
-    rawHostnames.forEach(host => {
-      const hostKey = host.toLowerCase().split(".")[0];
-      const serverInfo = cmdbHostMap[hostKey];
+    // First pass: Process line by line to extract and match servers
+    lines.forEach(line => {
+      const lineHost = findHostname(line);
+      const lineIps = findIps(line);
       
-      let status = "Desconhecido";
-      let badgeClass = "status-desconhecido";
-      let details = "Não encontrado no CMDB";
-      let isFound = false;
-      let srvId = null;
-      
-      if (serverInfo) {
-        isFound = true;
-        srvId = serverInfo.ServerID || serverInfo.ServerUUID || hostKey;
-        status = serverInfo.Status || "Desconhecido";
-        const ipInfo = serverInfo.IP ? ` | IP: ${serverInfo.IP}` : "";
-        details = `Cliente: ${serverInfo.Customer || "N/A"}${ipInfo} | OS: ${serverInfo.SO || "N/A"}`;
-        
-        if (status.toLowerCase() === "ligada") {
-          badgeClass = "status-ligada";
-          filteredHostnames.push(host);
-          activeVMs.push({ name: host, info: details });
-        } else if (status.toLowerCase() === "desligada") {
-          badgeClass = "status-desligada";
-          offlineVMs.push({ name: host, info: details, reason: "Desligada no CMDB" });
-          if (!onlyPoweredOn) filteredHostnames.push(host);
-        } else {
-          unknownVMs.push({ name: host, info: details, reason: `Status do CMDB: ${status}` });
-          if (!onlyPoweredOn) filteredHostnames.push(host);
-        }
-      } else {
-        srvId = hostKey; // Safe fallback key
-        unknownVMs.push({ name: host, info: details, reason: "Não cadastrado no CMDB" });
-        if (!onlyPoweredOn) {
-          filteredHostnames.push(host);
-        }
+      let hostKey = lineHost ? lineHost.toLowerCase().split(".")[0] : "";
+      let matchedServer = null;
+
+      // Try matching by hostname first
+      if (hostKey && cmdbHostMap[hostKey]) {
+        matchedServer = cmdbHostMap[hostKey];
       }
       
-      // Register srvId to prevent duplicate IP processing of the same machine
-      renderedServerIds.add(srvId);
-      
-      // Render status item only if we haven't rendered this server yet (checks duplicates before rendering)
-      listHtml += `<div class="vm-item">
-        <span><strong>${host}</strong> (${details})</span>
-        <span class="status-badge ${badgeClass}">${status}</span>
-      </div>`;
-    });
-
-    // Check IPs
-    const filteredIps = [];
-    rawIps.forEach(ip => {
-      const serverInfo = cmdbIpMap[ip];
-      
-      let status = "Desconhecido";
-      let badgeClass = "status-desconhecido";
-      let details = "Não encontrado no CMDB";
-      let isFound = false;
-      let srvId = ip; // Default to ip
-      
-      if (serverInfo) {
-        isFound = true;
-        const hostKey = serverInfo.HostName ? serverInfo.HostName.toLowerCase().split(".")[0] : "";
-        srvId = serverInfo.ServerID || serverInfo.ServerUUID || hostKey || ip;
-        status = serverInfo.Status || "Desconhecido";
-        const hostInfo = serverInfo.HostName ? `Hostname: ${serverInfo.HostName} | ` : "";
-        details = `${hostInfo}Cliente: ${serverInfo.Customer || "N/A"}`;
-        
-        // Check cross-reference to prevent duplicate VM categorization in the e-mail template lists
-        if (hostKey && (renderedServerIds.has(hostKey) || renderedServerIds.has(srvId))) {
-          if (status.toLowerCase() === "ligada") {
-            filteredIps.push(ip);
-          } else if (status.toLowerCase() === "desligada") {
-            if (!onlyPoweredOn) filteredIps.push(ip);
-          } else {
-            if (!onlyPoweredOn) filteredIps.push(ip);
-          }
-          return;
-        }
-        
-        if (status.toLowerCase() === "ligada") {
-          badgeClass = "status-ligada";
-          filteredIps.push(ip);
-          activeVMs.push({ name: ip, info: details });
-        } else if (status.toLowerCase() === "desligada") {
-          badgeClass = "status-desligada";
-          offlineVMs.push({ name: ip, info: details, reason: "Desligada no CMDB" });
-          if (!onlyPoweredOn) filteredIps.push(ip);
-        } else {
-          unknownVMs.push({ name: ip, info: details, reason: `Status do CMDB: ${status}` });
-          if (!onlyPoweredOn) filteredIps.push(ip);
-        }
-      } else {
-        // If IP is not in CMDB, check if we already processed a hostname with the same IP in raw input (cross-reference lookup)
-        let isIpAlreadyMatched = false;
-        
-        // Search through rawHostnames to see if any of them resolved to this IP in the CMDB
-        for (let host of rawHostnames) {
-          const hostKey = host.toLowerCase().split(".")[0];
-          const hostSrv = cmdbHostMap[hostKey];
-          if (hostSrv && hostSrv.IP === ip) {
-            isIpAlreadyMatched = true;
+      // If not matched by hostname, try matching by any identified IP on the line
+      if (!matchedServer && lineIps.length > 0) {
+        for (let ip of lineIps) {
+          if (cmdbIpMap[ip]) {
+            matchedServer = cmdbIpMap[ip];
             break;
           }
         }
-        
-        if (isIpAlreadyMatched) {
-          // Already handled as hostname, just push to Tanium if not strict
-          if (!onlyPoweredOn) filteredIps.push(ip);
-          return;
+      }
+
+      if (matchedServer) {
+        const srvId = matchedServer.ServerID || matchedServer.ServerUUID || (matchedServer.HostName ? matchedServer.HostName.toLowerCase().split(".")[0] : "") || matchedServer.IP;
+        if (!processedServerIds.has(srvId)) {
+          processedServerIds.add(srvId);
+          detectedServers.push({
+            isRegistered: true,
+            serverInfo: matchedServer,
+            displayName: matchedServer.HostName || lineHost || matchedServer.IP,
+            ip: matchedServer.IP || (lineIps.length > 0 ? lineIps[0] : "")
+          });
         }
-        
-        unknownVMs.push({ name: ip, info: details, reason: "Não cadastrado no CMDB" });
-        if (!onlyPoweredOn) {
-          filteredIps.push(ip);
+      } else {
+        // Unregistered server
+        const nameOrIp = lineHost || (lineIps.length > 0 ? lineIps[0] : "");
+        if (nameOrIp) {
+          const lookupKey = nameOrIp.toLowerCase().split(".")[0];
+          if (!processedUnregisteredNames.has(lookupKey)) {
+            processedUnregisteredNames.add(lookupKey);
+            detectedServers.push({
+              isRegistered: false,
+              displayName: nameOrIp,
+              ip: lineIps.length > 0 ? lineIps[0] : ""
+            });
+          }
         }
       }
-      
-      // Render status item and register server if we haven't rendered this server yet
-      if (!isFound || !renderedServerIds.has(srvId)) {
-        if (isFound) renderedServerIds.add(srvId);
+    });
+
+    const activeVMs = [];
+    const offlineVMs = [];
+    const unknownVMs = [];
+    
+    const filteredHostnames = [];
+    const filteredIps = [];
+
+    // Second pass: Classify and compile the outputs
+    detectedServers.forEach(srv => {
+      if (srv.isRegistered) {
+        const info = srv.serverInfo;
+        const status = info.Status || "Desconhecido";
+        const ipInfo = info.IP ? ` | IP: ${info.IP}` : "";
+        const details = `Cliente: ${info.Customer || "N/A"}${ipInfo} | OS: ${info.SO || "N/A"}`;
+        
+        let badgeClass = "status-desconhecido";
+        
+        if (status.toLowerCase() === "ligada") {
+          badgeClass = "status-ligada";
+          if (info.HostName) filteredHostnames.push(info.HostName.split(".")[0]);
+          if (info.IP) filteredIps.push(info.IP);
+          activeVMs.push({ name: srv.displayName, info: details });
+        } else if (status.toLowerCase() === "desligada") {
+          badgeClass = "status-desligada";
+          offlineVMs.push({ name: srv.displayName, info: details, reason: "Desligada no CMDB" });
+          if (!onlyPoweredOn) {
+            if (info.HostName) filteredHostnames.push(info.HostName.split(".")[0]);
+            if (info.IP) filteredIps.push(info.IP);
+          }
+        } else {
+          unknownVMs.push({ name: srv.displayName, info: details, reason: `Status do CMDB: ${status}` });
+          if (!onlyPoweredOn) {
+            if (info.HostName) filteredHostnames.push(info.HostName.split(".")[0]);
+            if (info.IP) filteredIps.push(info.IP);
+          }
+        }
+        
         listHtml += `<div class="vm-item">
-          <span><strong>${ip}</strong> (${details})</span>
+          <span><strong>${srv.displayName}</strong> (${details})</span>
           <span class="status-badge ${badgeClass}">${status}</span>
+        </div>`;
+      } else {
+        // Unregistered server
+        const details = "Não encontrado no CMDB";
+        unknownVMs.push({ name: srv.displayName, info: details, reason: "Não cadastrado no CMDB" });
+        
+        if (!onlyPoweredOn) {
+          if (isValidIp(srv.displayName)) {
+            filteredIps.push(srv.displayName);
+          } else {
+            filteredHostnames.push(srv.displayName.split(".")[0]);
+            if (srv.ip) filteredIps.push(srv.ip);
+          }
+        }
+        
+        listHtml += `<div class="vm-item">
+          <span><strong>${srv.displayName}</strong> (${details})</span>
+          <span class="status-badge status-desconhecido">Desconhecido</span>
         </div>`;
       }
     });
-    
+
     vmListContainer.innerHTML = listHtml;
     finalHostnames = filteredHostnames;
     finalIps = filteredIps;
