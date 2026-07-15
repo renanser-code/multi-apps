@@ -983,6 +983,8 @@ function buildSchedulingScript() {
   const [hh, mm]   = schedTime.split(":");
   const outlookDT  = mo + "/" + d + "/" + y + " " + hh + ":" + mm + ":00";
   const displayDT  = d + "/" + mo + "/" + y + " as " + hh + ":" + mm;
+  // Use individual integer components for DateTime - completely culture-independent
+  const dtNew = "[DateTime]::new(" + parseInt(y) + ", " + parseInt(mo) + ", " + parseInt(d) + ", " + parseInt(hh) + ", " + parseInt(mm) + ", 0)";
 
   const emailContent = document.getElementById("emailText").innerHTML;
   const escapedHtml  = emailContent.replace(/'/g, "''");
@@ -1008,7 +1010,7 @@ function buildSchedulingScript() {
     "    $Mail.Subject              = '" + subject + "'",
     "    $Mail.To                   = '" + toAddr + "'",
     "    $Mail.CC                   = '" + ccAddr + "'",
-    "    $Mail.DeferredDeliveryTime = [DateTime]'" + outlookDT + "'",
+    "    $Mail.DeferredDeliveryTime = " + dtNew,
     "",
     "    $Mail.Send()",
     "",
