@@ -977,66 +977,58 @@ function buildSchedulingScript() {
 
   if (!schedDate || !schedTime) return null;
 
-  // Convert YYYY-MM-DD + HH:MM → MM/DD/YYYY HH:MM:SS (format Outlook accepts)
+  // Convert YYYY-MM-DD + HH:MM to Outlook format (MM/DD/YYYY HH:MM:SS)
   const [y, mo, d] = schedDate.split("-");
   const [hh, mm]   = schedTime.split(":");
-  const outlookDT  = `${mo}/${d}/${y} ${hh}:${mm}:00`;
-  const displayDT  = `${d}/${mo}/${y} às ${hh}:${mm}`;
+  const outlookDT  = mo + "/" + d + "/" + y + " " + hh + ":" + mm + ":00";
+  const displayDT  = d + "/" + mo + "/" + y + " as " + hh + ":" + mm;
 
   const emailContent = document.getElementById("emailText").innerHTML;
-  // Escape for PowerShell here-string (backtick-escape backticks, escape $)
-  const escapedHtml = emailContent
-    .replace(/`/g, "``")
-    .replace(/\$/g, "`$");
-  const subject = `Início das Atividades - GMUD ${gmudNum}`;
+  // Escape single quotes for PowerShell single-quoted string
+  const escapedHtml = emailContent.replace(/'/g, "''");
+  const subject = "Inicio das Atividades - GMUD " + gmudNum;
 
-  return `# ─────────────────────────────────────────────────────────────
-# Agendamento de E-mail de GMUD via Outlook (Envio Agendado)
-# GMUD    : ${gmudNum}
-# Envio   : ${displayDT}
-# Para    : ${toAddr || "(não definido)"}
-# Cc      : ${ccAddr || "(não definido)"}
-# NÃO requer privilégios de Administrador
-# ─────────────────────────────────────────────────────────────
-
-try {
-    $Outlook = New-Object -ComObject Outlook.Application
-    $Mail    = $Outlook.CreateItem(0)   # 0 = olMailItem
-
-    $Mail.Subject             = "${subject}"
-    $Mail.HTMLBody            = @"
-${escapedHtml}
-"@
-    $Mail.To                  = "${toAddr}"
-    $Mail.CC                  = "${ccAddr}"
-
-    # DeferredDeliveryTime: Outlook segura o e-mail e envia automaticamente
-    # no dia e hora definidos (Outlook precisa estar aberto no momento)
-    $Mail.DeferredDeliveryTime = [DateTime]"${outlookDT}"
-
-    $Mail.Send()
-
-    Write-Host ""
-    Write-Host "✅ E-mail agendado com sucesso!" -ForegroundColor Green
-    Write-Host "   GMUD  : ${gmudNum}"
-    Write-Host "   Envio : ${displayDT}"
-    Write-Host "   Para  : ${toAddr}"
-    Write-Host ""
-    Write-Host "O e-mail está na pasta 'Caixa de Saída' do Outlook." -ForegroundColor Cyan
-    Write-Host "Ele será enviado automaticamente em ${displayDT}." -ForegroundColor Cyan
-    Write-Host "(Deixe o Outlook aberto no horário programado)" -ForegroundColor Yellow
-
-} catch {
-    Write-Host ""
-    Write-Host "❌ Erro ao agendar o e-mail:" -ForegroundColor Red
-    Write-Host $_.Exception.Message -ForegroundColor Red
-    Write-Host ""
-    Write-Host "Verifique se o Outlook está instalado e aberto." -ForegroundColor Yellow
+  const lines = [
+    "# Agendamento de E-mail de GMUD via Outlook (Envio Agendado)",
+    "# GMUD    : " + gmudNum,
+    "# Envio   : " + displayDT,
+    "# Para    : " + (toAddr || "(nao definido)"),
+    "# Cc      : " + (ccAddr || "(nao definido)"),
+    "# NAO requer privilegios de Administrador",
+    "",
+    "try {",
+    "    $Outlook = New-Object -ComObject Outlook.Application",
+    "    $Mail    = $Outlook.CreateItem(0)",
+    "",
+    "    $Mail.Subject              = '" + subject + "'",
+    "    $Mail.HTMLBody             = '" + escapedHtml + "'",
+    "    $Mail.To                   = '" + toAddr + "'",
+    "    $Mail.CC                   = '" + ccAddr + "'",
+    "    $Mail.DeferredDeliveryTime = [DateTime]'" + outlookDT + "'",
+    "",
+    "    $Mail.Send()",
+    "",
+    "    Write-Host ''",
+    "    Write-Host 'E-mail agendado com sucesso!' -ForegroundColor Green",
+    "    Write-Host '   GMUD  : " + gmudNum + "'",
+    "    Write-Host '   Envio : " + displayDT + "'",
+    "    Write-Host '   Para  : " + toAddr + "'",
+    "    Write-Host ''",
+    "    Write-Host 'O e-mail esta na Caixa de Saida do Outlook.' -ForegroundColor Cyan",
+    "    Write-Host 'Sera enviado automaticamente em " + displayDT + ".' -ForegroundColor Cyan",
+    "    Write-Host '(Deixe o Outlook aberto no horario programado)' -ForegroundColor Yellow",
+    "",
+    "} catch {",
+    "    Write-Host 'Erro ao agendar o e-mail:' -ForegroundColor Red",
+    "    Write-Host $_.Exception.Message -ForegroundColor Red",
+    "    Write-Host 'Verifique se o Outlook esta instalado e aberto.' -ForegroundColor Yellow",
+    "}",
+    "",
+    "Read-Host 'Pressione Enter para fechar'"
+  ];
+  return lines.join("\r\n");
 }
 
-Read-Host "`nPressione Enter para fechar"
-`;
-}
 
 // Auto-update preview textarea whenever scheduling fields change
 function updateScriptPreview() {
