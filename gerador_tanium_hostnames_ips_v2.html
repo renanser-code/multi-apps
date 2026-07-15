@@ -622,6 +622,23 @@ function processInput() {
         const hostInfo = serverInfo.HostName ? `Hostname: ${serverInfo.HostName} | ` : "";
         details = `${hostInfo}Cliente: ${serverInfo.Customer || "N/A"}`;
         
+        // Check cross-reference to prevent duplicate VM categorization in the e-mail template lists
+        if (hostKey && cmdbHostMap[hostKey]) {
+          const crossSrv = cmdbHostMap[hostKey];
+          const crossId = crossSrv.ServerID || crossSrv.ServerUUID || hostKey;
+          if (renderedServerIds.has(crossId)) {
+            // Already added as a Hostname to activeVMs, offlineVMs or unknownVMs, just save IP for Tanium
+            if (status.toLowerCase() === "ligada") {
+              filteredIps.push(ip);
+            } else if (status.toLowerCase() === "desligada") {
+              if (!onlyPoweredOn) filteredIps.push(ip);
+            } else {
+              if (!onlyPoweredOn) filteredIps.push(ip);
+            }
+            return;
+          }
+        }
+        
         if (status.toLowerCase() === "ligada") {
           badgeClass = "status-ligada";
           filteredIps.push(ip);
@@ -641,20 +658,7 @@ function processInput() {
         }
       }
       
-      // Render status item only if we haven't rendered this server yet (checks cross-reference with hostname map also)
-      if (isFound) {
-        // Double check cross-reference with Hostname key to link them securely
-        const crossHostKey = serverInfo.HostName ? serverInfo.HostName.toLowerCase().split(".")[0] : "";
-        if (crossHostKey && cmdbHostMap[crossHostKey]) {
-          const crossSrv = cmdbHostMap[crossHostKey];
-          const crossId = crossSrv.ServerID || crossSrv.ServerUUID || crossHostKey;
-          if (renderedServerIds.has(crossId)) {
-            // Already rendered under Hostname check, just map the output and skip duplicate HTML rendering
-            return;
-          }
-        }
-      }
-
+      // Render status item and register server if we haven't rendered this server yet
       if (!isFound || !renderedServerIds.has(srvId)) {
         if (isFound) renderedServerIds.add(srvId);
         listHtml += `<div class="vm-item">
