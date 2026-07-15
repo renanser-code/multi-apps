@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gerador Tanium V3 - CMDB ClaraHub Pilot (Agendamento)</title>
+  <style>
+    body { margin:0; padding:28px; background:#0f172a; color:#f9fafb; font-family:Arial, Helvetica, sans-serif; }
+    .container { max-width:1120px; margin:auto; background:#1f2937; border:1px solid #334155; border-radius:16px; overflow:hidden; box-shadow:0 18px 45px rgba(0,0,0,.35); }
+    .header { background:#0b1f3a; padding:22px 26px; border-bottom:1px solid #334155; }
+    h1 { margin:0; font-size:28px; }
+    .subtitle { margin-top:8px; color:#cbd5e1; line-height:1.45; }
+    .content { padding:24px 26px 28px; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    @media (max-width:850px){ .grid{grid-template-columns:1fr;} body{padding:14px;} }
+    label { display:block; font-weight:700; margin:15px 0 7px; color:#e5e7eb; }
+    textarea { width:100%; border:1px solid #334155; border-radius:10px; background:#020617; color:#f9fafb; padding:12px; font-size:14px; outline:none; min-height:220px; resize:vertical; font-family:Consolas, monospace; line-height:1.45; }
+    .small { min-height:115px; }
+    .options { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:10px 18px; margin:16px 0 8px; padding:14px; background:#111827; border:1px solid #334155; border-radius:12px; }
+    .check { display:flex; align-items:center; gap:8px; color:#e5e7eb; font-size:14px; margin:0; font-weight:400; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; margin:18px 0; align-items:center; }
+    button { border:0; border-radius:10px; padding:12px 16px; color:white; font-weight:700; cursor:pointer; font-size:14px; transition: background 0.2s; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .primary{background:#dc2626;} .secondary{background:#475569;} .success{background:#16a34a;} .blue{background:#2563eb;}
+    .purple{background:#8b5cf6;} .orange{background:#f97316;}
+    .result-box { background:#111827; border:1px solid #334155; border-radius:12px; padding:14px; margin-top:15px; }
+    .result-box textarea { min-height:80px; }
+    .hint { color:#94a3b8; font-size:13px; margin-top:8px; }
+    .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; margin-top:15px; }
+    .stat { background:#0b1220; border:1px solid #334155; border-radius:12px; padding:12px; }
+    .stat strong { display:block; font-size:22px; margin-bottom:4px; }
+    .stat span { color:#94a3b8; font-size:13px; }
+    .badge { display:inline-block; padding:4px 8px; border-radius:999px; background:#0b3b5f; color:#bfdbfe; font-size:12px; font-weight:700; margin-left:8px; }
+    .copy-feedback { color:#86efac; font-size:13px; margin-left:4px; display:none; }
+    .example { background:#0b1220; border:1px solid #334155; border-radius:10px; padding:10px; color:#cbd5e1; font-family:Consolas, monospace; font-size:13px; line-height:1.45; margin-top:10px; }
+    
+    /* CMDB Section CSS */
+    .cmdb-section {
+      background: #1e1b4b; 
+      border: 1px solid #4338ca; 
+      border-radius: 12px; 
+      padding: 16px; 
+      margin-top: 15px;
+    }
+    .cmdb-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .cmdb-title {
+      font-size: 16px;
+      font-weight: bold;
+      color: #c7d2fe;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .cmdb-status {
+      font-size: 13px;
+      color: #93c5fd;
+    }
+    .vms-list-container {
+      max-height: 180px;
+      overflow-y: auto;
+      background: #0f0b29;
+      border: 1px solid #312e81;
+      border-radius: 8px;
+      padding: 8px;
+      margin-top: 10px;
+      font-family: Consolas, monospace;
+      font-size: 13px;
+    }
+    .vm-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 8px;
+      border-bottom: 1px solid #1e1b4b;
+    }
+    .vm-item:last-child {
+      border-bottom: none;
+    }
+    .status-badge {
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: bold;
+    }
+    .status-ligada {
+      background: #065f46;
+      color: #34d399;
+    }
+    .status-desligada {
+      background: #7f1d1d;
+      color: #fca5a5;
+    }
+    .status-desconhecido {
+      background: #374151;
+      color: #d1d5db;
+    }
+
+    /* Scheduler Form Styles */
+    .schedule-form {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-top: 12px;
+      background: #020617;
+      padding: 16px;
+      border: 1px solid #334155;
+      border-radius: 12px;
+    }
+    .schedule-form div {
+      display: flex;
+      flex-direction: column;
+    }
+    .schedule-form input {
+      background: #1f2937;
+      border: 1px solid #334155;
+      color: #f9fafb;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 14px;
+      outline: none;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Gerador Tanium <span class="badge" style="background:#8b5cf6;">V3 - ClaraHub Pilot (Agendador)</span></h1>
+      <div class="subtitle">
+        Integração com a API CMDB ClaraHub para filtrar VMs ligadas e **Gerador de Script de Agendamento de E-mail do Outlook**.
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="grid">
+        <div>
+          <label for="input">Entrada bruta</label>
+          <textarea id="input" placeholder="SV-WEB-BARUEL04 10.255.68.10&#10;SV-WEB-BARUEL03 10.255.68.11&#10;SRV-CL02.baruel.com.br 10.255.68.23"></textarea>
+          <div class="example">
+Exemplo aceito:<br>
+SV-WEB-BARUEL05&nbsp;&nbsp;&nbsp;10.255.68.16<br>
+SRV-CL02.baruel.com.br&nbsp;&nbsp;&nbsp;10.255.68.23<br>
+SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
+          </div>
+        </div>
+
+        <div>
+          <label for="cleanHostnames">Hostnames identificados (filtrados pela API)</label>
+          <textarea id="cleanHostnames" class="small" readonly></textarea>
+          <label for="cleanIps">IPs identificados (filtrados pela API)</label>
+          <textarea id="cleanIps" class="small" readonly></textarea>
+        </div>
+      </div>
+
+      <div class="options">
+        <label class="check"><input type="checkbox" id="beforeDot" checked> Hostname: pegar somente antes do primeiro ponto</label>
+        <label class="check"><input type="checkbox" id="removeDuplicates" checked> Remover duplicados</label>
+        <label class="check"><input type="checkbox" id="sortList"> Ordenar alfabeticamente/numericamente</label>
+        <label class="check"><input type="checkbox" id="escapeIps"> Escapar pontos dos IPs com \.</label>
+        <label class="check"><input type="checkbox" id="appendWildcard" checked> Adicionar .* no final</label>
+        <label class="check"><input type="checkbox" id="ignoreInvalidIps" checked> Ignorar IPs inválidos</label>
+        <label class="check"><input type="checkbox" id="onlyPoweredOn" checked> 🟢 Filtrar apenas VMs com Status "Ligada"</label>
+      </div>
+
+      <!-- CMDB ClaraHub Panel -->
+      <div class="cmdb-section">
+        <div class="cmdb-header">
+          <div class="cmdb-title">
+            🌐 Integração CMDB ClaraHub (API DataLake)
+          </div>
+          <div class="cmdb-status" id="cmdbApiStatus">Pronto para carregar base de dados.</div>
+        </div>
+        <div class="row" style="margin: 0 0 10px 0;">
+          <button class="orange" id="btnLoadCmdb" onclick="loadCmdbData()">1. Carregar Base de Dados (GetDataLake)</button>
+          <button class="purple" id="btnFilterStatus" onclick="generate()" disabled>2. Atualizar Status das VMs</button>
+        </div>
+        <div class="hint" style="color: #cbd5e1;">
+          Como a base possui cerca de 9.600 servidores, o gerador baixa a base localmente no navegador em memória de forma segura para fazer consultas instantâneas offline, sem travar seu fluxo.
+        </div>
+        <div id="vmStatusPanel" style="display:none; margin-top: 12px;">
+          <div style="font-size: 14px; font-weight: bold; color: #a5b4fc; margin-bottom: 5px;">Detalhamento de Status das VMs Identificadas:</div>
+          <div class="vms-list-container" id="vmsList"></div>
+        </div>
+      </div>
+
+      <!-- OUTLOOK AUTOMATIC MAIL SCHEDULER PANEL -->
+      <div class="cmdb-section" style="background: #1e293b; border-color: #475569;">
+        <div class="cmdb-title" style="color: #cbd5e1;">
+          📅 Agendador de Comunicado de GMUD (Outlook Local)
+        </div>
+        <div class="hint" style="color: #94a3b8; margin-bottom: 10px;">
+          Insira o número da GMUD, o dia e a hora do início para gerar o script PowerShell que realiza o envio automático do e-mail de início no horário programado.
+        </div>
+        <div class="schedule-form">
+          <div>
+            <label for="schedGmud">Número da GMUD</label>
+            <input type="text" id="schedGmud" placeholder="Ex: 100" value="100">
+          </div>
+          <div>
+            <label for="schedDate">Data do Agendamento</label>
+            <input type="date" id="schedDate">
+          </div>
+          <div>
+            <label for="schedTime">Hora do Agendamento</label>
+            <input type="time" id="schedTime">
+          </div>
+        </div>
+        <div class="row" style="margin: 15px 0 0 0;">
+          <button class="success" onclick="downloadSchedulingScript()" style="background: #10b981; display: flex; align-items: center; gap: 8px;">
+            📥 Baixar Script de Agendamento Automático (.ps1)
+          </button>
+        </div>
+      </div>
+
+      <div class="row">
+        <button class="primary" onclick="generate()">Gerar padrão Tanium</button>
+        <button class="blue" onclick="copyText('combinedRegex')">Copiar resultado principal</button>
+        <button class="success" onclick="copyText('hostnameRegex')">Copiar só hostnames</button>
+        <button class="success" onclick="copyText('ipRegex')">Copiar só IPs</button>
+        <button class="purple" onclick="copyText('emailText')">Copiar texto p/ E-mail</button>
+        <button class="secondary" onclick="clearAll()">Limpar</button>
+        <span class="copy-feedback" id="feedback">Copiado!</span>
+      </div>
+
+      <!-- KB Security Microsoft Suggestion panel -->
+      <div class="result-box" style="border-left: 4px solid #f57f17; background: #1e1e24;">
+        <label style="color: #fca5a5; font-size: 16px;">🔍 KBs de Segurança Microsoft Recomendados para o Deploy</label>
+        <div id="kbSuggestions" style="padding: 10px; line-height: 1.6; color: #cbd5e1;">
+          <em>Insira hosts com indicações de SO (ex: 2016, 2019, 2022, RHEL) ou preencha a entrada para ver sugestões.</em>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><strong id="hostCount">0</strong><span>hostnames</span></div>
+        <div class="stat"><strong id="ipCount">0</strong><span>IPs</span></div>
+        <div class="stat"><strong id="lineCount">0</strong><span>linhas processadas</span></div>
+      </div>
+
+      <!-- Generated Email text area box -->
+      <div class="result-box" style="border-left: 4px solid #8b5cf6; background: #1a1525;">
+        <label style="color: #c084fc; font-size: 16px;">📧 Texto pronto para E-mail (Lista de VMs)</label>
+        <div id="emailText" contenteditable="true" style="min-height: 180px; font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; background: #020617; border: 1px solid #334155; border-radius: 10px; padding: 12px; overflow-y: auto; color: #f9fafb; white-space: pre-wrap; line-height: 1.5;"></div>
+        <div class="hint">Este texto já vem estruturado em formato Rich Text (HTML). Ao clicar em "Copiar texto p/ E-mail", as VMs em <strong>negrito</strong> serão copiadas formatadas e prontas para colar diretamente no corpo do e-mail do Outlook.</div>
+      </div>
+
+      <div class="result-box">
+        <label for="combinedRegex">Resultado principal - Hostnames + IPs</label>
+        <textarea id="combinedRegex" readonly></textarea>
+        <div class="hint">Este é o resultado no formato: hostnames e IPs dentro do mesmo parêntese, separados por |.</div>
+      </div>
+
+      <div class="result-box">
+        <label for="hostnameRegex">Somente Hostnames</label>
+        <textarea id="hostnameRegex" readonly></textarea>
+      </div>
+
+      <div class="result-box">
+        <label for="ipRegex">Somente IPs</label>
+        <textarea id="ipRegex" readonly></textarea>
+      </div>
+    </div>
+  </div>
+
+<script>
+// Default backup catalog mapping for typical Windows Server versions (Backup for Offline / API failure)
+let KB_CATALOG = {
+  "2016": { kb: "KB5099535", name: "Windows Server 2016 Cumulative Update" },
+  "2019": { kb: "KB5099538", name: "Windows Server 2019 Cumulative Update" },
+  "2022": { kb: "KB5099540", name: "Windows Server 2022 Cumulative Update" },
+  "2012": { kb: "KB5099444", name: "Windows Server 2012 R2 Cumulative Update (Monthly Rollup)" },
+  "10": { kb: "KB5099539", name: "Windows 10 Cumulative Update" },
+  "11": { kb: "KB5101650", name: "Windows 11 Cumulative Update" }
+};
+
+// API Fetch state
+let isApiLoaded = false;
+// CMDB Data Cache
+let cmdbDatabase = [];
+let isCmdbLoaded = false;
+
+// Initialize form default dates (today)
+const today = new Date();
+document.getElementById("schedDate").value = today.toISOString().split("T")[0];
+const currentHours = String(today.getHours()).padStart(2, '0');
+const currentMinutes = String(today.getMinutes()).padStart(2, '0');
+document.getElementById("schedTime").value = `${currentHours}:${currentMinutes}`;
+
+// Async function to load current month's KBs directly from Microsoft MSRC CVRF API
+async function loadLatestKBsFromMicrosoft() {
+  try {
+    const now = new Date();
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const currentYear = now.getFullYear();
+    const currentMonthStr = months[now.getMonth()];
+    const documentId = `${currentYear}-${currentMonthStr}`;
+    
+    const fetchDoc = async (docId) => {
+      const directUrl = `https://api.msrc.microsoft.com/cvrf/v3.0/cvrf/${docId}`;
+      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(directUrl)}`;
+      
+      let response;
+      try {
+        response = await fetch(directUrl, { headers: { "Accept": "application/json" } });
+      } catch(e) {
+        response = await fetch(proxyUrl, { headers: { "Accept": "application/json" } });
+      }
+      
+      if (!response.ok) throw new Error("Document not found");
+      return await response.json();
+    };
+
+    let data = null;
+    try {
+      data = await fetchDoc(documentId);
+    } catch (e) {
+      const prevMonthIdx = (now.getMonth() - 1 + 12) % 12;
+      const prevYear = prevMonthIdx === 11 ? currentYear - 1 : currentYear;
+      const prevMonthStr = months[prevMonthIdx];
+      data = await fetchDoc(`${prevYear}-${prevMonthStr}`);
+    }
+
+    if (data && data.Vulnerability) {
+      const newCatalog = { ...KB_CATALOG };
+      const docName = data.DocumentTracking && data.DocumentTracking.Identification && data.DocumentTracking.Identification.ID ? data.DocumentTracking.Identification.ID.Value : documentId;
+      const productMap = {};
+      
+      const traverseTree = (node) => {
+        if (!node) return;
+        if (node.FullProductName) {
+          const products = Array.isArray(node.FullProductName) ? node.FullProductName : [node.FullProductName];
+          products.forEach(prod => {
+            if (prod.ProductID && prod.Value) {
+              const name = prod.Value.toLowerCase();
+              const pid = prod.ProductID;
+              if (name.includes("windows server 2022")) {
+                productMap[pid] = "2022";
+              } else if (name.includes("windows server 2019")) {
+                productMap[pid] = "2019";
+              } else if (name.includes("windows server 2016")) {
+                productMap[pid] = "2016";
+              } else if (name.includes("windows server 2012 r2") || name.includes("windows server 2012")) {
+                productMap[pid] = "2012";
+              } else if (name.includes("windows 11")) {
+                productMap[pid] = "11";
+              } else if (name.includes("windows 10")) {
+                productMap[pid] = "10";
+              }
+            }
+          });
+        }
+        if (node.Branch) {
+          const branches = Array.isArray(node.Branch) ? node.Branch : [node.Branch];
+          branches.forEach(traverseTree);
+        }
+      };
+      
+      if (data.ProductTree) {
+        traverseTree(data.ProductTree);
+      }
+
+      data.Vulnerability.forEach(vuln => {
+        if (vuln.Remediations) {
+          vuln.Remediations.forEach(rem => {
+            if (rem.Description && rem.Description.Value) {
+              const desc = rem.Description.Value;
+              if (/^(?:KB)?\d+$/i.test(desc)) {
+                const kbId = desc.toUpperCase().startsWith("KB") ? desc.toUpperCase() : `KB${desc}`;
+                
+                if (rem.ProductID && rem.ProductID.length > 0) {
+                  rem.ProductID.forEach(pid => {
+                    const osKey = productMap[pid];
+                    if (osKey) {
+                      newCatalog[osKey] = {
+                        kb: kbId,
+                        name: `${osKey.includes("20") ? "Windows Server " : "Windows "}${osKey} Cumulative Update (${docName})`
+                      };
+                    }
+                  });
+                }
+                
+                const url = rem.URL || "";
+                const subject = (url.toLowerCase() + " " + desc.toLowerCase() + " " + (rem.SubType ? rem.SubType.toLowerCase() : ""));
+                if (subject.includes("2022")) {
+                  newCatalog["2022"] = { kb: kbId, name: `Windows Server 2022 Cumulative Update (${docName})` };
+                } else if (subject.includes("2019")) {
+                  newCatalog["2019"] = { kb: kbId, name: `Windows Server 2019 Cumulative Update (${docName})` };
+                } else if (subject.includes("2016")) {
+                  newCatalog["2016"] = { kb: kbId, name: `Windows Server 2016 Cumulative Update (${docName})` };
+                } else if (subject.includes("2012")) {
+                  newCatalog["2012"] = { kb: kbId, name: `Windows Server 2012 / 2012 R2 Cumulative Security Update (${docName})` };
+                } else if (subject.includes("windows-11") || subject.includes("win11")) {
+                  newCatalog["11"] = { kb: kbId, name: `Windows 11 Cumulative Update (${docName})` };
+                } else if (subject.includes("windows-10") || subject.includes("win10")) {
+                  newCatalog["10"] = { kb: kbId, name: `Windows 10 Cumulative Update (${docName})` };
+                }
+              }
+            }
+          });
+        }
+      });
+      
+      KB_CATALOG = newCatalog;
+      isApiLoaded = true;
+      console.log("Catálogo MSRC atualizado com sucesso:", KB_CATALOG);
+      generate();
+    }
+  } catch (err) {
+    console.warn("Não foi possível carregar KBs da API, usando catálogo local estável:", err);
+  }
+}
+
+// CMDB API ClaraHub Loader
+async function loadCmdbData() {
+  const statusLabel = document.getElementById("cmdbApiStatus");
+  const btnLoad = document.getElementById("btnLoadCmdb");
+  const btnFilter = document.getElementById("btnFilterStatus");
+  
+  statusLabel.innerText = "Carregando base de dados (getDataLake)...";
+  statusLabel.style.color = "#f59e0b";
+  btnLoad.disabled = true;
+  
+  try {
+    const directUrl = "https://clarahub.claranet.com.br/cmdb-servers-api/api/getDataLake";
+    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(directUrl)}`;
+    
+    let response;
+    try {
+      response = await fetch(directUrl);
+    } catch(e) {
+      response = await fetch(proxyUrl);
+    }
+    
+    if (!response.ok) throw new Error("Status HTTP incorreto da API CMDB");
+    
+    cmdbDatabase = await response.json();
+    isCmdbLoaded = true;
+    
+    statusLabel.innerText = `Base CMDB carregada! (${cmdbDatabase.length} servidores carregados)`;
+    statusLabel.style.color = "#10b981";
+    btnFilter.disabled = false;
+    btnLoad.innerText = "Recarregar Base CMDB";
+    btnLoad.disabled = false;
+    
+    generate();
+  } catch(err) {
+    console.error("Erro ao ler CMDB:", err);
+    statusLabel.innerText = "Erro ao conectar na API CMDB. Tente novamente.";
+    statusLabel.style.color = "#ef4444";
+    btnLoad.disabled = false;
+  }
+}
+
+function isValidIp(ip) {
+  const parts = ip.split(".");
+  if (parts.length !== 4) return false;
+  return parts.every(p => /^\d+$/.test(p) && Number(p) >= 0 && Number(p) <= 255);
+}
+
+function findIps(line) {
+  const matches = line.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g) || [];
+  const ignoreInvalid = document.getElementById("ignoreInvalidIps").checked;
+  return matches.filter(ip => !ignoreInvalid || isValidIp(ip));
+}
+
+function findHostname(line) {
+  const tokens = line.trim().split(/\s+/);
+  const beforeDot = document.getElementById("beforeDot").checked;
+
+  for (let token of tokens) {
+    token = token.replace(/[;,]+$/g, "").trim();
+    if (!token) continue;
+    if (isValidIp(token)) continue;
+    if (!/[A-Za-z]/.test(token)) continue;
+
+    if (/^[A-Za-z0-9][A-Za-z0-9.-]*$/.test(token)) {
+      return beforeDot ? token.split(".")[0] : token;
+    }
+  }
+  return "";
+}
+
+// Order helpers
+function numericIpCompare(a, b) {
+  const pa = a.split(".").map(Number);
+  const pb = b.split(".").map(Number);
+  for (let i = 0; i < 4; i++) if (pa[i] !== pb[i]) return pa[i] - pb[i];
+  return 0;
+}
+
+function unique(list) { return [...new Set(list)]; }
+
+function escapeIp(ip) {
+  return ip.replace(/\./g, "\\.");
+}
+
+function makeRegex(list, isIpList=false) {
+  const appendWildcard = document.getElementById("appendWildcard").checked;
+  const escapeIps = document.getElementById("escapeIps").checked;
+  const processed = list.map(item => isIpList && escapeIps ? escapeIp(item) : item);
+  if (!processed.length) return "";
+  return "(" + processed.join("|") + ")" + (appendWildcard ? ".*" : "");
+}
+
+function makeCombined(hostnames, ips) {
+  const appendWildcard = document.getElementById("appendWildcard").checked;
+  const escapeIps = document.getElementById("escapeIps").checked;
+  const processedIps = ips.map(ip => escapeIps ? escapeIp(ip) : ip);
+  const all = [...hostnames, ...processedIps];
+  if (!all.length) return "";
+  return "(" + all.join("|") + ")" + (appendWildcard ? ".*" : "");
+}
+
+function suggestKBs(lines) {
+  const suggested = new Set();
+  const text = lines.join(" ").toLowerCase();
+
+  if (text.includes("2016") || text.includes("srv16") || text.includes("server16")) {
+    suggested.add("2016");
+  }
+  if (text.includes("2019") || text.includes("srv19") || text.includes("server19")) {
+    suggested.add("2019");
+  }
+  if (text.includes("2022") || text.includes("srv22") || text.includes("server22")) {
+    suggested.add("2022");
+  }
+  if (text.includes("2012") || text.includes("srv12") || text.includes("server12")) {
+    suggested.add("2012");
+  }
+  if (text.includes("win10") || text.includes("w10")) {
+    suggested.add("10");
+  }
+  if (text.includes("win11") || text.includes("w11")) {
+    suggested.add("11");
+  }
+
+  if (suggested.size === 0 && (text.includes("win") || text.includes("microsoft") || text.includes("ad") || text.includes("sql"))) {
+    suggested.add("2019");
+    suggested.add("2022");
+  }
+
+  const container = document.getElementById("kbSuggestions");
+  if (suggested.size === 0) {
+    container.innerHTML = "<em>Nenhum sistema operacional Windows mapeado detectado na entrada. Digite '2016', '2019' ou '2022' para obter sugestões automáticas.</em>";
+    return [];
+  }
+
+  let html = "<ul style='margin: 0; padding-left: 20px;'>";
+  let items = [];
+  suggested.forEach(key => {
+    const item = KB_CATALOG[key];
+    items.push(item);
+    const badgeText = isApiLoaded ? "Live MSRC API" : "Backup Local";
+    const badgeColor = isApiLoaded ? "#8b5cf6" : "#10b981";
+    html += `<li><strong>${item.kb}</strong> - ${item.name} <span class='badge' style='background:${badgeColor}; color:#fff;'>${badgeText}</span></li>`;
+  });
+  html += "</ul>";
+  container.innerHTML = html;
+  return items;
+}
+
+function processInput() {
+  const input = document.getElementById("input").value;
+  const lines = input.split(/\r?\n/).filter(line => line.trim());
+
+  let rawHostnames = [];
+  let rawIps = [];
+
+  lines.forEach(line => {
+    const host = findHostname(line);
+    if (host) rawHostnames.push(host);
+    rawIps.push(...findIps(line));
+  });
+
+  if (document.getElementById("removeDuplicates").checked) {
+    rawHostnames = unique(rawHostnames);
+    rawIps = unique(rawIps);
+  }
+
+  // Pilot filter logic for CMDB statuses
+  let finalHostnames = [...rawHostnames];
+  let finalIps = [...rawIps];
+  const onlyPoweredOn = document.getElementById("onlyPoweredOn").checked;
+  
+  const vmListContainer = document.getElementById("vmsList");
+  const vmStatusPanel = document.getElementById("vmStatusPanel");
+  
+  if (isCmdbLoaded && (rawHostnames.length > 0 || rawIps.length > 0)) {
+    vmStatusPanel.style.display = "block";
+    let listHtml = "";
+    
+    // Create lookup maps from CMDB database
+    const cmdbHostMap = {};
+    const cmdbIpMap = {};
+    cmdbDatabase.forEach(server => {
+      if (server.HostName) {
+        const key = server.HostName.toLowerCase().split(".")[0];
+        cmdbHostMap[key] = server;
+      }
+      if (server.IP) {
+        cmdbIpMap[server.IP] = server;
+      }
+    });
+
+    const detectedServers = [];
+    const processedServerIds = new Set();
+    const processedUnregisteredNames = new Set();
+
+    lines.forEach(line => {
+      const lineHost = findHostname(line);
+      const lineIps = findIps(line);
+      
+      let hostKey = lineHost ? lineHost.toLowerCase().split(".")[0] : "";
+      let matchedServer = null;
+
+      if (hostKey && cmdbHostMap[hostKey]) {
+        matchedServer = cmdbHostMap[hostKey];
+      }
+      
+      if (!matchedServer && lineIps.length > 0) {
+        for (let ip of lineIps) {
+          if (cmdbIpMap[ip]) {
+            matchedServer = cmdbIpMap[ip];
+            break;
+          }
+        }
+      }
+
+      if (matchedServer) {
+        const srvId = matchedServer.ServerID || matchedServer.ServerUUID || (matchedServer.HostName ? matchedServer.HostName.toLowerCase().split(".")[0] : "") || matchedServer.IP;
+        if (!processedServerIds.has(srvId)) {
+          processedServerIds.add(srvId);
+          detectedServers.push({
+            isRegistered: true,
+            serverInfo: matchedServer,
+            displayName: matchedServer.HostName || lineHost || matchedServer.IP,
+            ip: matchedServer.IP || (lineIps.length > 0 ? lineIps[0] : "")
+          });
+        }
+      } else {
+        const nameOrIp = lineHost || (lineIps.length > 0 ? lineIps[0] : "");
+        if (nameOrIp) {
+          const lookupKey = nameOrIp.toLowerCase().split(".")[0];
+          if (!processedUnregisteredNames.has(lookupKey)) {
+            processedUnregisteredNames.add(lookupKey);
+            detectedServers.push({
+              isRegistered: false,
+              displayName: nameOrIp,
+              ip: lineIps.length > 0 ? lineIps[0] : ""
+            });
+          }
+        }
+      }
+    });
+
+    const activeVMs = [];
+    const offlineVMs = [];
+    const unknownVMs = [];
+    
+    const filteredHostnames = [];
+    const filteredIps = [];
+
+    detectedServers.forEach(srv => {
+      if (srv.isRegistered) {
+        const info = srv.serverInfo;
+        const status = info.Status || "Desconhecido";
+        const ipInfo = info.IP ? ` | IP: ${info.IP}` : "";
+        const details = `Cliente: ${info.Customer || "N/A"}${ipInfo} | OS: ${info.SO || "N/A"}`;
+        
+        let badgeClass = "status-desconhecido";
+        
+        if (status.toLowerCase() === "ligada") {
+          badgeClass = "status-ligada";
+          if (info.HostName) filteredHostnames.push(info.HostName.split(".")[0]);
+          if (info.IP) filteredIps.push(info.IP);
+          activeVMs.push({ name: srv.displayName, info: details });
+        } else if (status.toLowerCase() === "desligada") {
+          badgeClass = "status-desligada";
+          offlineVMs.push({ name: srv.displayName, info: details, reason: "Desligada no CMDB" });
+          if (!onlyPoweredOn) {
+            if (info.HostName) filteredHostnames.push(info.HostName.split(".")[0]);
+            if (info.IP) filteredIps.push(info.IP);
+          }
+        } else {
+          unknownVMs.push({ name: srv.displayName, info: details, reason: `Status do CMDB: ${status}` });
+          if (!onlyPoweredOn) {
+            if (info.HostName) filteredHostnames.push(info.HostName.split(".")[0]);
+            if (info.IP) filteredIps.push(info.IP);
+          }
+        }
+        
+        listHtml += `<div class="vm-item">
+          <span><strong>${srv.displayName}</strong> (${details})</span>
+          <span class="status-badge ${badgeClass}">${status}</span>
+        </div>`;
+      } else {
+        const details = "Não encontrado no CMDB";
+        unknownVMs.push({ name: srv.displayName, info: details, reason: "Não cadastrado no CMDB" });
+        
+        if (!onlyPoweredOn) {
+          if (isValidIp(srv.displayName)) {
+            filteredIps.push(srv.displayName);
+          } else {
+            filteredHostnames.push(srv.displayName.split(".")[0]);
+            if (srv.ip) filteredIps.push(srv.ip);
+          }
+        }
+        
+        listHtml += `<div class="vm-item">
+          <span><strong>${srv.displayName}</strong> (${details})</span>
+          <span class="status-badge status-desconhecido">Desconhecido</span>
+        </div>`;
+      }
+    });
+
+    vmListContainer.innerHTML = listHtml;
+    finalHostnames = filteredHostnames;
+    finalIps = filteredIps;
+    
+    if (document.getElementById("sortList").checked) {
+      activeVMs.sort((a,b) => a.name.localeCompare(b.name));
+      offlineVMs.sort((a,b) => a.name.localeCompare(b.name));
+      unknownVMs.sort((a,b) => a.name.localeCompare(b.name));
+    }
+    
+    return { lines, hostnames: finalHostnames, ips: finalIps, activeVMs, offlineVMs, unknownVMs, isCmdbApplied: true };
+  } else {
+    vmStatusPanel.style.display = "none";
+  }
+
+  if (document.getElementById("sortList").checked) {
+    finalHostnames.sort((a,b) => a.localeCompare(b));
+    finalIps.sort(numericIpCompare);
+  }
+
+  return { lines, hostnames: finalHostnames, ips: finalIps, isCmdbApplied: false };
+}
+
+function generate() {
+  const gmudNumber = document.getElementById("schedGmud").value || "XXX";
+  const data = processInput();
+
+  document.getElementById("cleanHostnames").value = data.hostnames.join("\n");
+  document.getElementById("cleanIps").value = data.ips.join("\n");
+
+  document.getElementById("combinedRegex").value = makeCombined(data.hostnames, data.ips);
+  document.getElementById("hostnameRegex").value = makeRegex(data.hostnames, false);
+  document.getElementById("ipRegex").value = makeRegex(data.ips, true);
+
+  document.getElementById("hostCount").innerText = data.hostnames.length;
+  document.getElementById("ipCount").innerText = data.ips.length;
+  document.getElementById("lineCount").innerText = data.lines.length;
+
+  const suggestedKbs = suggestKBs(data.lines);
+  
+  let emailHtml = `Senhores, boa noite.<br><br>Informamos que estamos iniciando as atividades referentes à GMUD ${gmudNumber}, conforme planejamento aprovado.<br><br>A partir deste momento, será dado início ao processo de atualização dos servidores relacionados abaixo:<br><br>`;
+  
+  if (data.isCmdbApplied) {
+    if (data.activeVMs.length > 0) {
+      emailHtml += "<strong>Servidores LIGADOS (Patches serão aplicados):</strong><br>";
+      data.activeVMs.forEach(vm => {
+        emailHtml += `- <strong>${vm.name}</strong> (${vm.info})<br>`;
+      });
+    } else {
+      emailHtml += "<strong>Servidores LIGADOS:</strong><br>- n/a<br>";
+    }
+    
+    if (data.offlineVMs.length > 0 || data.unknownVMs.length > 0) {
+      emailHtml += "<br><strong>Servidores DESLIGADOS / Fora do escopo (Não serão atualizados):</strong><br>";
+      data.offlineVMs.forEach(vm => {
+        emailHtml += `- <strong>${vm.name}</strong> (Evidência: ${vm.reason} | ${vm.info})<br>`;
+      });
+      data.unknownVMs.forEach(vm => {
+        emailHtml += `- <strong>${vm.name}</strong> (Evidência: ${vm.reason})<br>`;
+      });
+    }
+  } else {
+    if (data.hostnames.length > 0) {
+      data.hostnames.forEach(host => {
+        emailHtml += `- <strong>${host}</strong><br>`;
+      });
+    } else {
+      emailHtml += "[Nenhum servidor identificado]";
+    }
+  }
+
+  emailHtml += "<br><strong>Sistemas Operacionais afetados:</strong><br>";
+  if (suggestedKbs.length > 0) {
+    const osNames = suggestedKbs.map(item => item.name.split(" Cumulative")[0].split(" Cumulative Security")[0]);
+    osNames.forEach(os => {
+      emailHtml += `- ${os}<br>`;
+    });
+  } else {
+    emailHtml += "- Windows Server / Client (Padrão)<br>";
+  }
+
+  emailHtml += "<br><strong>Patches de segurança que serão aplicados:</strong><br>";
+  if (suggestedKbs.length > 0) {
+    suggestedKbs.forEach(item => {
+      emailHtml += `- ${item.kb} (${item.name})<br>`;
+    });
+  } else {
+    emailHtml += "- Cumulative Security Updates (Tanium Patch)<br>";
+  }
+
+  emailHtml += "<br>Qualquer dúvida, estamos à disposição.<br>Atenciosamente,";
+  document.getElementById("emailText").innerHTML = emailHtml;
+}
+
+function copyText(id) {
+  const el = document.getElementById(id);
+  
+  if (id === "emailText") {
+    const htmlContent = el.innerHTML;
+    const plainText = el.innerText || el.textContent;
+    
+    const container = document.createElement("div");
+    container.innerHTML = htmlContent;
+    container.style.position = "fixed";
+    container.style.pointerEvents = "none";
+    container.style.opacity = "0";
+    document.body.appendChild(container);
+    
+    const range = document.createRange();
+    range.selectNodeContents(container);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    
+    try {
+      document.execCommand("copy");
+    } catch (e) {
+      console.warn("execCommand fallback failed:", e);
+    }
+    
+    selection.removeAllRanges();
+    document.body.removeChild(container);
+    
+    if (navigator.clipboard && window.ClipboardItem) {
+      const htmlBlob = new Blob([htmlContent], { type: "text/html" });
+      const textBlob = new Blob([plainText], { type: "text/plain" });
+      const item = new ClipboardItem({
+        "text/html": htmlBlob,
+        "text/plain": textBlob
+      });
+      navigator.clipboard.write([item]).catch(err => {
+        console.warn("ClipboardItem write failed:", err);
+      });
+    }
+  } else {
+    el.select();
+    el.setSelectionRange(0, 999999);
+    navigator.clipboard.writeText(el.value || "");
+  }
+  
+  const feedback = document.getElementById("feedback");
+  feedback.style.display = "inline";
+  setTimeout(() => feedback.style.display = "none", 1200);
+}
+
+// Generate PowerShell Scheduling Script File
+function downloadSchedulingScript() {
+  const gmudNum = document.getElementById("schedGmud").value || "XXX";
+  const schedDate = document.getElementById("schedDate").value;
+  const schedTime = document.getElementById("schedTime").value;
+
+  if (!schedDate || !schedTime) {
+    alert("Por favor, preencha a Data e a Hora do agendamento primeiro!");
+    return;
+  }
+
+  // Format date and time for Task Scheduler
+  const targetDateTime = `${schedDate} ${schedTime}`;
+  
+  // Format HTML body safely escaping single quotes for PowerShell
+  const emailContent = document.getElementById("emailText").innerHTML;
+  const escapedHtml = emailContent.replace(/'/g, "''");
+  const subject = `Início das Atividades - GMUD ${gmudNum}`;
+
+  // PowerShell Script that runs in background and interacts with local Outlook instance
+  const psScriptContent = `# PowerShell Script para envio agendado de e-mail de GMUD via Outlook local
+# GMUD: ${gmudNum} | Agendado para: ${targetDateTime}
+
+# 1. Configurar tarefa agendada no Windows para disparar esse e-mail no dia e hora corretos
+$ScriptName = $MyInvocation.MyCommand.Name
+$ScriptPath = $MyInvocation.MyCommand.Path
+
+if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    Write-Warning "AVISO: Para criar a tarefa agendada no Windows Task Scheduler, este script precisa ser executado como Administrador."
+    Write-Host "Pressione qualquer tecla para continuar apenas com o teste de envio imediato..."
+    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+} else {
+    $Trigger = New-ScheduledTaskTrigger -Once -At "${schedDate} ${schedTime}"
+    $Action = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File \`"\$ScriptPath\`" -SendMailNow"
+    $Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
+    
+    # Register the task
+    Register-ScheduledTask -TaskName "GMUD_${gmudNum}_Email_Inicio" -Trigger $Trigger -Action $Action -Settings $Settings -Force
+    
+    [System.Windows.Forms.MessageBox]::Show("Agendamento de e-mail para GMUD ${gmudNum} criado com sucesso no Agendador de Tarefas do Windows!\n\nData de Execução: ${schedDate} às ${schedTime}", "Agendamento Confirmado", 0, 64)
+    Exit
+}
+
+# 2. Lógica de envio usando a API local do Outlook
+if ($args -contains "-SendMailNow" -or $true) {
+    try {
+        # Initialize Outlook Application object
+        $Outlook = New-Object -ComObject Outlook.Application
+        $Mail = $Outlook.CreateItem(0)
+        
+        $Mail.Subject = "${subject}"
+        $Mail.HTMLBody = '${escapedHtml}'
+        
+        # Opcional: preencher destinatários padrão se quiser
+        # $Mail.To = "destinatario@claranet.com.br"
+        
+        # Envia a mensagem silenciosamente
+        $Mail.Send()
+        
+        # Log local
+        $LogPath = Join-Path $env:TEMP "gmud_mail_sender.log"
+        "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - E-mail para GMUD ${gmudNum} enviado com sucesso." | Out-File -FilePath $LogPath -Append
+    } catch {
+        $Error[0].Exception.Message | Out-File -FilePath (Join-Path $env:TEMP "gmud_mail_error.log") -Append
+    }
+}
+`;
+
+  // Create blob and trigger file download
+  const blob = new Blob([psScriptContent], { type: "text/plain;charset=utf-8" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `agendar_gmud_${gmudNum}.ps1`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+function clearAll() {
+  document.getElementById("input").value = "";
+  generate();
+}
+
+document.getElementById("input").addEventListener("input", generate);
+document.querySelectorAll("input[type=checkbox]").forEach(el => el.addEventListener("change", generate));
+document.getElementById("schedGmud").addEventListener("input", generate);
+
+generate();
+loadLatestKBsFromMicrosoft();
+</script>
+</body>
+</html>
