@@ -18,9 +18,11 @@
     .small { min-height:115px; }
     .options { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:10px 18px; margin:16px 0 8px; padding:14px; background:#111827; border:1px solid #334155; border-radius:12px; }
     .check { display:flex; align-items:center; gap:8px; color:#e5e7eb; font-size:14px; margin:0; font-weight:400; }
-    .row { display:flex; gap:10px; flex-wrap:wrap; margin:18px 0; }
-    button { border:0; border-radius:10px; padding:12px 16px; color:white; font-weight:700; cursor:pointer; font-size:14px; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; margin:18px 0; align-items:center; }
+    button { border:0; border-radius:10px; padding:12px 16px; color:white; font-weight:700; cursor:pointer; font-size:14px; transition: background 0.2s; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
     .primary{background:#dc2626;} .secondary{background:#475569;} .success{background:#16a34a;} .blue{background:#2563eb;}
+    .purple{background:#8b5cf6;} .orange{background:#f97316;}
     .result-box { background:#111827; border:1px solid #334155; border-radius:12px; padding:14px; margin-top:15px; }
     .result-box textarea { min-height:80px; }
     .hint { color:#94a3b8; font-size:13px; margin-top:8px; }
@@ -31,6 +33,71 @@
     .badge { display:inline-block; padding:4px 8px; border-radius:999px; background:#0b3b5f; color:#bfdbfe; font-size:12px; font-weight:700; margin-left:8px; }
     .copy-feedback { color:#86efac; font-size:13px; margin-left:4px; display:none; }
     .example { background:#0b1220; border:1px solid #334155; border-radius:10px; padding:10px; color:#cbd5e1; font-family:Consolas, monospace; font-size:13px; line-height:1.45; margin-top:10px; }
+    
+    /* CMDB Section CSS */
+    .cmdb-section {
+      background: #1e1b4b; 
+      border: 1px solid #4338ca; 
+      border-radius: 12px; 
+      padding: 16px; 
+      margin-top: 15px;
+    }
+    .cmdb-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .cmdb-title {
+      font-size: 16px;
+      font-weight: bold;
+      color: #c7d2fe;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .cmdb-status {
+      font-size: 13px;
+      color: #93c5fd;
+    }
+    .vms-list-container {
+      max-height: 180px;
+      overflow-y: auto;
+      background: #0f0b29;
+      border: 1px solid #312e81;
+      border-radius: 8px;
+      padding: 8px;
+      margin-top: 10px;
+      font-family: Consolas, monospace;
+      font-size: 13px;
+    }
+    .vm-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 8px;
+      border-bottom: 1px solid #1e1b4b;
+    }
+    .vm-item:last-child {
+      border-bottom: none;
+    }
+    .status-badge {
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: bold;
+    }
+    .status-ligada {
+      background: #065f46;
+      color: #34d399;
+    }
+    .status-desligada {
+      background: #7f1d1d;
+      color: #fca5a5;
+    }
+    .status-desconhecido {
+      background: #374151;
+      color: #d1d5db;
+    }
   </style>
 </head>
 <body>
@@ -38,7 +105,7 @@
     <div class="header">
       <h1>Gerador Tanium <span class="badge">Hostnames + IPs</span></h1>
       <div class="subtitle">
-        Cole a lista bruta com servidores, IPs e observações. O app gera o padrão do Tanium em formato único:
+        Cole a lista bruta com servidores, IPs e observações. O app gera o padrão do Tanium filtrando pelo CMDB:
         <strong>(SVR-01|SVR-02|10.0.0.1|10.0.0.2).*</strong>
       </div>
     </div>
@@ -57,9 +124,9 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
         </div>
 
         <div>
-          <label for="cleanHostnames">Hostnames identificados</label>
+          <label for="cleanHostnames">Hostnames identificados (filtrados pela API)</label>
           <textarea id="cleanHostnames" class="small" readonly></textarea>
-          <label for="cleanIps">IPs identificados</label>
+          <label for="cleanIps">IPs identificados (filtrados pela API)</label>
           <textarea id="cleanIps" class="small" readonly></textarea>
         </div>
       </div>
@@ -71,6 +138,28 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
         <label class="check"><input type="checkbox" id="escapeIps"> Escapar pontos dos IPs com \.</label>
         <label class="check"><input type="checkbox" id="appendWildcard" checked> Adicionar .* no final</label>
         <label class="check"><input type="checkbox" id="ignoreInvalidIps" checked> Ignorar IPs inválidos</label>
+        <label class="check"><input type="checkbox" id="onlyPoweredOn" checked> 🟢 Filtrar apenas VMs com Status "Ligada"</label>
+      </div>
+
+      <!-- CMDB ClaraHub Panel -->
+      <div class="cmdb-section">
+        <div class="cmdb-header">
+          <div class="cmdb-title">
+            🌐 Integração CMDB ClaraHub (API DataLake)
+          </div>
+          <div class="cmdb-status" id="cmdbApiStatus">Pronto para carregar base de dados.</div>
+        </div>
+        <div class="row" style="margin: 0 0 10px 0;">
+          <button class="orange" id="btnLoadCmdb" onclick="loadCmdbData()">1. Carregar Base de Dados (GetDataLake)</button>
+          <button class="purple" id="btnFilterStatus" onclick="generate()" disabled>2. Atualizar Status das VMs</button>
+        </div>
+        <div class="hint" style="color: #cbd5e1;">
+          Como a base possui cerca de 9.600 servidores, o gerador baixa a base localmente no navegador em memória de forma segura para fazer consultas instantâneas offline, sem travar seu fluxo.
+        </div>
+        <div id="vmStatusPanel" style="display:none; margin-top: 12px;">
+          <div style="font-size: 14px; font-weight: bold; color: #a5b4fc; margin-bottom: 5px;">Detalhamento de Status das VMs Identificadas:</div>
+          <div class="vms-list-container" id="vmsList"></div>
+        </div>
       </div>
 
       <div class="row">
@@ -78,7 +167,7 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
         <button class="blue" onclick="copyText('combinedRegex')">Copiar resultado principal</button>
         <button class="success" onclick="copyText('hostnameRegex')">Copiar só hostnames</button>
         <button class="success" onclick="copyText('ipRegex')">Copiar só IPs</button>
-        <button class="blue" style="background:#8b5cf6;" onclick="copyText('emailText')">Copiar texto p/ E-mail</button>
+        <button class="purple" onclick="copyText('emailText')">Copiar texto p/ E-mail</button>
         <button class="secondary" onclick="clearAll()">Limpar</button>
         <span class="copy-feedback" id="feedback">Copiado!</span>
       </div>
@@ -107,7 +196,7 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
       <div class="result-box">
         <label for="combinedRegex">Resultado principal - Hostnames + IPs</label>
         <textarea id="combinedRegex" readonly></textarea>
-        <div class="hint">Este é o resultado no formato que você pediu: hostnames e IPs dentro do mesmo parêntese, separados por |.</div>
+        <div class="hint">Este é o resultado no formato: hostnames e IPs dentro do mesmo parêntese, separados por |.</div>
       </div>
 
       <div class="result-box">
@@ -135,6 +224,9 @@ let KB_CATALOG = {
 
 // API Fetch state
 let isApiLoaded = false;
+// CMDB Data Cache
+let cmdbDatabase = [];
+let isCmdbLoaded = false;
 
 // Async function to load current month's KBs directly from Microsoft MSRC CVRF API
 async function loadLatestKBsFromMicrosoft() {
@@ -146,7 +238,6 @@ async function loadLatestKBsFromMicrosoft() {
     const documentId = `${currentYear}-${currentMonthStr}`;
     
     const fetchDoc = async (docId) => {
-      // Use standard CORS proxy to bypass API CORS policies if browser blocks direct fetch
       const directUrl = `https://api.msrc.microsoft.com/cvrf/v3.0/cvrf/${docId}`;
       const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(directUrl)}`;
       
@@ -165,7 +256,6 @@ async function loadLatestKBsFromMicrosoft() {
     try {
       data = await fetchDoc(documentId);
     } catch (e) {
-      // Fallback to previous month if current month is not published
       const prevMonthIdx = (now.getMonth() - 1 + 12) % 12;
       const prevYear = prevMonthIdx === 11 ? currentYear - 1 : currentYear;
       const prevMonthStr = months[prevMonthIdx];
@@ -175,11 +265,8 @@ async function loadLatestKBsFromMicrosoft() {
     if (data && data.Vulnerability) {
       const newCatalog = { ...KB_CATALOG };
       const docName = data.DocumentTracking && data.DocumentTracking.Identification && data.DocumentTracking.Identification.ID ? data.DocumentTracking.Identification.ID.Value : documentId;
-      
-      // Step 1: Map Product IDs to their OS labels
       const productMap = {};
       
-      // Helper function to recursively find all FullProductName definitions inside ProductTree branches
       const traverseTree = (node) => {
         if (!node) return;
         if (node.FullProductName) {
@@ -214,17 +301,14 @@ async function loadLatestKBsFromMicrosoft() {
         traverseTree(data.ProductTree);
       }
 
-      // Step 2: Extract KBs from remediations and link to their matched product categories
       data.Vulnerability.forEach(vuln => {
         if (vuln.Remediations) {
           vuln.Remediations.forEach(rem => {
             if (rem.Description && rem.Description.Value) {
               const desc = rem.Description.Value;
-              // Accept both "KB1234567" and raw numeric strings "1234567"
               if (/^(?:KB)?\d+$/i.test(desc)) {
                 const kbId = desc.toUpperCase().startsWith("KB") ? desc.toUpperCase() : `KB${desc}`;
                 
-                // If remediation has explicit ProductIDs, map them directly
                 if (rem.ProductID && rem.ProductID.length > 0) {
                   rem.ProductID.forEach(pid => {
                     const osKey = productMap[pid];
@@ -237,7 +321,6 @@ async function loadLatestKBsFromMicrosoft() {
                   });
                 }
                 
-                // Fallback check on URL/Description subject matching
                 const url = rem.URL || "";
                 const subject = (url.toLowerCase() + " " + desc.toLowerCase() + " " + (rem.SubType ? rem.SubType.toLowerCase() : ""));
                 if (subject.includes("2022")) {
@@ -266,6 +349,49 @@ async function loadLatestKBsFromMicrosoft() {
     }
   } catch (err) {
     console.warn("Não foi possível carregar KBs da API, usando catálogo local estável:", err);
+  }
+}
+
+// CMDB API ClaraHub Loader
+async function loadCmdbData() {
+  const statusLabel = document.getElementById("cmdbApiStatus");
+  const btnLoad = document.getElementById("btnLoadCmdb");
+  const btnFilter = document.getElementById("btnFilterStatus");
+  
+  statusLabel.innerText = "Carregando base de dados (getDataLake)...";
+  statusLabel.style.color = "#f59e0b";
+  btnLoad.disabled = true;
+  
+  try {
+    const directUrl = "https://clarahub.claranet.com.br/cmdb-servers-api/api/getDataLake";
+    // We add CORS proxy fallback in case local file hits CORS policies in browser
+    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(directUrl)}`;
+    
+    let response;
+    try {
+      response = await fetch(directUrl);
+    } catch(e) {
+      response = await fetch(proxyUrl);
+    }
+    
+    if (!response.ok) throw new Error("Status HTTP incorreto da API CMDB");
+    
+    cmdbDatabase = await response.json();
+    isCmdbLoaded = true;
+    
+    statusLabel.innerText = `Base CMDB carregada! (${cmdbDatabase.length} servidores carregados)`;
+    statusLabel.style.color = "#10b981";
+    btnFilter.disabled = false;
+    btnLoad.innerText = "Recarregar Base CMDB";
+    btnLoad.disabled = false;
+    
+    // Automatically regenerate lists with active statuses if input already has text
+    generate();
+  } catch(err) {
+    console.error("Erro ao ler CMDB:", err);
+    statusLabel.innerText = "Erro ao conectar na API CMDB. Tente novamente.";
+    statusLabel.style.color = "#ef4444";
+    btnLoad.disabled = false;
   }
 }
 
@@ -332,7 +458,6 @@ function suggestKBs(lines) {
   const suggested = new Set();
   const text = lines.join(" ").toLowerCase();
 
-  // OS detection rules
   if (text.includes("2016") || text.includes("srv16") || text.includes("server16")) {
     suggested.add("2016");
   }
@@ -352,7 +477,6 @@ function suggestKBs(lines) {
     suggested.add("11");
   }
 
-  // Fallback: If Windows/win is mentioned but no version specified, suggest main active servers
   if (suggested.size === 0 && (text.includes("win") || text.includes("microsoft") || text.includes("ad") || text.includes("sql"))) {
     suggested.add("2019");
     suggested.add("2022");
@@ -382,26 +506,167 @@ function processInput() {
   const input = document.getElementById("input").value;
   const lines = input.split(/\r?\n/).filter(line => line.trim());
 
-  let hostnames = [];
-  let ips = [];
+  let rawHostnames = [];
+  let rawIps = [];
 
   lines.forEach(line => {
     const host = findHostname(line);
-    if (host) hostnames.push(host);
-    ips.push(...findIps(line));
+    if (host) rawHostnames.push(host);
+    rawIps.push(...findIps(line));
   });
 
   if (document.getElementById("removeDuplicates").checked) {
-    hostnames = unique(hostnames);
-    ips = unique(ips);
+    rawHostnames = unique(rawHostnames);
+    rawIps = unique(rawIps);
+  }
+
+  // Pilot filter logic for CMDB statuses
+  let finalHostnames = [...rawHostnames];
+  let finalIps = [...rawIps];
+  const onlyPoweredOn = document.getElementById("onlyPoweredOn").checked;
+  
+  const vmListContainer = document.getElementById("vmsList");
+  const vmStatusPanel = document.getElementById("vmStatusPanel");
+  
+  if (isCmdbLoaded && (rawHostnames.length > 0 || rawIps.length > 0)) {
+    vmStatusPanel.style.display = "block";
+    let listHtml = "";
+    
+    const matchedHosts = new Set();
+    const matchedIps = new Set();
+    
+    // Create maps for efficient lookups
+    const cmdbHostMap = {};
+    const cmdbIpMap = {};
+    
+    cmdbDatabase.forEach(server => {
+      if (server.HostName) {
+        const key = server.HostName.toLowerCase().split(".")[0];
+        cmdbHostMap[key] = server;
+      }
+      if (server.IP) {
+        cmdbIpMap[server.IP] = server;
+      }
+    });
+
+    // Track already processed servers to prevent duplicate rendering of status items
+    const renderedServerIds = new Set();
+
+    // Check hostnames
+    const filteredHostnames = [];
+    rawHostnames.forEach(host => {
+      const hostKey = host.toLowerCase().split(".")[0];
+      const serverInfo = cmdbHostMap[hostKey];
+      
+      let status = "Desconhecido";
+      let badgeClass = "status-desconhecido";
+      let details = "Não encontrado no CMDB";
+      let isFound = false;
+      let srvId = null;
+      
+      if (serverInfo) {
+        isFound = true;
+        srvId = serverInfo.ServerID || serverInfo.ServerUUID || hostKey;
+        status = serverInfo.Status || "Desconhecido";
+        const ipInfo = serverInfo.IP ? ` | IP: ${serverInfo.IP}` : "";
+        details = `Cliente: ${serverInfo.Customer || "N/A"}${ipInfo} | OS: ${serverInfo.SO || "N/A"}`;
+        
+        if (status.toLowerCase() === "ligada") {
+          badgeClass = "status-ligada";
+          filteredHostnames.push(host);
+        } else if (status.toLowerCase() === "desligada") {
+          badgeClass = "status-desligada";
+          if (!onlyPoweredOn) filteredHostnames.push(host);
+        } else {
+          if (!onlyPoweredOn) filteredHostnames.push(host);
+        }
+      } else {
+        // When CMDB is loaded, if onlyPoweredOn is checked, we exclude it if not found (since we cannot verify it is online)
+        if (!onlyPoweredOn) {
+          filteredHostnames.push(host);
+        }
+      }
+      
+      // Render status item only if we haven't rendered this server yet
+      if (!isFound || !renderedServerIds.has(srvId)) {
+        if (isFound) renderedServerIds.add(srvId);
+        listHtml += `<div class="vm-item">
+          <span><strong>${host}</strong> (${details})</span>
+          <span class="status-badge ${badgeClass}">${status}</span>
+        </div>`;
+      }
+    });
+
+    // Check IPs
+    const filteredIps = [];
+    rawIps.forEach(ip => {
+      const serverInfo = cmdbIpMap[ip];
+      
+      let status = "Desconhecido";
+      let badgeClass = "status-desconhecido";
+      let details = "Não encontrado no CMDB";
+      let isFound = false;
+      let srvId = null;
+      
+      if (serverInfo) {
+        isFound = true;
+        const hostKey = serverInfo.HostName ? serverInfo.HostName.toLowerCase().split(".")[0] : "";
+        srvId = serverInfo.ServerID || serverInfo.ServerUUID || hostKey || ip;
+        status = serverInfo.Status || "Desconhecido";
+        const hostInfo = serverInfo.HostName ? `Hostname: ${serverInfo.HostName} | ` : "";
+        details = `${hostInfo}Cliente: ${serverInfo.Customer || "N/A"}`;
+        
+        if (status.toLowerCase() === "ligada") {
+          badgeClass = "status-ligada";
+          filteredIps.push(ip);
+        } else if (status.toLowerCase() === "desligada") {
+          badgeClass = "status-desligada";
+          if (!onlyPoweredOn) filteredIps.push(ip);
+        } else {
+          if (!onlyPoweredOn) filteredIps.push(ip);
+        }
+      } else {
+        if (!onlyPoweredOn) {
+          filteredIps.push(ip);
+        }
+      }
+      
+      // Render status item only if we haven't rendered this server yet (checks cross-reference with hostname map also)
+      if (isFound) {
+        // Double check cross-reference with Hostname key to link them securely
+        const crossHostKey = serverInfo.HostName ? serverInfo.HostName.toLowerCase().split(".")[0] : "";
+        if (crossHostKey && cmdbHostMap[crossHostKey]) {
+          const crossSrv = cmdbHostMap[crossHostKey];
+          const crossId = crossSrv.ServerID || crossSrv.ServerUUID || crossHostKey;
+          if (renderedServerIds.has(crossId)) {
+            // Already rendered under Hostname check, just map the output and skip duplicate HTML rendering
+            return;
+          }
+        }
+      }
+
+      if (!isFound || !renderedServerIds.has(srvId)) {
+        if (isFound) renderedServerIds.add(srvId);
+        listHtml += `<div class="vm-item">
+          <span><strong>${ip}</strong> (${details})</span>
+          <span class="status-badge ${badgeClass}">${status}</span>
+        </div>`;
+      }
+    });
+    
+    vmListContainer.innerHTML = listHtml;
+    finalHostnames = filteredHostnames;
+    finalIps = filteredIps;
+  } else {
+    vmStatusPanel.style.display = "none";
   }
 
   if (document.getElementById("sortList").checked) {
-    hostnames.sort((a,b) => a.localeCompare(b));
-    ips.sort(numericIpCompare);
+    finalHostnames.sort((a,b) => a.localeCompare(b));
+    finalIps.sort(numericIpCompare);
   }
 
-  return { lines, hostnames, ips };
+  return { lines, hostnames: finalHostnames, ips: finalIps };
 }
 
 function generate() {
@@ -418,7 +683,6 @@ function generate() {
   document.getElementById("ipCount").innerText = data.ips.length;
   document.getElementById("lineCount").innerText = data.lines.length;
 
-  // Format dynamic corporate email template
   const suggestedKbs = suggestKBs(data.lines);
   
   let emailText = "Senhores, boa noite.\n\nInformamos que estamos iniciando as atividades referentes à GMUD XXX, conforme planejamento aprovado.\n\nA partir deste momento, será dado início ao processo de atualização dos servidores relacionados abaixo:\n\n";
@@ -432,7 +696,6 @@ function generate() {
 
   emailText += "\nSistemas Operacionais afetados:\n";
   if (suggestedKbs.length > 0) {
-    // Extract OS names
     const osNames = suggestedKbs.map(item => item.name.split(" Cumulative")[0].split(" Cumulative Security")[0]);
     osNames.forEach(os => {
       emailText += `- ${os}\n`;
@@ -464,10 +727,6 @@ function copyText(id) {
   setTimeout(() => feedback.style.display = "none", 1200);
 }
 
-function copyKB() {
-  // Simple copy action helper if needed
-}
-
 function clearAll() {
   document.getElementById("input").value = "";
   generate();
@@ -476,7 +735,6 @@ function clearAll() {
 document.getElementById("input").addEventListener("input", generate);
 document.querySelectorAll("input[type=checkbox]").forEach(el => el.addEventListener("change", generate));
 
-// Run initialization
 generate();
 loadLatestKBsFromMicrosoft();
 </script>
