@@ -188,9 +188,9 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
 
       <!-- Generated Email text area box -->
       <div class="result-box" style="border-left: 4px solid #8b5cf6; background: #1a1525;">
-        <label for="emailText" style="color: #c084fc; font-size: 16px;">📧 Texto pronto para E-mail (Lista de VMs)</label>
-        <textarea id="emailText" style="min-height: 150px; font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px;" readonly></textarea>
-        <div class="hint">Este texto já vem estruturado com a lista de servidores prontos para colar na comunicação do e-mail.</div>
+        <label style="color: #c084fc; font-size: 16px;">📧 Texto pronto para E-mail (Lista de VMs)</label>
+        <div id="emailText" contenteditable="true" style="min-height: 180px; font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; background: #020617; border: 1px solid #334155; border-radius: 10px; padding: 12px; overflow-y: auto; color: #f9fafb; white-space: pre-wrap; line-height: 1.5;"></div>
+        <div class="hint">Este texto já vem estruturado em formato Rich Text (HTML). Ao clicar em "Copiar texto p/ E-mail", as VMs em <strong>negrito</strong> serão copiadas formatadas e prontas para colar diretamente no corpo do e-mail do Outlook.</div>
       </div>
 
       <div class="result-box">
@@ -703,67 +703,110 @@ function generate() {
 
   const suggestedKbs = suggestKBs(data.lines);
   
-  let emailText = "Senhores, boa noite.\n\nInformamos que estamos iniciando as atividades referentes à GMUD XXX, conforme planejamento aprovado.\n\nA partir deste momento, será dado início ao processo de atualização dos servidores relacionados abaixo:\n\n";
+  let emailHtml = "Senhores, boa noite.<br><br>Informamos que estamos iniciando as atividades referentes à GMUD XXX, conforme planejamento aprovado.<br><br>A partir deste momento, será dado início ao processo de atualização dos servidores relacionados abaixo:<br><br>";
   
   if (data.isCmdbApplied) {
-    // If CMDB was applied, display structured e-mail grouped by online and offline servers (with evidences)
     if (data.activeVMs.length > 0) {
-      emailText += "Servidores LIGADOS (Patches serão aplicados):\n";
+      emailHtml += "<strong>Servidores LIGADOS (Patches serão aplicados):</strong><br>";
       data.activeVMs.forEach(vm => {
-        emailText += `- ${vm.name} (${vm.info})\n`;
+        emailHtml += `- <strong>${vm.name}</strong> (${vm.info})<br>`;
       });
     } else {
-      emailText += "Servidores LIGADOS:\n- n/a\n";
+      emailHtml += "<strong>Servidores LIGADOS:</strong><br>- n/a<br>";
     }
     
     if (data.offlineVMs.length > 0 || data.unknownVMs.length > 0) {
-      emailText += "\nServidores DESLIGADOS / Fora do escopo (Não serão atualizados):\n";
+      emailHtml += "<br><strong>Servidores DESLIGADOS / Fora do escopo (Não serão atualizados):</strong><br>";
       data.offlineVMs.forEach(vm => {
-        emailText += `- ${vm.name} (Evidência: ${vm.reason} | ${vm.info})\n`;
+        emailHtml += `- <strong>${vm.name}</strong> (Evidência: ${vm.reason} | ${vm.info})<br>`;
       });
       data.unknownVMs.forEach(vm => {
-        emailText += `- ${vm.name} (Evidência: ${vm.reason})\n`;
+        emailHtml += `- <strong>${vm.name}</strong> (Evidência: ${vm.reason})<br>`;
       });
     }
   } else {
-    // Fallback simple list if CMDB data is not loaded yet
     if (data.hostnames.length > 0) {
       data.hostnames.forEach(host => {
-        emailText += `- ${host}\n`;
+        emailHtml += `- <strong>${host}</strong><br>`;
       });
     } else {
-      emailText += "[Nenhum servidor identificado]";
+      emailHtml += "[Nenhum servidor identificado]";
     }
   }
 
-  emailText += "\nSistemas Operacionais afetados:\n";
+  emailHtml += "<br><strong>Sistemas Operacionais afetados:</strong><br>";
   if (suggestedKbs.length > 0) {
     const osNames = suggestedKbs.map(item => item.name.split(" Cumulative")[0].split(" Cumulative Security")[0]);
     osNames.forEach(os => {
-      emailText += `- ${os}\n`;
+      emailHtml += `- ${os}<br>`;
     });
   } else {
-    emailText += "- Windows Server / Client (Padrão)\n";
+    emailHtml += "- Windows Server / Client (Padrão)<br>";
   }
 
-  emailText += "\nPatches de segurança que serão aplicados:\n";
+  emailHtml += "<br><strong>Patches de segurança que serão aplicados:</strong><br>";
   if (suggestedKbs.length > 0) {
     suggestedKbs.forEach(item => {
-      emailText += `- ${item.kb} (${item.name})\n`;
+      emailHtml += `- ${item.kb} (${item.name})<br>`;
     });
   } else {
-    emailText += "- Cumulative Security Updates (Tanium Patch)\n";
+    emailHtml += "- Cumulative Security Updates (Tanium Patch)<br>";
   }
 
-  emailText += "\nQualquer dúvida, estamos à disposição.\nAtenciosamente,";
-  document.getElementById("emailText").value = emailText;
+  emailHtml += "<br>Qualquer dúvida, estamos à disposição.<br>Atenciosamente,";
+  document.getElementById("emailText").innerHTML = emailHtml;
 }
 
 function copyText(id) {
   const el = document.getElementById(id);
-  el.select();
-  el.setSelectionRange(0, 999999);
-  navigator.clipboard.writeText(el.value || "");
+  
+  if (id === "emailText") {
+    // Advanced Rich Text HTML copy mechanism for Microsoft Outlook
+    const htmlContent = el.innerHTML;
+    // Replace <br> with newlines for plain text backup
+    const plainText = el.innerText || el.textContent;
+    
+    const container = document.createElement("div");
+    container.innerHTML = htmlContent;
+    container.style.position = "fixed";
+    container.style.pointerEvents = "none";
+    container.style.opacity = "0";
+    document.body.appendChild(container);
+    
+    const range = document.createRange();
+    range.selectNodeContents(container);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    
+    try {
+      document.execCommand("copy");
+    } catch (e) {
+      console.warn("execCommand fallback failed:", e);
+    }
+    
+    selection.removeAllRanges();
+    document.body.removeChild(container);
+    
+    // Also try copying modern ClipboardItem containing both formats if supported
+    if (navigator.clipboard && window.ClipboardItem) {
+      const htmlBlob = new Blob([htmlContent], { type: "text/html" });
+      const textBlob = new Blob([plainText], { type: "text/plain" });
+      const item = new ClipboardItem({
+        "text/html": htmlBlob,
+        "text/plain": textBlob
+      });
+      navigator.clipboard.write([item]).catch(err => {
+        console.warn("ClipboardItem write failed:", err);
+      });
+    }
+  } else {
+    // Normal textarea copy
+    el.select();
+    el.setSelectionRange(0, 999999);
+    navigator.clipboard.writeText(el.value || "");
+  }
+  
   const feedback = document.getElementById("feedback");
   feedback.style.display = "inline";
   setTimeout(() => feedback.style.display = "none", 1200);
