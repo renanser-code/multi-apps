@@ -125,12 +125,12 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
 <script>
 // Default backup catalog mapping for typical Windows Server versions (Backup for Offline / API failure)
 let KB_CATALOG = {
-  "2016": { kb: "KB5094122", name: "Windows Server 2016 Cumulative Update" },
-  "2019": { kb: "KB5094123", name: "Windows Server 2019 Cumulative Update" },
-  "2022": { kb: "KB5094128", name: "Windows Server 2022 Cumulative Update" },
-  "2012": { kb: "KB5094006", name: "Windows Server 2012 / 2012 R2 Cumulative Security Update" },
-  "10": { kb: "KB5094125", name: "Windows 10/Client Cumulative Update" },
-  "11": { kb: "KB5094126", name: "Windows 11/Client Cumulative Update" }
+  "2016": { kb: "KB5099535", name: "Windows Server 2016 Cumulative Update" },
+  "2019": { kb: "KB5099538", name: "Windows Server 2019 Cumulative Update" },
+  "2022": { kb: "KB5099540", name: "Windows Server 2022 Cumulative Update" },
+  "2012": { kb: "KB5099444", name: "Windows Server 2012 R2 Cumulative Update (Monthly Rollup)" },
+  "10": { kb: "KB5099539", name: "Windows 10 Cumulative Update" },
+  "11": { kb: "KB5101650", name: "Windows 11 Cumulative Update" }
 };
 
 // API Fetch state
@@ -158,7 +158,7 @@ async function loadLatestKBsFromMicrosoft() {
       }
       
       if (!response.ok) throw new Error("Document not found");
-      return await response.ok ? await response.json() : null;
+      return await response.json();
     };
 
     let data = null;
@@ -174,30 +174,44 @@ async function loadLatestKBsFromMicrosoft() {
 
     if (data && data.Vulnerability) {
       const newCatalog = { ...KB_CATALOG };
-      const docName = data.DocumentTracking.Identification.ID.Value;
+      const docName = data.DocumentTracking && data.DocumentTracking.Identification && data.DocumentTracking.Identification.ID ? data.DocumentTracking.Identification.ID.Value : documentId;
       
       // Step 1: Map Product IDs to their OS labels
       const productMap = {};
-      if (data.ProductTree && data.ProductTree.FullProductName) {
-        data.ProductTree.FullProductName.forEach(prod => {
-          if (prod.ProductID && prod.Value) {
-            const name = prod.Value.toLowerCase();
-            const pid = prod.ProductID;
-            if (name.includes("windows server 2022")) {
-              productMap[pid] = "2022";
-            } else if (name.includes("windows server 2019")) {
-              productMap[pid] = "2019";
-            } else if (name.includes("windows server 2016")) {
-              productMap[pid] = "2016";
-            } else if (name.includes("windows server 2012 r2") || name.includes("windows server 2012")) {
-              productMap[pid] = "2012";
-            } else if (name.includes("windows 11")) {
-              productMap[pid] = "11";
-            } else if (name.includes("windows 10")) {
-              productMap[pid] = "10";
+      
+      // Helper function to recursively find all FullProductName definitions inside ProductTree branches
+      const traverseTree = (node) => {
+        if (!node) return;
+        if (node.FullProductName) {
+          const products = Array.isArray(node.FullProductName) ? node.FullProductName : [node.FullProductName];
+          products.forEach(prod => {
+            if (prod.ProductID && prod.Value) {
+              const name = prod.Value.toLowerCase();
+              const pid = prod.ProductID;
+              if (name.includes("windows server 2022")) {
+                productMap[pid] = "2022";
+              } else if (name.includes("windows server 2019")) {
+                productMap[pid] = "2019";
+              } else if (name.includes("windows server 2016")) {
+                productMap[pid] = "2016";
+              } else if (name.includes("windows server 2012 r2") || name.includes("windows server 2012")) {
+                productMap[pid] = "2012";
+              } else if (name.includes("windows 11")) {
+                productMap[pid] = "11";
+              } else if (name.includes("windows 10")) {
+                productMap[pid] = "10";
+              }
             }
-          }
-        });
+          });
+        }
+        if (node.Branch) {
+          const branches = Array.isArray(node.Branch) ? node.Branch : [node.Branch];
+          branches.forEach(traverseTree);
+        }
+      };
+      
+      if (data.ProductTree) {
+        traverseTree(data.ProductTree);
       }
 
       // Step 2: Extract KBs from remediations and link to their matched product categories
@@ -206,8 +220,9 @@ async function loadLatestKBsFromMicrosoft() {
           vuln.Remediations.forEach(rem => {
             if (rem.Description && rem.Description.Value) {
               const desc = rem.Description.Value;
-              if (/^KB\d+$/i.test(desc)) {
-                const kbId = desc.toUpperCase();
+              // Accept both "KB1234567" and raw numeric strings "1234567"
+              if (/^(?:KB)?\d+$/i.test(desc)) {
+                const kbId = desc.toUpperCase().startsWith("KB") ? desc.toUpperCase() : `KB${desc}`;
                 
                 // If remediation has explicit ProductIDs, map them directly
                 if (rem.ProductID && rem.ProductID.length > 0) {
@@ -222,23 +237,21 @@ async function loadLatestKBsFromMicrosoft() {
                   });
                 }
                 
-                // Fallback check on URL subject matching
+                // Fallback check on URL/Description subject matching
                 const url = rem.URL || "";
-                if (url.includes("support.microsoft.com")) {
-                  const subject = url.toLowerCase() + " " + desc.toLowerCase();
-                  if (subject.includes("2022")) {
-                    newCatalog["2022"] = { kb: kbId, name: `Windows Server 2022 Cumulative Update (${docName})` };
-                  } else if (subject.includes("2019")) {
-                    newCatalog["2019"] = { kb: kbId, name: `Windows Server 2019 Cumulative Update (${docName})` };
-                  } else if (subject.includes("2016")) {
-                    newCatalog["2016"] = { kb: kbId, name: `Windows Server 2016 Cumulative Update (${docName})` };
-                  } else if (subject.includes("2012")) {
-                    newCatalog["2012"] = { kb: kbId, name: `Windows Server 2012 / 2012 R2 Cumulative Security Update (${docName})` };
-                  } else if (subject.includes("windows-11") || subject.includes("win11")) {
-                    newCatalog["11"] = { kb: kbId, name: `Windows 11 Cumulative Update (${docName})` };
-                  } else if (subject.includes("windows-10") || subject.includes("win10")) {
-                    newCatalog["10"] = { kb: kbId, name: `Windows 10 Cumulative Update (${docName})` };
-                  }
+                const subject = (url.toLowerCase() + " " + desc.toLowerCase() + " " + (rem.SubType ? rem.SubType.toLowerCase() : ""));
+                if (subject.includes("2022")) {
+                  newCatalog["2022"] = { kb: kbId, name: `Windows Server 2022 Cumulative Update (${docName})` };
+                } else if (subject.includes("2019")) {
+                  newCatalog["2019"] = { kb: kbId, name: `Windows Server 2019 Cumulative Update (${docName})` };
+                } else if (subject.includes("2016")) {
+                  newCatalog["2016"] = { kb: kbId, name: `Windows Server 2016 Cumulative Update (${docName})` };
+                } else if (subject.includes("2012")) {
+                  newCatalog["2012"] = { kb: kbId, name: `Windows Server 2012 / 2012 R2 Cumulative Security Update (${docName})` };
+                } else if (subject.includes("windows-11") || subject.includes("win11")) {
+                  newCatalog["11"] = { kb: kbId, name: `Windows 11 Cumulative Update (${docName})` };
+                } else if (subject.includes("windows-10") || subject.includes("win10")) {
+                  newCatalog["10"] = { kb: kbId, name: `Windows 10 Cumulative Update (${docName})` };
                 }
               }
             }
