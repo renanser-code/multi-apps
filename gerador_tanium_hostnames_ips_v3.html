@@ -110,6 +110,7 @@
       border: 1px solid #334155;
       border-radius: 12px;
     }
+    .schedule-form { grid-template-columns: repeat(3, 1fr); }
     .schedule-form div {
       display: flex;
       flex-direction: column;
@@ -124,6 +125,14 @@
       outline: none;
       margin-top: 5px;
     }
+    .schedule-form input.raw-dt {
+      background: #0f172a;
+      border-color: #f59e0b;
+      font-size: 15px;
+      color: #fde68a;
+    }
+    .schedule-form input.raw-dt.valid { border-color: #34d399; color: #6ee7b7; }
+    .schedule-form input.raw-dt.invalid { border-color: #f87171; color: #fca5a5; }
     /* Parsed field tag styles */
     .parsed-field { background: #020617; border: 1px solid #334155; border-radius: 8px; padding: 8px 12px; font-size: 13px; color: #a5b4fc; font-family: Consolas, monospace; margin-top: 5px; min-height: 30px; word-break: break-all; }
     .parsed-section { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
@@ -245,23 +254,33 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
           Preencha ou confirme os campos abaixo (extraídos automaticamente do e-mail) para gerar o script PowerShell de envio automático.
         </div>
         <div class="schedule-form">
+          <!-- Free-text datetime field spanning all 3 columns -->
+          <div style="grid-column: span 3;">
+            <label for="schedDatetimeRaw" style="color: #fde68a;">⌨️ Data e Hora de Início (digitação livre)</label>
+            <input type="text" id="schedDatetimeRaw" class="raw-dt"
+              placeholder="Ex: 17/07/2026 23:00  ou  sexta-feira, 17 de julho de 2026 23:00"
+              oninput="parseFreeDateTime(this)">
+            <div id="dtParseHint" style="font-size: 12px; color: #64748b; margin-top: 4px;">Digite a data e hora — os campos abaixo serão preenchidos automaticamente.</div>
+          </div>
+          <!-- Divider -->
+          <div style="grid-column: span 3; border-top: 1px solid #334155; margin: 4px 0;"></div>
           <div>
             <label for="schedGmud">Número da GMUD</label>
             <input type="text" id="schedGmud" placeholder="Ex: 100" value="100">
           </div>
           <div>
-            <label for="schedDate">Data do Agendamento</label>
+            <label for="schedDate">Data (preenchida automaticamente)</label>
             <input type="date" id="schedDate">
           </div>
           <div>
-            <label for="schedTime">Hora do Agendamento</label>
+            <label for="schedTime">Hora (preenchida automaticamente)</label>
             <input type="time" id="schedTime">
           </div>
-          <div>
+          <div style="grid-column: span 2;">
             <label for="schedTo">Para (To) — separados por ;</label>
             <input type="text" id="schedTo" placeholder="email1@empresa.com; email2@empresa.com">
           </div>
-          <div style="grid-column: span 2;">
+          <div>
             <label for="schedCc">Cópia (Cc) — separados por ;</label>
             <input type="text" id="schedCc" placeholder="copia@empresa.com">
           </div>
@@ -1121,6 +1140,85 @@ function parseGmudEmail() {
   feedback.style.display = "inline";
   setTimeout(() => feedback.style.display = "none", 3000);
   generate();
+}
+
+// Parse free-text datetime typed by the user into date/time pickers
+function parseFreeDateTime(el) {
+  const raw = el.value.trim();
+  const hint = document.getElementById("dtParseHint");
+  if (!raw) {
+    el.className = "raw-dt";
+    hint.textContent = "Digite a data e hora — os campos abaixo serão preenchidos automaticamente.";
+    hint.style.color = "#64748b";
+    return;
+  }
+
+  const MONTHS = {
+    janeiro:'01', fevereiro:'02', março:'03', marco:'03',
+    abril:'04', maio:'05', junho:'06', julho:'07',
+    agosto:'08', setembro:'09', outubro:'10', novembro:'11', dezembro:'12'
+  };
+
+  // Normalize input: remove day-of-week prefix like "sexta-feira, "
+  const normalized = raw
+    .replace(/^(segunda|terça|quarta|quinta|sexta|sábado|sabado|domingo)[\-\s]*(feira)?,?\s*/i, '')
+    .trim();
+
+  let dateVal = "", timeVal = "";
+
+  // Pattern 1: DD/MM/YYYY HH:MM or DD-MM-YYYY HH:MM
+  let m = normalized.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\s+(\d{1,2}):(\d{2})/);
+  if (m) {
+    dateVal = `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+    timeVal = `${m[4].padStart(2,'0')}:${m[5]}`;
+  }
+
+  // Pattern 2: YYYY-MM-DD HH:MM or YYYY-MM-DDTHH:MM
+  if (!dateVal) {
+    m = normalized.match(/^(\d{4})-(\d{2})-(\d{2})[T\s]+(\d{1,2}):(\d{2})/);
+    if (m) {
+      dateVal = `${m[1]}-${m[2]}-${m[3]}`;
+      timeVal = `${m[4].padStart(2,'0')}:${m[5]}`;
+    }
+  }
+
+  // Pattern 3: "17 de julho de 2026 23:00" or "17 de julho de 2026 às 23:00"
+  if (!dateVal) {
+    m = normalized.match(/(\d{1,2})\s+de\s+([a-záéíóúãçê]+)\s+de\s+(\d{4})[\s\w\àà]*(\d{1,2}):(\d{2})/i);
+    if (m) {
+      const monthKey = m[2].toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const monthNum = MONTHS[monthKey] || MONTHS[m[2].toLowerCase()] || null;
+      if (monthNum) {
+        dateVal = `${m[3]}-${monthNum}-${m[1].padStart(2,'0')}`;
+        timeVal = `${m[4].padStart(2,'0')}:${m[5]}`;
+      }
+    }
+  }
+
+  // Pattern 4: Just time alone (HH:MM) — keep current date
+  if (!dateVal && !timeVal) {
+    m = normalized.match(/^(\d{1,2}):(\d{2})$/);
+    if (m) {
+      timeVal = `${m[1].padStart(2,'0')}:${m[2]}`;
+    }
+  }
+
+  if (dateVal || timeVal) {
+    if (dateVal) document.getElementById("schedDate").value = dateVal;
+    if (timeVal) document.getElementById("schedTime").value = timeVal;
+    el.classList.remove("invalid");
+    el.classList.add("valid");
+    const display = dateVal
+      ? `${dateVal.split('-').reverse().join('/')} às ${timeVal}`
+      : `Hora: ${timeVal}`;
+    hint.textContent = `✅ Reconhecido: ${display}`;
+    hint.style.color = "#34d399";
+  } else {
+    el.classList.remove("valid");
+    el.classList.add("invalid");
+    hint.textContent = "❌ Formato não reconhecido. Tente: 17/07/2026 23:00  ou  17 de julho de 2026 23:00";
+    hint.style.color = "#f87171";
+  }
 }
 
 function clearAll() {
