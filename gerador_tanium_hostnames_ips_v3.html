@@ -285,17 +285,32 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
             <input type="text" id="schedCc" placeholder="copia@empresa.com">
           </div>
         </div>
-        <div class="row" style="margin: 15px 0 0 0;">
-          <button class="success" onclick="downloadSchedulingScript()" style="background: #10b981; display: flex; align-items: center; gap: 8px;">
-            📥 Baixar Script de Agendamento Automático (.ps1)
-          </button>
+        <!-- Script preview -->
+        <div style="margin: 15px 0 0 0;">
+          <label style="font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">Script PowerShell gerado (pré-visualização):</label>
+          <textarea id="psScriptPreview" readonly style="min-height: 110px; margin-top: 6px; font-family: Consolas, monospace; font-size: 12px; color: #86efac; background: #020617; border-color: #166534;"></textarea>
         </div>
-        <div style="margin: 12px 0 0 0; background: #422006; border: 1px solid #f59e0b; border-radius: 10px; padding: 12px 16px; font-size: 13px; color: #fde68a; line-height: 1.7;">
-          <strong>⚠️ Após baixar o arquivo .ps1:</strong><br>
-          O Windows pode bloquear a execução por segurança. Para resolver:<br>
-          1. Clique com o <strong>botão direito</strong> no arquivo → <strong>Propriedades</strong><br>
-          2. Na aba <strong>Geral</strong>, marque a caixa <strong>"Desbloquear"</strong> no rodapé<br>
-          3. Clique <strong>OK</strong> e depois execute com botão direito → <strong>"Executar com PowerShell"</strong> (como Administrador)
+        <div class="row" style="margin: 12px 0 0 0; flex-wrap: wrap; gap: 10px;">
+          <button onclick="copySchedulingScript()" style="background: #7c3aed; color: white; font-weight: 700; border: 0; border-radius: 10px; padding: 13px 18px; cursor: pointer; font-size: 14px; display:flex; align-items:center; gap:8px;">
+            📋 Copiar Script PowerShell
+          </button>
+          <button onclick="downloadSchedulingScript()" style="background: #374151; color: #d1d5db; font-weight: 600; border: 1px solid #4b5563; border-radius: 10px; padding: 13px 18px; cursor: pointer; font-size: 14px; display:flex; align-items:center; gap:8px;">
+            📥 Baixar .ps1 (alternativo)
+          </button>
+          <span id="scriptCopyFeedback" style="color: #86efac; font-size: 13px; align-self: center; display: none;">✅ Script copiado!</span>
+        </div>
+        <!-- No-admin how-to -->
+        <div style="margin: 14px 0 0 0; background: #052e16; border: 1px solid #16a34a; border-radius: 10px; padding: 14px 16px; font-size: 13px; color: #bbf7d0; line-height: 1.9;">
+          <div style="font-size: 14px; font-weight: 700; color: #4ade80; margin-bottom: 6px;">🚀 Como agendar sem ser Administrador:</div>
+          <span style="background:#166534; border-radius:4px; padding:2px 7px; font-weight:700;">1</span>&nbsp;
+          Clique em <strong>"📋 Copiar Script PowerShell"</strong> acima<br>
+          <span style="background:#166534; border-radius:4px; padding:2px 7px; font-weight:700;">2</span>&nbsp;
+          Pressione <strong>Win + R</strong>, digite <code style="background:#1e3a2f;padding:1px 5px;border-radius:3px;">powershell</code> e pressione <strong>Enter</strong><br>
+          <span style="background:#166534; border-radius:4px; padding:2px 7px; font-weight:700;">3</span>&nbsp;
+          Na janela preta do PowerShell, cole com <strong>Ctrl+V</strong> e pressione <strong>Enter</strong><br>
+          <span style="background:#166534; border-radius:4px; padding:2px 7px; font-weight:700;">4</span>&nbsp;
+          Pronto! O e-mail fica salvo no Outlook e <strong>será enviado automaticamente</strong> na data e hora programadas ✉️<br>
+          <div style="margin-top: 8px; color: #86efac; font-size: 12px;">⚠️ O Outlook precisa estar aberto no horário do envio. Como é um computador de trabalho, normalmente fica aberto o dia todo.</div>
         </div>
       </div>
 
@@ -943,86 +958,128 @@ function copyText(id) {
   setTimeout(() => feedback.style.display = "none", 1200);
 }
 
-// Generate PowerShell Scheduling Script File
-function downloadSchedulingScript() {
-  const gmudNum = document.getElementById("schedGmud").value || "XXX";
-  const schedDate = document.getElementById("schedDate").value;
-  const schedTime = document.getElementById("schedTime").value;
 
-  if (!schedDate || !schedTime) {
+// ── Scheduling Script Core ─────────────────────────────────────────────────
+
+function buildSchedulingScript() {
+  const gmudNum    = document.getElementById("schedGmud").value.trim() || "XXX";
+  const schedDate  = document.getElementById("schedDate").value;   // YYYY-MM-DD
+  const schedTime  = document.getElementById("schedTime").value;   // HH:MM
+  const toAddr     = document.getElementById("schedTo").value.trim() || "";
+  const ccAddr     = document.getElementById("schedCc").value.trim() || "";
+
+  if (!schedDate || !schedTime) return null;
+
+  // Convert YYYY-MM-DD + HH:MM → MM/DD/YYYY HH:MM:SS (format Outlook accepts)
+  const [y, mo, d] = schedDate.split("-");
+  const [hh, mm]   = schedTime.split(":");
+  const outlookDT  = `${mo}/${d}/${y} ${hh}:${mm}:00`;
+  const displayDT  = `${d}/${mo}/${y} às ${hh}:${mm}`;
+
+  const emailContent = document.getElementById("emailText").innerHTML;
+  // Escape for PowerShell here-string (backtick-escape backticks, escape $)
+  const escapedHtml = emailContent
+    .replace(/`/g, "``")
+    .replace(/\$/g, "`$");
+  const subject = `Início das Atividades - GMUD ${gmudNum}`;
+
+  return `# ─────────────────────────────────────────────────────────────
+# Agendamento de E-mail de GMUD via Outlook (Envio Agendado)
+# GMUD    : ${gmudNum}
+# Envio   : ${displayDT}
+# Para    : ${toAddr || "(não definido)"}
+# Cc      : ${ccAddr || "(não definido)"}
+# NÃO requer privilégios de Administrador
+# ─────────────────────────────────────────────────────────────
+
+try {
+    $Outlook = New-Object -ComObject Outlook.Application
+    $Mail    = $Outlook.CreateItem(0)   # 0 = olMailItem
+
+    $Mail.Subject             = "${subject}"
+    $Mail.HTMLBody            = @"
+${escapedHtml}
+"@
+    $Mail.To                  = "${toAddr}"
+    $Mail.CC                  = "${ccAddr}"
+
+    # DeferredDeliveryTime: Outlook segura o e-mail e envia automaticamente
+    # no dia e hora definidos (Outlook precisa estar aberto no momento)
+    $Mail.DeferredDeliveryTime = [DateTime]"${outlookDT}"
+
+    $Mail.Send()
+
+    Write-Host ""
+    Write-Host "✅ E-mail agendado com sucesso!" -ForegroundColor Green
+    Write-Host "   GMUD  : ${gmudNum}"
+    Write-Host "   Envio : ${displayDT}"
+    Write-Host "   Para  : ${toAddr}"
+    Write-Host ""
+    Write-Host "O e-mail está na pasta 'Caixa de Saída' do Outlook." -ForegroundColor Cyan
+    Write-Host "Ele será enviado automaticamente em ${displayDT}." -ForegroundColor Cyan
+    Write-Host "(Deixe o Outlook aberto no horário programado)" -ForegroundColor Yellow
+
+} catch {
+    Write-Host ""
+    Write-Host "❌ Erro ao agendar o e-mail:" -ForegroundColor Red
+    Write-Host $_.Exception.Message -ForegroundColor Red
+    Write-Host ""
+    Write-Host "Verifique se o Outlook está instalado e aberto." -ForegroundColor Yellow
+}
+
+Read-Host "`nPressione Enter para fechar"
+`;
+}
+
+// Auto-update preview textarea whenever scheduling fields change
+function updateScriptPreview() {
+  const script = buildSchedulingScript();
+  const preview = document.getElementById("psScriptPreview");
+  if (!preview) return;
+  if (script) {
+    preview.value = script;
+    preview.style.color = "#86efac";
+  } else {
+    preview.value = "(Preencha a Data e a Hora de Agendamento para gerar o script)";
+    preview.style.color = "#64748b";
+  }
+}
+
+function copySchedulingScript() {
+  const script = buildSchedulingScript();
+  if (!script) {
     alert("Por favor, preencha a Data e a Hora do agendamento primeiro!");
     return;
   }
-
-  // Format date and time for Task Scheduler
-  const targetDateTime = `${schedDate} ${schedTime}`;
-  
-  // Format HTML body safely escaping single quotes for PowerShell
-  const emailContent = document.getElementById("emailText").innerHTML;
-  const escapedHtml = emailContent.replace(/'/g, "''");
-  const subject = `Início das Atividades - GMUD ${gmudNum}`;
-
-  // PowerShell Script that runs in background and interacts with local Outlook instance
-  const toAddresses = document.getElementById("schedTo").value.trim() || "";
-  const ccAddresses = document.getElementById("schedCc").value.trim() || "";
-
-  const psScriptContent = `# PowerShell Script para envio agendado de e-mail de GMUD via Outlook local
-# GMUD: ${gmudNum} | Agendado para: ${targetDateTime}
-
-# 1. Configurar tarefa agendada no Windows para disparar esse e-mail no dia e hora corretos
-$ScriptName = $MyInvocation.MyCommand.Name
-$ScriptPath = $MyInvocation.MyCommand.Path
-
-if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Write-Warning "AVISO: Para criar a tarefa agendada no Windows Task Scheduler, este script precisa ser executado como Administrador."
-    Write-Host "Pressione qualquer tecla para continuar apenas com o teste de envio imediato..."
-    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-} else {
-    $Trigger = New-ScheduledTaskTrigger -Once -At "${schedDate} ${schedTime}"
-    $Action = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File \`"\$ScriptPath\`" -SendMailNow"
-    $Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
-    
-    # Register the task
-    Register-ScheduledTask -TaskName "GMUD_${gmudNum}_Email_Inicio" -Trigger $Trigger -Action $Action -Settings $Settings -Force
-    
-    Add-Type -AssemblyName System.Windows.Forms
-    [System.Windows.Forms.MessageBox]::Show("Agendamento de e-mail para GMUD ${gmudNum} criado com sucesso!\n\nData de Execucao: ${schedDate} as ${schedTime}\nPara: ${toAddresses || '(nao definido)'}\nCc: ${ccAddresses || '(nao definido)'}", "Agendamento Confirmado", 0, 64)
-    Exit
+  navigator.clipboard.writeText(script).then(() => {
+    const fb = document.getElementById("scriptCopyFeedback");
+    fb.style.display = "inline";
+    setTimeout(() => fb.style.display = "none", 3000);
+  }).catch(() => {
+    // Fallback: select preview textarea
+    const ta = document.getElementById("psScriptPreview");
+    ta.select();
+    document.execCommand("copy");
+  });
 }
 
-# 2. Logica de envio usando a API local do Outlook
-if ($args -contains "-SendMailNow" -or $true) {
-    try {
-        # Initialize Outlook Application object
-        $Outlook = New-Object -ComObject Outlook.Application
-        $Mail = $Outlook.CreateItem(0)
-        
-        $Mail.Subject = "${subject}"
-        $Mail.HTMLBody = '${escapedHtml}'
-        $Mail.To = "${toAddresses}"
-        $Mail.CC = "${ccAddresses}"
-        
-        # Envia a mensagem silenciosamente
-        $Mail.Send()
-        
-        # Log local
-        $LogPath = Join-Path $env:TEMP "gmud_mail_sender.log"
-        "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - E-mail para GMUD ${gmudNum} enviado com sucesso para: ${toAddresses}" | Out-File -FilePath $LogPath -Append
-    } catch {
-        $Error[0].Exception.Message | Out-File -FilePath (Join-Path $env:TEMP "gmud_mail_error.log") -Append
-    }
-}
-`;
-
-  // Create blob and trigger file download
-  const blob = new Blob([psScriptContent], { type: "text/plain;charset=utf-8" });
+function downloadSchedulingScript() {
+  const gmudNum = document.getElementById("schedGmud").value.trim() || "XXX";
+  const script  = buildSchedulingScript();
+  if (!script) {
+    alert("Por favor, preencha a Data e a Hora do agendamento primeiro!");
+    return;
+  }
+  const blob = new Blob([script], { type: "text/plain;charset=utf-8" });
   const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
+  link.href     = URL.createObjectURL(blob);
   link.download = `agendar_gmud_${gmudNum}.ps1`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
 }
+
+
 
 // Smart GMUD email parser
 function parseGmudEmail() {
@@ -1235,9 +1292,16 @@ function clearAll() {
 
 document.getElementById("input").addEventListener("input", generate);
 document.querySelectorAll("input[type=checkbox]").forEach(el => el.addEventListener("change", generate));
-document.getElementById("schedGmud").addEventListener("input", generate);
+document.getElementById("schedGmud").addEventListener("input", () => { generate(); updateScriptPreview(); });
+["schedDate","schedTime","schedTo","schedCc"].forEach(id => {
+  document.getElementById(id).addEventListener("input", updateScriptPreview);
+  document.getElementById(id).addEventListener("change", updateScriptPreview);
+});
+// Also update preview when email body is re-generated
+const origGenerate = generate;
 
 generate();
+updateScriptPreview();
 loadLatestKBsFromMicrosoft();
 </script>
 </body>
