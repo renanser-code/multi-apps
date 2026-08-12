@@ -376,8 +376,16 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
 let KB_CATALOG = {
   "2016": { kb: "KB5120418", name: "Windows Server 2016 Cumulative Update (August 2026 Security Updates)" },
   "2019": { kb: "KB5120238", name: "Windows Server 2019 Cumulative Update (August 2026 Security Updates)" },
-  "2022": { kb: "KB5120242", name: "Windows Server 2022 Cumulative Update (August 2026 Security Updates)" },
-  "2025": { kb: "KB5120233", name: "Windows Server 2025 Cumulative Update (August 2026 Security Updates)" },
+  "2022": [
+    { kb: "KB5120242", name: "Windows Server 2022 Cumulative Update (August 2026 Security Updates)" },
+    { kb: "KB5123303", name: "Windows Server 2022 Security Update (August 2026 Security Updates)" },
+    { kb: "KB5120714", name: ".NET Framework 3.5 and 4.8.1 for Windows Server 2022 (August 2026 Security Updates)" },
+    { kb: "KB5120705", name: ".NET Framework 3.5 and 4.8 for Windows Server 2022 (August 2026 Security Updates)" }
+  ],
+  "2025": [
+    { kb: "KB5120233", name: "Windows Server 2025 Cumulative Update (August 2026 Security Updates)" },
+    { kb: "KB5120708", name: ".NET Framework 3.5 and 4.8.1 for Windows Server 2025 (August 2026 Security Updates)" }
+  ],
   "2012": { kb: "KB5120385", name: "Windows Server 2012 R2 Monthly Rollup (August 2026 Security Updates)" },
   "10": { kb: "KB5120249", name: "Windows 10 Cumulative Update (August 2026 Security Updates)" },
   "11": { kb: "KB5121000", name: "Windows 11 Cumulative Update (August 2026 Security Updates)" }
@@ -426,8 +434,8 @@ function getMsrcDocLabel(data, fallbackDocId) {
 
 function getWindowsOsKey(productName) {
   const name = String(productName || "").toLowerCase();
-  if (name.includes("windows server 2025")) return "2025";
-  if (name.includes("windows server 2022")) return "2022";
+  if (name.includes("windows server 2025") || name.includes("microsoft server operating system version 24h2")) return "2025";
+  if (name.includes("windows server 2022") || name.includes("microsoft server operating system version 21h2")) return "2022";
   if (name.includes("windows server 2019")) return "2019";
   if (name.includes("windows server 2016")) return "2016";
   if (name.includes("windows server 2012 r2") || name.includes("windows server 2012")) return "2012";
@@ -436,10 +444,44 @@ function getWindowsOsKey(productName) {
   return "";
 }
 
-function getKbName(osKey, docName, subType) {
+function getKbComponent(productName) {
+  const name = String(productName || "").toLowerCase();
+  if (name.includes(".net framework")) return "dotnet";
+  return "os";
+}
+
+function getDotNetName(osKey, productName, docName) {
+  const frameworkMatch = String(productName || "").match(/\.NET Framework ([^]+?) on /i);
+  const frameworkText = frameworkMatch ? frameworkMatch[1].replace(/\s+AND\s+/ig, " and ") : "3.5/4.x";
+  return `.NET Framework ${frameworkText} for Windows Server ${osKey} (${docName})`;
+}
+
+function getKbName(osKey, docName, subType, productName = "") {
+  if (getKbComponent(productName) === "dotnet") {
+    return getDotNetName(osKey, productName, docName);
+  }
   const suffix = subType && subType.toLowerCase().includes("monthly rollup") ? "Monthly Rollup" : "Cumulative Update";
   const prefix = osKey === "10" || osKey === "11" ? `Windows ${osKey}` : `Windows Server ${osKey}`;
   return `${prefix} ${suffix} (${docName})`;
+}
+
+function getOsSecurityUpdateName(osKey, docName) {
+  const prefix = osKey === "10" || osKey === "11" ? `Windows ${osKey}` : `Windows Server ${osKey}`;
+  return `${prefix} Security Update (${docName})`;
+}
+
+function normalizeKbItems(item) {
+  if (!item) return [];
+  return Array.isArray(item) ? item : [item];
+}
+
+function getKbOsLabel(item) {
+  const name = String(item && item.name ? item.name : "");
+  const serverMatch = name.match(/Windows Server\s+\d{4}/i);
+  if (serverMatch) return serverMatch[0];
+  const windowsMatch = name.match(/Windows\s+(10|11)/i);
+  if (windowsMatch) return windowsMatch[0];
+  return name.split(" Cumulative")[0].split(" Monthly")[0].split(" Security")[0];
 }
 
 function compareBuild(left, right) {
@@ -474,13 +516,25 @@ function buildKbCatalogFromMsrc(data, baseCatalog = KB_CATALOG, fallbackDocId = 
 
     if (node.ProductID && node.Value) {
       const osKey = getWindowsOsKey(node.Value);
-      if (osKey) productMap[String(node.ProductID)] = osKey;
+      if (osKey) {
+        productMap[String(node.ProductID)] = {
+          osKey,
+          productName: node.Value,
+          component: getKbComponent(node.Value)
+        };
+      }
     }
 
     asArray(node.FullProductName).forEach(prod => {
       if (prod && prod.ProductID && prod.Value) {
         const osKey = getWindowsOsKey(prod.Value);
-        if (osKey) productMap[String(prod.ProductID)] = osKey;
+        if (osKey) {
+          productMap[String(prod.ProductID)] = {
+            osKey,
+            productName: prod.Value,
+            component: getKbComponent(prod.Value)
+          };
+        }
       }
     });
 
@@ -502,21 +556,29 @@ function buildKbCatalogFromMsrc(data, baseCatalog = KB_CATALOG, fallbackDocId = 
 
       if (rem.Type && rem.Type !== 2) return;
       if (!rank) return;
+      if (subTypeKey.includes("hotpatch")) return;
 
       const kbId = `KB${kbMatch[1]}`;
       asArray(rem.ProductID).forEach(pid => {
-        const osKey = productMap[String(pid)];
-        if (!osKey) return;
+        const productInfo = productMap[String(pid)];
+        if (!productInfo) return;
+
+        const osKey = productInfo.osKey;
 
         const candidate = {
           kb: kbId,
-          name: getKbName(osKey, docName, subType),
+          name: getKbName(osKey, docName, subType, productInfo.productName),
           rank,
-          fixedBuild: rem.FixedBuild || ""
+          fixedBuild: rem.FixedBuild || "",
+          component: productInfo.component,
+          osKey,
+          docName
         };
 
-        if (shouldReplaceKb(candidates[osKey], candidate)) {
-          candidates[osKey] = candidate;
+        if (!candidates[osKey]) candidates[osKey] = {};
+        const candidateKey = candidate.component === "dotnet" ? `dotnet:${candidate.name}` : `os:${kbId}`;
+        if (shouldReplaceKb(candidates[osKey][candidateKey], candidate)) {
+          candidates[osKey][candidateKey] = candidate;
         }
       });
     });
@@ -524,10 +586,29 @@ function buildKbCatalogFromMsrc(data, baseCatalog = KB_CATALOG, fallbackDocId = 
 
   const newCatalog = { ...baseCatalog };
   Object.keys(candidates).forEach(osKey => {
-    newCatalog[osKey] = {
-      kb: candidates[osKey].kb,
-      name: candidates[osKey].name
-    };
+    const allItems = Object.values(candidates[osKey]);
+    const osItems = allItems.filter(item => item.component === "os");
+    const otherItems = allItems.filter(item => item.component !== "os");
+    const maxOsBuild = osItems.reduce((best, item) => {
+      if (!best) return item.fixedBuild || "";
+      return compareBuild(item.fixedBuild, best) > 0 ? item.fixedBuild : best;
+    }, "");
+    const currentOsItems = maxOsBuild
+      ? osItems.filter(item => compareBuild(item.fixedBuild, maxOsBuild) === 0)
+      : osItems;
+
+    const orderedItems = [...currentOsItems, ...otherItems]
+      .sort((a, b) => {
+        if (a.component !== b.component) return a.component === "os" ? -1 : 1;
+        if (a.component === "os") return a.kb.localeCompare(b.kb);
+        return a.name.localeCompare(b.name);
+      })
+      .map((item, index) => ({
+        kb: item.kb,
+        name: item.component === "os" && index > 0 ? getOsSecurityUpdateName(item.osKey, item.docName) : item.name
+      }));
+
+    newCatalog[osKey] = orderedItems.length === 1 ? orderedItems[0] : orderedItems;
   });
 
   return newCatalog;
@@ -824,10 +905,10 @@ function suggestKBs(lines) {
   if (text.includes("2019") || text.includes("srv19") || text.includes("server19")) {
     suggested.add("2019");
   }
-  if (text.includes("2022") || text.includes("srv22") || text.includes("server22")) {
+  if (text.includes("2022") || text.includes("srv22") || text.includes("server22") || text.includes("version 21h2")) {
     suggested.add("2022");
   }
-  if (text.includes("2025") || text.includes("srv25") || text.includes("server25")) {
+  if (text.includes("2025") || text.includes("srv25") || text.includes("server25") || text.includes("version 24h2")) {
     suggested.add("2025");
   }
   if (text.includes("2012") || text.includes("srv12") || text.includes("server12")) {
@@ -843,6 +924,7 @@ function suggestKBs(lines) {
   if (suggested.size === 0 && (text.includes("win") || text.includes("microsoft") || text.includes("ad") || text.includes("sql"))) {
     suggested.add("2019");
     suggested.add("2022");
+    suggested.add("2025");
   }
 
   const container = document.getElementById("kbSuggestions");
@@ -854,12 +936,14 @@ function suggestKBs(lines) {
   let html = "<ul style='margin: 0; padding-left: 20px;'>";
   let items = [];
   suggested.forEach(key => {
-    const item = KB_CATALOG[key];
-    if (!item) return;
-    items.push(item);
+    const kbItems = normalizeKbItems(KB_CATALOG[key]);
+    if (kbItems.length === 0) return;
     const badgeText = isApiLoaded && kbCatalogDocumentId ? `${kbCatalogSource}: ${kbCatalogDocumentId}` : kbCatalogSource;
     const badgeColor = isApiLoaded ? "#8b5cf6" : "#10b981";
-    html += `<li><strong>${item.kb}</strong> - ${item.name} <span class='badge' style='background:${badgeColor}; color:#fff;'>${badgeText}</span></li>`;
+    kbItems.forEach(item => {
+      items.push(item);
+      html += `<li><strong>${item.kb}</strong> - ${item.name} <span class='badge' style='background:${badgeColor}; color:#fff;'>${badgeText}</span></li>`;
+    });
   });
   html += "</ul>";
   container.innerHTML = html;
@@ -1093,7 +1177,7 @@ function generate() {
 
   emailHtml += "<br><strong>Sistemas Operacionais afetados:</strong><br>";
   if (suggestedKbs.length > 0) {
-    const osNames = suggestedKbs.map(item => item.name.split(" Cumulative")[0].split(" Cumulative Security")[0]);
+    const osNames = [...new Set(suggestedKbs.map(getKbOsLabel))];
     osNames.forEach(os => {
       emailHtml += `- ${os}<br>`;
     });

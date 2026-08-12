@@ -56,9 +56,10 @@ let script = scriptMatch[1];
 script = script.replace(/generate\(\);\s*updateScriptPreview\(\);\s*loadLatestKBsFromMicrosoft\(\);/, "");
 
 vm.createContext(sandbox);
-vm.runInContext(`${script}\nthis.__buildKbCatalogFromMsrc = buildKbCatalogFromMsrc;`, sandbox);
+vm.runInContext(`${script}\nthis.__buildKbCatalogFromMsrc = buildKbCatalogFromMsrc;\nthis.__suggestKBs = suggestKBs;`, sandbox);
 
 assert.strictEqual(typeof sandbox.__buildKbCatalogFromMsrc, "function");
+assert.strictEqual(typeof sandbox.__suggestKBs, "function");
 
 const baseCatalog = {
   "2016": { kb: "KB0000001", name: "old 2016" },
@@ -80,8 +81,12 @@ const sampleMsrc = {
             Items: [
               { ProductID: "11923", Value: "Windows Server 2022" },
               { ProductID: "11924", Value: "Windows Server 2022 (Server Core installation)" },
+              { ProductID: "12436", Value: "Windows Server 2025" },
+              { ProductID: "12437", Value: "Windows Server 2025 (Server Core installation)" },
               { ProductID: "11571", Value: "Windows Server 2019" },
               { ProductID: "10816", Value: "Windows Server 2016" },
+              { ProductID: "12079-11923", Value: "Microsoft .NET Framework 3.5 AND 4.8.1 on Windows Server 2022" },
+              { ProductID: "12079-12436", Value: "Microsoft .NET Framework 3.5 AND 4.8.1 on Windows Server 2025" },
               { ProductID: "12097", Value: "Windows 10 Version 22H2 for x64-based Systems" },
               { ProductID: "12243", Value: "Windows 11 Version 23H2 for x64-based Systems" },
             ],
@@ -93,8 +98,13 @@ const sampleMsrc = {
   Vulnerability: [
     {
       Remediations: [
-        { Description: { Value: "5120242" }, ProductID: ["11923", "11924"], Type: 2, SubType: "Security Update" },
+        { Description: { Value: "5120242" }, ProductID: ["11923", "11924"], Type: 2, SubType: "Security Update", FixedBuild: "10.0.20348.5499" },
+        { Description: { Value: "5123303" }, ProductID: ["11923", "11924"], Type: 2, SubType: "Security Update", FixedBuild: "10.0.20348.5499" },
         { Description: { Value: "5120229" }, ProductID: ["11923", "11924"], Type: 2, SubType: "Security Hotpatch Update" },
+        { Description: { Value: "5120714" }, ProductID: ["12079-11923"], Type: 2, SubType: "Security Update" },
+        { Description: { Value: "5120233" }, ProductID: ["12436", "12437"], Type: 2, SubType: "Security Update", FixedBuild: "10.0.26100.33296" },
+        { Description: { Value: "5094125" }, ProductID: ["12436", "12437"], Type: 2, SubType: "Security Update", FixedBuild: "10.0.26100.32995" },
+        { Description: { Value: "5120708" }, ProductID: ["12079-12436"], Type: 2, SubType: "Security Update" },
         { Description: { Value: "5120238" }, ProductID: ["11571"], Type: 2, SubType: "Security Update" },
         { Description: { Value: "5120418" }, ProductID: ["10816"], Type: 2, SubType: "Security Update" },
         { Description: { Value: "5120249" }, ProductID: ["12097"], Type: 2, SubType: "Security Update" },
@@ -106,10 +116,23 @@ const sampleMsrc = {
 };
 
 const catalog = sandbox.__buildKbCatalogFromMsrc(sampleMsrc, baseCatalog, "2026-Aug");
+const catalog2022 = Array.isArray(catalog["2022"]) ? catalog["2022"] : [catalog["2022"]];
+const catalog2025 = Array.isArray(catalog["2025"]) ? catalog["2025"] : [catalog["2025"]];
 
-assert.strictEqual(catalog["2022"].kb, "KB5120242");
+assert(catalog2022.some(item => item.kb === "KB5120242"));
+assert(catalog2022.some(item => item.kb === "KB5123303"));
+assert(catalog2022.some(item => item.kb === "KB5120714"));
+assert(catalog2025.some(item => item.kb === "KB5120233"));
+assert(catalog2025.some(item => item.kb === "KB5120708"));
+assert(!catalog2025.some(item => item.kb === "KB5094125"));
 assert.strictEqual(catalog["2019"].kb, "KB5120238");
 assert.strictEqual(catalog["2016"].kb, "KB5120418");
 assert.strictEqual(catalog["10"].kb, "KB5120249");
 assert.strictEqual(catalog["11"].kb, "KB5120240");
-assert.match(catalog["2022"].name, /August 2026|2026-Aug/);
+assert.match(catalog2022[0].name, /August 2026|2026-Aug/);
+
+const genericServerItems = sandbox.__suggestKBs(["Aplicar patch em servidores Windows Server x64"]);
+assert(genericServerItems.some(item => item.kb === "KB5120233"), "fallback Windows Server deve incluir Server 2025");
+
+const catalogNameItems = sandbox.__suggestKBs(["Microsoft server operating system version 24H2 for x64-based Systems"]);
+assert(catalogNameItems.some(item => item.kb === "KB5120233"), "nome do Microsoft Update Catalog 24H2 deve mapear para Server 2025");
