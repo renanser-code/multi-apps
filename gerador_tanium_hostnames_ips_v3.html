@@ -374,16 +374,19 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
 <script>
 // Default backup catalog mapping for typical Windows Server versions (Backup for Offline / API failure)
 let KB_CATALOG = {
-  "2016": { kb: "KB5099535", name: "Windows Server 2016 Cumulative Update" },
-  "2019": { kb: "KB5099538", name: "Windows Server 2019 Cumulative Update" },
-  "2022": { kb: "KB5099540", name: "Windows Server 2022 Cumulative Update" },
-  "2012": { kb: "KB5099444", name: "Windows Server 2012 R2 Cumulative Update (Monthly Rollup)" },
-  "10": { kb: "KB5099539", name: "Windows 10 Cumulative Update" },
-  "11": { kb: "KB5101650", name: "Windows 11 Cumulative Update" }
+  "2016": { kb: "KB5120418", name: "Windows Server 2016 Cumulative Update (August 2026 Security Updates)" },
+  "2019": { kb: "KB5120238", name: "Windows Server 2019 Cumulative Update (August 2026 Security Updates)" },
+  "2022": { kb: "KB5120242", name: "Windows Server 2022 Cumulative Update (August 2026 Security Updates)" },
+  "2025": { kb: "KB5120233", name: "Windows Server 2025 Cumulative Update (August 2026 Security Updates)" },
+  "2012": { kb: "KB5120385", name: "Windows Server 2012 R2 Monthly Rollup (August 2026 Security Updates)" },
+  "10": { kb: "KB5120249", name: "Windows 10 Cumulative Update (August 2026 Security Updates)" },
+  "11": { kb: "KB5121000", name: "Windows 11 Cumulative Update (August 2026 Security Updates)" }
 };
 
 // API Fetch state
 let isApiLoaded = false;
+let kbCatalogSource = "Backup Local";
+let kbCatalogDocumentId = "";
 // CMDB Data Cache
 let cmdbDatabase = [];
 let isCmdbLoaded = false;
@@ -395,8 +398,167 @@ const currentHours = String(today.getHours()).padStart(2, '0');
 const currentMinutes = String(today.getMinutes()).padStart(2, '0');
 document.getElementById("schedTime").value = `${currentHours}:${currentMinutes}`;
 
+const MSRC_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const SECURITY_UPDATE_RANK = {
+  "security update": 1,
+  "monthly rollup": 1,
+  "security only": 2,
+  "security hotpatch update": 3
+};
+
+function asArray(value) {
+  if (!value) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+function getMsrcDocId(date, offsetMonths = 0) {
+  const monthDate = new Date(date.getFullYear(), date.getMonth() + offsetMonths, 1);
+  return `${monthDate.getFullYear()}-${MSRC_MONTHS[monthDate.getMonth()]}`;
+}
+
+function getMsrcDocLabel(data, fallbackDocId) {
+  if (data.DocumentTitle && data.DocumentTitle.Value) return data.DocumentTitle.Value;
+  if (typeof data.DocumentTitle === "string") return data.DocumentTitle;
+  const trackingId = data.DocumentTracking && data.DocumentTracking.Identification && data.DocumentTracking.Identification.ID;
+  if (trackingId && trackingId.Value) return trackingId.Value;
+  return fallbackDocId;
+}
+
+function getWindowsOsKey(productName) {
+  const name = String(productName || "").toLowerCase();
+  if (name.includes("windows server 2025")) return "2025";
+  if (name.includes("windows server 2022")) return "2022";
+  if (name.includes("windows server 2019")) return "2019";
+  if (name.includes("windows server 2016")) return "2016";
+  if (name.includes("windows server 2012 r2") || name.includes("windows server 2012")) return "2012";
+  if (name.includes("windows 11")) return "11";
+  if (name.includes("windows 10")) return "10";
+  return "";
+}
+
+function getKbName(osKey, docName, subType) {
+  const suffix = subType && subType.toLowerCase().includes("monthly rollup") ? "Monthly Rollup" : "Cumulative Update";
+  const prefix = osKey === "10" || osKey === "11" ? `Windows ${osKey}` : `Windows Server ${osKey}`;
+  return `${prefix} ${suffix} (${docName})`;
+}
+
+function compareBuild(left, right) {
+  const leftParts = String(left || "").split(".").map(part => Number(part) || 0);
+  const rightParts = String(right || "").split(".").map(part => Number(part) || 0);
+  const len = Math.max(leftParts.length, rightParts.length);
+  for (let i = 0; i < len; i++) {
+    if ((leftParts[i] || 0) !== (rightParts[i] || 0)) {
+      return (leftParts[i] || 0) - (rightParts[i] || 0);
+    }
+  }
+  return 0;
+}
+
+function shouldReplaceKb(current, candidate) {
+  if (!current) return true;
+  if (candidate.rank !== current.rank) return candidate.rank < current.rank;
+  return compareBuild(candidate.fixedBuild, current.fixedBuild) > 0;
+}
+
+function buildKbCatalogFromMsrc(data, baseCatalog = KB_CATALOG, fallbackDocId = "") {
+  if (!data || !data.Vulnerability || !data.ProductTree) {
+    throw new Error("Documento MSRC sem ProductTree/Vulnerability.");
+  }
+
+  const docName = getMsrcDocLabel(data, fallbackDocId);
+  const productMap = {};
+  const candidates = {};
+
+  const traverseTree = (node) => {
+    if (!node || typeof node !== "object") return;
+
+    if (node.ProductID && node.Value) {
+      const osKey = getWindowsOsKey(node.Value);
+      if (osKey) productMap[String(node.ProductID)] = osKey;
+    }
+
+    asArray(node.FullProductName).forEach(prod => {
+      if (prod && prod.ProductID && prod.Value) {
+        const osKey = getWindowsOsKey(prod.Value);
+        if (osKey) productMap[String(prod.ProductID)] = osKey;
+      }
+    });
+
+    asArray(node.Branch).forEach(traverseTree);
+    asArray(node.Items).forEach(traverseTree);
+  };
+
+  traverseTree(data.ProductTree);
+
+  data.Vulnerability.forEach(vuln => {
+    asArray(vuln.Remediations).forEach(rem => {
+      const desc = rem.Description && rem.Description.Value ? rem.Description.Value : "";
+      const kbMatch = String(desc).match(/^(?:KB)?(\d+)$/i);
+      if (!kbMatch) return;
+
+      const subType = String(rem.SubType || "");
+      const subTypeKey = subType.toLowerCase();
+      const rank = SECURITY_UPDATE_RANK[subTypeKey];
+
+      if (rem.Type && rem.Type !== 2) return;
+      if (!rank) return;
+
+      const kbId = `KB${kbMatch[1]}`;
+      asArray(rem.ProductID).forEach(pid => {
+        const osKey = productMap[String(pid)];
+        if (!osKey) return;
+
+        const candidate = {
+          kb: kbId,
+          name: getKbName(osKey, docName, subType),
+          rank,
+          fixedBuild: rem.FixedBuild || ""
+        };
+
+        if (shouldReplaceKb(candidates[osKey], candidate)) {
+          candidates[osKey] = candidate;
+        }
+      });
+    });
+  });
+
+  const newCatalog = { ...baseCatalog };
+  Object.keys(candidates).forEach(osKey => {
+    newCatalog[osKey] = {
+      kb: candidates[osKey].kb,
+      name: candidates[osKey].name
+    };
+  });
+
+  return newCatalog;
+}
+
+async function fetchMsrcJson(docId) {
+  const directUrl = `https://api.msrc.microsoft.com/cvrf/v3.0/cvrf/${docId}`;
+  const urls = [
+    directUrl,
+    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(directUrl)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}`
+  ];
+
+  let lastError = null;
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, { headers: { "Accept": "application/json" } });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      return await response.json();
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  throw lastError || new Error("Falha ao buscar MSRC.");
+}
+
 // Async function to load current month's KBs directly from Microsoft MSRC CVRF API
-async function loadLatestKBsFromMicrosoft() {
+async function loadLatestKBsFromMicrosoftLegacy() {
   try {
     const now = new Date();
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -519,6 +681,39 @@ async function loadLatestKBsFromMicrosoft() {
   }
 }
 
+// Loader ativo: usa o parser MSRC 3.0 acima e tenta mes atual + dois meses anteriores.
+async function loadLatestKBsFromMicrosoft() {
+  const now = new Date();
+  const candidateDocIds = [
+    getMsrcDocId(now, 0),
+    getMsrcDocId(now, -1),
+    getMsrcDocId(now, -2)
+  ];
+
+  let lastError = null;
+
+  for (const documentId of candidateDocIds) {
+    try {
+      const data = await fetchMsrcJson(documentId);
+      KB_CATALOG = buildKbCatalogFromMsrc(data, KB_CATALOG, documentId);
+      isApiLoaded = true;
+      kbCatalogSource = "Live MSRC API";
+      kbCatalogDocumentId = getMsrcDocLabel(data, documentId);
+      console.log("Catalogo MSRC atualizado com sucesso:", KB_CATALOG);
+      generate();
+      return;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  isApiLoaded = false;
+  kbCatalogSource = "Backup Local";
+  kbCatalogDocumentId = "";
+  console.warn("Nao foi possivel carregar KBs da API MSRC, usando catalogo local estavel:", lastError);
+  generate();
+}
+
 // CMDB API ClaraHub Loader
 async function loadCmdbData() {
   const statusLabel = document.getElementById("cmdbApiStatus");
@@ -632,6 +827,9 @@ function suggestKBs(lines) {
   if (text.includes("2022") || text.includes("srv22") || text.includes("server22")) {
     suggested.add("2022");
   }
+  if (text.includes("2025") || text.includes("srv25") || text.includes("server25")) {
+    suggested.add("2025");
+  }
   if (text.includes("2012") || text.includes("srv12") || text.includes("server12")) {
     suggested.add("2012");
   }
@@ -657,8 +855,9 @@ function suggestKBs(lines) {
   let items = [];
   suggested.forEach(key => {
     const item = KB_CATALOG[key];
+    if (!item) return;
     items.push(item);
-    const badgeText = isApiLoaded ? "Live MSRC API" : "Backup Local";
+    const badgeText = isApiLoaded && kbCatalogDocumentId ? `${kbCatalogSource}: ${kbCatalogDocumentId}` : kbCatalogSource;
     const badgeColor = isApiLoaded ? "#8b5cf6" : "#10b981";
     html += `<li><strong>${item.kb}</strong> - ${item.name} <span class='badge' style='background:${badgeColor}; color:#fff;'>${badgeText}</span></li>`;
   });
