@@ -56,10 +56,11 @@ let script = scriptMatch[1];
 script = script.replace(/generate\(\);\s*updateScriptPreview\(\);\s*loadLatestKBsFromMicrosoft\(\);/, "");
 
 vm.createContext(sandbox);
-vm.runInContext(`${script}\nthis.__buildKbCatalogFromMsrc = buildKbCatalogFromMsrc;\nthis.__suggestKBs = suggestKBs;`, sandbox);
+vm.runInContext(`${script}\nthis.__buildKbCatalogFromMsrc = buildKbCatalogFromMsrc;\nthis.__suggestKBs = suggestKBs;\nthis.__generate = generate;\nthis.__setKbCatalog = (catalog) => { KB_CATALOG = catalog; };`, sandbox);
 
 assert.strictEqual(typeof sandbox.__buildKbCatalogFromMsrc, "function");
 assert.strictEqual(typeof sandbox.__suggestKBs, "function");
+assert.strictEqual(typeof sandbox.__generate, "function");
 
 const baseCatalog = {
   "2016": { kb: "KB0000001", name: "old 2016" },
@@ -110,6 +111,11 @@ const sampleMsrc = {
         { Description: { Value: "5120249" }, ProductID: ["12097"], Type: 2, SubType: "Security Update" },
         { Description: { Value: "5120240" }, ProductID: ["12243"], Type: 2, SubType: "Security Update" },
         { URL: "https://support.microsoft.com/help/5120242", ProductID: ["11923"], Type: 3, SubType: "5120242" },
+        { Description: { Value: "5120233" }, URL: "https://support.microsoft.com/help/5120233", ProductID: ["12436"], Type: 3, SubType: "5120233" },
+        { Description: { Value: "5120238" }, URL: "https://support.microsoft.com/help/5120238", ProductID: ["11571"], Type: 3, SubType: "5120238" },
+        { Description: { Value: "5120418" }, URL: "https://support.microsoft.com/help/5120418", ProductID: ["10816"], Type: 3, SubType: "5120418" },
+        { Description: { Value: "5120249" }, URL: "https://support.microsoft.com/help/5120249", ProductID: ["12097"], Type: 3, SubType: "5120249" },
+        { Description: { Value: "5120240" }, URL: "https://support.microsoft.com/help/5120240", ProductID: ["12243"], Type: 3, SubType: "5120240" },
       ],
     },
   ],
@@ -120,10 +126,11 @@ const catalog2022 = Array.isArray(catalog["2022"]) ? catalog["2022"] : [catalog[
 const catalog2025 = Array.isArray(catalog["2025"]) ? catalog["2025"] : [catalog["2025"]];
 
 assert(catalog2022.some(item => item.kb === "KB5120242"));
-assert(catalog2022.some(item => item.kb === "KB5123303"));
-assert(catalog2022.some(item => item.kb === "KB5120714"));
+assert(!catalog2022.some(item => item.kb === "KB5123303"));
+assert(!catalog2022.some(item => item.kb === "KB5120714"));
+assert(!catalog2022.some(item => item.kb === "KB5120705"));
 assert(catalog2025.some(item => item.kb === "KB5120233"));
-assert(catalog2025.some(item => item.kb === "KB5120708"));
+assert(!catalog2025.some(item => item.kb === "KB5120708"));
 assert(!catalog2025.some(item => item.kb === "KB5094125"));
 assert.strictEqual(catalog["2019"].kb, "KB5120238");
 assert.strictEqual(catalog["2016"].kb, "KB5120418");
@@ -131,8 +138,25 @@ assert.strictEqual(catalog["10"].kb, "KB5120249");
 assert.strictEqual(catalog["11"].kb, "KB5120240");
 assert.match(catalog2022[0].name, /August 2026|2026-Aug/);
 
+sandbox.__setKbCatalog(catalog);
 const genericServerItems = sandbox.__suggestKBs(["Aplicar patch em servidores Windows Server x64"]);
 assert(genericServerItems.some(item => item.kb === "KB5120233"), "fallback Windows Server deve incluir Server 2025");
+assert(!genericServerItems.some(item => item.kb === "KB5123303"), "fallback Windows Server nao deve incluir security update avulso");
+assert(!genericServerItems.some(item => item.name.includes(".NET Framework")), "fallback Windows Server nao deve incluir .NET Framework");
 
 const catalogNameItems = sandbox.__suggestKBs(["Microsoft server operating system version 24H2 for x64-based Systems"]);
 assert(catalogNameItems.some(item => item.kb === "KB5120233"), "nome do Microsoft Update Catalog 24H2 deve mapear para Server 2025");
+
+getElement("schedGmud").value = "GMUD-TESTE";
+getElement("input").value = [
+  "VISA011-B Microsoft Windows Server 2022 (64-bit)",
+  "VISA029-1 Microsoft Windows Server 2016 (64-bit)"
+].join("\n");
+sandbox.__generate();
+const emailHtml = getElement("emailText").innerHTML;
+
+assert(emailHtml.includes("KB5120242"), "email deve citar cumulativo do Windows Server 2022");
+assert(emailHtml.includes("KB5120418"), "email deve citar cumulativo do Windows Server 2016");
+assert(!emailHtml.includes("KB5123303"), "email nao deve citar security update avulso");
+assert(!emailHtml.includes("KB5120714"), "email nao deve citar .NET Framework 4.8.1");
+assert(!emailHtml.includes("KB5120705"), "email nao deve citar .NET Framework 4.8");

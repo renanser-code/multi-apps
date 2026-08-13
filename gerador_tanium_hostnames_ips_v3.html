@@ -376,16 +376,8 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
 let KB_CATALOG = {
   "2016": { kb: "KB5120418", name: "Windows Server 2016 Cumulative Update (August 2026 Security Updates)" },
   "2019": { kb: "KB5120238", name: "Windows Server 2019 Cumulative Update (August 2026 Security Updates)" },
-  "2022": [
-    { kb: "KB5120242", name: "Windows Server 2022 Cumulative Update (August 2026 Security Updates)" },
-    { kb: "KB5123303", name: "Windows Server 2022 Security Update (August 2026 Security Updates)" },
-    { kb: "KB5120714", name: ".NET Framework 3.5 and 4.8.1 for Windows Server 2022 (August 2026 Security Updates)" },
-    { kb: "KB5120705", name: ".NET Framework 3.5 and 4.8 for Windows Server 2022 (August 2026 Security Updates)" }
-  ],
-  "2025": [
-    { kb: "KB5120233", name: "Windows Server 2025 Cumulative Update (August 2026 Security Updates)" },
-    { kb: "KB5120708", name: ".NET Framework 3.5 and 4.8.1 for Windows Server 2025 (August 2026 Security Updates)" }
-  ],
+  "2022": { kb: "KB5120242", name: "Windows Server 2022 Cumulative Update (August 2026 Security Updates)" },
+  "2025": { kb: "KB5120233", name: "Windows Server 2025 Cumulative Update (August 2026 Security Updates)" },
   "2012": { kb: "KB5120385", name: "Windows Server 2012 R2 Monthly Rollup (August 2026 Security Updates)" },
   "10": { kb: "KB5120249", name: "Windows 10 Cumulative Update (August 2026 Security Updates)" },
   "11": { kb: "KB5121000", name: "Windows 11 Cumulative Update (August 2026 Security Updates)" }
@@ -475,6 +467,14 @@ function normalizeKbItems(item) {
   return Array.isArray(item) ? item : [item];
 }
 
+function isDeployableCumulativeKb(item) {
+  const name = String(item && item.name ? item.name : "").toLowerCase();
+  if (!name) return false;
+  if (name.includes(".net framework")) return false;
+  if (name.includes("dynamic update") || name.includes("hotpatch")) return false;
+  return name.includes("cumulative update") || name.includes("monthly rollup");
+}
+
 function getKbOsLabel(item) {
   const name = String(item && item.name ? item.name : "");
   const serverMatch = name.match(/Windows Server\s+\d{4}/i);
@@ -502,12 +502,47 @@ function shouldReplaceKb(current, candidate) {
   return compareBuild(candidate.fixedBuild, current.fixedBuild) > 0;
 }
 
+function getKbIdFromRemediation(rem) {
+  const sources = [
+    rem && rem.Description && rem.Description.Value,
+    rem && rem.SubType,
+    rem && rem.URL
+  ];
+
+  for (const source of sources) {
+    const kbMatch = String(source || "").match(/(?:KB)?(\d{6,8})/i);
+    if (kbMatch) return `KB${kbMatch[1]}`;
+  }
+
+  return "";
+}
+
+function collectStandardSupportKbIds(data) {
+  const supportKbIds = new Set();
+
+  data.Vulnerability.forEach(vuln => {
+    asArray(vuln.Remediations).forEach(rem => {
+      const kbId = getKbIdFromRemediation(rem);
+      if (!kbId) return;
+
+      const kbNumber = kbId.replace(/^KB/i, "");
+      const url = String(rem.URL || "").toLowerCase();
+      if (url.includes(`support.microsoft.com/help/${kbNumber}`) || url.includes(`support.microsoft.com/help/kb${kbNumber}`)) {
+        supportKbIds.add(kbId);
+      }
+    });
+  });
+
+  return supportKbIds;
+}
+
 function buildKbCatalogFromMsrc(data, baseCatalog = KB_CATALOG, fallbackDocId = "") {
   if (!data || !data.Vulnerability || !data.ProductTree) {
     throw new Error("Documento MSRC sem ProductTree/Vulnerability.");
   }
 
   const docName = getMsrcDocLabel(data, fallbackDocId);
+  const standardSupportKbIds = collectStandardSupportKbIds(data);
   const productMap = {};
   const candidates = {};
 
@@ -546,10 +581,8 @@ function buildKbCatalogFromMsrc(data, baseCatalog = KB_CATALOG, fallbackDocId = 
 
   data.Vulnerability.forEach(vuln => {
     asArray(vuln.Remediations).forEach(rem => {
-      const desc = rem.Description && rem.Description.Value ? rem.Description.Value : "";
-      const kbMatch = String(desc).match(/^(?:KB)?(\d+)$/i);
-      if (!kbMatch) return;
-
+      const kbId = getKbIdFromRemediation(rem);
+      if (!kbId) return;
       const subType = String(rem.SubType || "");
       const subTypeKey = subType.toLowerCase();
       const rank = SECURITY_UPDATE_RANK[subTypeKey];
@@ -558,10 +591,11 @@ function buildKbCatalogFromMsrc(data, baseCatalog = KB_CATALOG, fallbackDocId = 
       if (!rank) return;
       if (subTypeKey.includes("hotpatch")) return;
 
-      const kbId = `KB${kbMatch[1]}`;
       asArray(rem.ProductID).forEach(pid => {
         const productInfo = productMap[String(pid)];
         if (!productInfo) return;
+        if (productInfo.component !== "os") return;
+        if (standardSupportKbIds.size > 0 && !standardSupportKbIds.has(kbId)) return;
 
         const osKey = productInfo.osKey;
 
@@ -588,7 +622,6 @@ function buildKbCatalogFromMsrc(data, baseCatalog = KB_CATALOG, fallbackDocId = 
   Object.keys(candidates).forEach(osKey => {
     const allItems = Object.values(candidates[osKey]);
     const osItems = allItems.filter(item => item.component === "os");
-    const otherItems = allItems.filter(item => item.component !== "os");
     const maxOsBuild = osItems.reduce((best, item) => {
       if (!best) return item.fixedBuild || "";
       return compareBuild(item.fixedBuild, best) > 0 ? item.fixedBuild : best;
@@ -597,11 +630,9 @@ function buildKbCatalogFromMsrc(data, baseCatalog = KB_CATALOG, fallbackDocId = 
       ? osItems.filter(item => compareBuild(item.fixedBuild, maxOsBuild) === 0)
       : osItems;
 
-    const orderedItems = [...currentOsItems, ...otherItems]
+    const orderedItems = currentOsItems
       .sort((a, b) => {
-        if (a.component !== b.component) return a.component === "os" ? -1 : 1;
-        if (a.component === "os") return a.kb.localeCompare(b.kb);
-        return a.name.localeCompare(b.name);
+        return a.kb.localeCompare(b.kb);
       })
       .map((item, index) => ({
         kb: item.kb,
@@ -936,7 +967,7 @@ function suggestKBs(lines) {
   let html = "<ul style='margin: 0; padding-left: 20px;'>";
   let items = [];
   suggested.forEach(key => {
-    const kbItems = normalizeKbItems(KB_CATALOG[key]);
+    const kbItems = normalizeKbItems(KB_CATALOG[key]).filter(isDeployableCumulativeKb);
     if (kbItems.length === 0) return;
     const badgeText = isApiLoaded && kbCatalogDocumentId ? `${kbCatalogSource}: ${kbCatalogDocumentId}` : kbCatalogSource;
     const badgeColor = isApiLoaded ? "#8b5cf6" : "#10b981";
@@ -946,6 +977,10 @@ function suggestKBs(lines) {
     });
   });
   html += "</ul>";
+  if (items.length === 0) {
+    container.innerHTML = "<em>Nenhum KB cumulativo mapeado para os sistemas operacionais detectados.</em>";
+    return [];
+  }
   container.innerHTML = html;
   return items;
 }
@@ -1142,7 +1177,7 @@ function generate() {
   document.getElementById("ipCount").innerText = data.ips.length;
   document.getElementById("lineCount").innerText = data.lines.length;
 
-  const suggestedKbs = suggestKBs(data.lines);
+  const suggestedKbs = suggestKBs(data.lines).filter(isDeployableCumulativeKb);
   
   let emailHtml = `Senhores, boa noite.<br><br>Informamos que estamos iniciando as atividades referentes à GMUD ${gmudNumber}, conforme planejamento aprovado.<br><br>A partir deste momento, será dado início ao processo de atualização dos servidores relacionados abaixo:<br><br>`;
   
