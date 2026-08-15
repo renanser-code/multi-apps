@@ -213,6 +213,23 @@ assert(closureReportHtml.includes("data:image/png;base64,AA=="));
 assert(closureReportHtml.includes("Relatorio_Tecnico_Evidencia_GMUD481_GER7.pdf"));
 assert(closureReportHtml.includes("Salvar como PDF"));
 
+getElement("closureStatus").value = "Concluída com ressalvas";
+sandbox.__setClosureEvidenceFiles([
+  {
+    name: "tanium-final.png",
+    type: "image/png",
+    size: 4096,
+    dataUrl: "data:image/png;base64,BB==",
+    ocrText: [
+      "VISA011-B Parent Status Complete Status Complete, All Patches Applied Currently Targeted Yes",
+      "VISA029-1 Status Pending Error Reboot Required"
+    ].join("\n")
+  }
+]);
+const perServerReportHtml = sandbox.__buildClosureReportHtml();
+assert(perServerReportHtml.includes("<td>VISA011-B</td><td>Windows Server 2022</td><td>Complete, All Patches Applied</td>"));
+assert(perServerReportHtml.includes("<td>VISA029-1</td><td>Windows Server 2016</td><td>Validado com ressalvas</td>"));
+
 const successStatus = sandbox.__inferClosureStatusFromEvidenceText("Parent Status Complete Status Complete, All Patches Applied Currently Targeted Yes");
 assert.strictEqual(successStatus.status, "Concluída com sucesso");
 assert(successStatus.reason.includes("Complete"));

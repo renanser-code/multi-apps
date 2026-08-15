@@ -1391,6 +1391,101 @@ function getClosureResultLabel(status) {
   return "Validacao registrada";
 }
 
+function getClosureEvidenceText(files = closureEvidenceFiles) {
+  return (files || [])
+    .map(file => file.ocrText || file.recognizedText || file.text || "")
+    .filter(Boolean)
+    .join("\n");
+}
+
+function getClosureServerAliases(server) {
+  const aliases = [];
+  const name = String(server && server.name ? server.name : "").trim();
+  if (name) {
+    aliases.push(name);
+    aliases.push(name.split(".")[0]);
+  }
+
+  const info = String(server && server.info ? server.info : "");
+  const ipMatches = info.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g) || [];
+  ipMatches.forEach(ip => aliases.push(ip));
+
+  return unique(aliases.map(alias => alias.trim()).filter(alias => alias.length >= 3));
+}
+
+function textContainsAnyAlias(text, aliases) {
+  const normalized = normalizeEvidenceText(text);
+  return aliases.some(alias => normalized.includes(alias));
+}
+
+function getServerEvidenceContext(evidenceText, server, allServers) {
+  const text = String(evidenceText || "");
+  if (!text.trim()) return "";
+
+  const aliases = getClosureServerAliases(server).map(normalizeEvidenceText);
+  if (aliases.length === 0) return "";
+
+  const otherAliases = (allServers || [])
+    .filter(item => item !== server)
+    .flatMap(getClosureServerAliases)
+    .map(normalizeEvidenceText)
+    .filter(Boolean);
+
+  const lines = text.split(/\r?\n/);
+  for (let index = 0; index < lines.length; index++) {
+    if (!textContainsAnyAlias(lines[index], aliases)) continue;
+
+    const contextLines = [lines[index]];
+    for (let next = index + 1; next < lines.length && contextLines.length < 5; next++) {
+      if (textContainsAnyAlias(lines[next], otherAliases)) break;
+      contextLines.push(lines[next]);
+    }
+    return contextLines.join(" ");
+  }
+
+  const normalizedText = normalizeEvidenceText(text);
+  let hitIndex = -1;
+  aliases.forEach(alias => {
+    const aliasIndex = normalizedText.indexOf(alias);
+    if (aliasIndex >= 0 && (hitIndex === -1 || aliasIndex < hitIndex)) {
+      hitIndex = aliasIndex;
+    }
+  });
+  if (hitIndex < 0) return "";
+
+  let endIndex = Math.min(text.length, hitIndex + 600);
+  otherAliases.forEach(alias => {
+    const otherIndex = normalizedText.indexOf(alias, hitIndex + 1);
+    if (otherIndex > hitIndex && otherIndex < endIndex) {
+      endIndex = otherIndex;
+    }
+  });
+
+  return text.slice(hitIndex, endIndex);
+}
+
+function inferClosureResultFromEvidence(server, evidenceText, allServers) {
+  const context = getServerEvidenceContext(evidenceText, server, allServers);
+  if (!context) return "";
+
+  const normalized = normalizeEvidenceText(context);
+  const hasComplete = normalized.includes("complete") || normalized.includes("concluido") || normalized.includes("concluida");
+  const hasAllPatches = normalized.includes("all patches applied") || normalized.includes("sem pendencias") || normalized.includes("100% de sucesso");
+  const hasIssue = /\b(failed|failure|error|erro|falha|pending|pendente|reboot required|restart required|not targeted|not applicable)\b/.test(normalized);
+
+  if (hasComplete && hasAllPatches) return "Complete, All Patches Applied";
+  if (hasIssue) return "Validado com ressalvas";
+  if (hasComplete) return "Complete";
+  return "";
+}
+
+function applyEvidenceResultsToServers(servers, evidenceText, fallbackResult) {
+  return servers.map(server => ({
+    ...server,
+    result: inferClosureResultFromEvidence(server, evidenceText, servers) || server.result || fallbackResult
+  }));
+}
+
 function getClosureClientName(data) {
   const manualClient = document.getElementById("closureClient").value.trim();
   if (manualClient) return manualClient;
@@ -1406,17 +1501,19 @@ function getClosureClientName(data) {
 
 function getClosureServerItems(data) {
   const result = getClosureResultLabel(document.getElementById("closureStatus").value || "");
+  const evidenceText = getClosureEvidenceText();
+  let servers = [];
 
   if (data.isCmdbApplied && data.activeVMs && data.activeVMs.length > 0) {
-    return data.activeVMs.map(vm => ({
+    servers = data.activeVMs.map(vm => ({
       name: vm.name,
       info: vm.info || "",
       os: getOsFromText(vm.info || ""),
       result
     }));
+    return applyEvidenceResultsToServers(servers, evidenceText, result);
   }
 
-  const servers = [];
   const seen = new Set();
   data.lines.forEach(line => {
     const host = findHostname(line);
@@ -1432,10 +1529,11 @@ function getClosureServerItems(data) {
     });
   });
 
-  if (servers.length > 0) return servers;
+  if (servers.length > 0) return applyEvidenceResultsToServers(servers, evidenceText, result);
 
   if (data.ips && data.ips.length > 0) {
-    return data.ips.map(ip => ({ name: ip, info: "", os: "Nao informado", result }));
+    servers = data.ips.map(ip => ({ name: ip, info: "", os: "Nao informado", result }));
+    return applyEvidenceResultsToServers(servers, evidenceText, result);
   }
 
   return [];
@@ -1587,6 +1685,8 @@ async function analyzeClosureEvidenceStatus() {
     });
     const text = result && result.data && result.data.text ? result.data.text : "";
     const inference = inferClosureStatusFromEvidenceText(text);
+    imageEvidence.ocrText = text;
+    imageEvidence.ocrInference = inference;
 
     document.getElementById("closureStatus").value = inference.status;
     feedback.textContent = `OCR: ${inference.status} sugerido. ${inference.reason}`;
