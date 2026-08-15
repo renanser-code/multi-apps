@@ -412,7 +412,7 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
 
         <div class="row" style="margin: 14px 0 0 0;">
           <button class="orange" onclick="analyzeClosureEvidenceStatus()">Analisar evidencia e sugerir status</button>
-          <button class="success" onclick="generateClosure()">Gerar encerramento</button>
+          <button class="success" onclick="generateClosureFromEvidence()">Gerar encerramento</button>
           <button class="purple" onclick="copyText('closureEmailText')">Copiar e-mail de encerramento</button>
           <button class="blue" onclick="openClosureReportForPdf()">Abrir relatorio para PDF</button>
           <button class="secondary" onclick="clearClosureEvidence()">Limpar evidencias</button>
@@ -1398,6 +1398,41 @@ function getClosureEvidenceText(files = closureEvidenceFiles) {
     .join("\n");
 }
 
+function isClosureImageEvidence(file) {
+  return String(file && file.type ? file.type : "").toLowerCase().startsWith("image/");
+}
+
+function closureImageHasOcrText(file) {
+  return !!(file && (file.ocrText || file.recognizedText || file.text));
+}
+
+function getClosureEvidenceAnalysisState(files = closureEvidenceFiles) {
+  const imageFiles = (files || []).filter(isClosureImageEvidence);
+  const pendingImages = imageFiles.filter(file => !closureImageHasOcrText(file) && !file.ocrAnalyzed && !file.ocrError);
+  const failedImages = imageFiles.filter(file => !closureImageHasOcrText(file) && file.ocrError);
+
+  return {
+    imageCount: imageFiles.length,
+    pendingImages,
+    failedImages,
+    hasImages: imageFiles.length > 0,
+    hasPending: pendingImages.length > 0,
+    hasFailures: failedImages.length > 0
+  };
+}
+
+function compactEvidenceIdentifier(value) {
+  return normalizeEvidenceText(value).replace(/[^a-z0-9]/g, "");
+}
+
+function canonicalEvidenceIdentifier(value) {
+  return compactEvidenceIdentifier(value)
+    .replace(/o/g, "0")
+    .replace(/[il]/g, "1")
+    .replace(/b/g, "8")
+    .replace(/s/g, "5");
+}
+
 function getClosureServerAliases(server) {
   const aliases = [];
   const name = String(server && server.name ? server.name : "").trim();
@@ -1415,7 +1450,19 @@ function getClosureServerAliases(server) {
 
 function textContainsAnyAlias(text, aliases) {
   const normalized = normalizeEvidenceText(text);
-  return aliases.some(alias => normalized.includes(alias));
+  const compactText = compactEvidenceIdentifier(text);
+  const canonicalText = canonicalEvidenceIdentifier(text);
+
+  return aliases.some(alias => {
+    const normalizedAlias = normalizeEvidenceText(alias);
+    if (normalizedAlias && normalized.includes(normalizedAlias)) return true;
+
+    const compactAlias = compactEvidenceIdentifier(alias);
+    if (compactAlias.length >= 5 && compactText.includes(compactAlias)) return true;
+
+    const canonicalAlias = canonicalEvidenceIdentifier(alias);
+    return canonicalAlias.length >= 5 && canonicalText.includes(canonicalAlias);
+  });
 }
 
 function serverIsMentionedInText(server, text) {
@@ -1488,7 +1535,11 @@ function inferClosureResultFromEvidence(server, evidenceText, allServers) {
   return inferClosureResultFromEvidenceContext(getServerEvidenceContext(evidenceText, server, allServers));
 }
 
-function applyEvidenceResultsToServers(servers, evidenceText, observationText) {
+function applyEvidenceResultsToServers(servers, evidenceText, observationText, evidenceState) {
+  const hasEvidenceText = !!String(evidenceText || "").trim();
+  const hasAnyServerEvidenceContext = hasEvidenceText
+    && servers.some(server => !!getServerEvidenceContext(evidenceText, server, servers));
+
   return servers.map(server => {
     const evidenceContext = getServerEvidenceContext(evidenceText, server, servers);
     const evidenceResult = inferClosureResultFromEvidenceContext(evidenceContext);
@@ -1503,6 +1554,22 @@ function applyEvidenceResultsToServers(servers, evidenceText, observationText) {
 
     if (serverIsMentionedInText(server, observationText)) {
       return { ...server, result: "Registrado nas observacoes da GMUD", evidenceState: "observed" };
+    }
+
+    if (evidenceState.hasPending) {
+      return { ...server, result: "Aguardando analise OCR da evidencia", evidenceState: "pending_ocr" };
+    }
+
+    if (evidenceState.hasFailures) {
+      return { ...server, result: "Falha na analise OCR; validar manualmente", evidenceState: "ocr_failed" };
+    }
+
+    if (evidenceState.hasImages && hasEvidenceText && !hasAnyServerEvidenceContext) {
+      return { ...server, result: "OCR sem correspondencia com o servidor; validar manualmente", evidenceState: "ocr_unmatched" };
+    }
+
+    if (evidenceState.hasImages && !hasEvidenceText) {
+      return { ...server, result: "OCR nao extraiu texto da evidencia; validar manualmente", evidenceState: "ocr_unmatched" };
     }
 
     return { ...server, result: "Nao evidenciado no encerramento", evidenceState: "missing" };
@@ -1525,6 +1592,7 @@ function getClosureClientName(data) {
 function getClosureServerItems(data, observations = "") {
   const result = getClosureResultLabel(document.getElementById("closureStatus").value || "");
   const evidenceText = getClosureEvidenceText();
+  const evidenceState = getClosureEvidenceAnalysisState();
   let servers = [];
 
   if (data.isCmdbApplied && data.activeVMs && data.activeVMs.length > 0) {
@@ -1534,7 +1602,7 @@ function getClosureServerItems(data, observations = "") {
       os: getOsFromText(vm.info || ""),
       result
     }));
-    return applyEvidenceResultsToServers(servers, evidenceText, observations);
+    return applyEvidenceResultsToServers(servers, evidenceText, observations, evidenceState);
   }
 
   const seen = new Set();
@@ -1552,11 +1620,11 @@ function getClosureServerItems(data, observations = "") {
     });
   });
 
-  if (servers.length > 0) return applyEvidenceResultsToServers(servers, evidenceText, observations);
+  if (servers.length > 0) return applyEvidenceResultsToServers(servers, evidenceText, observations, evidenceState);
 
   if (data.ips && data.ips.length > 0) {
     servers = data.ips.map(ip => ({ name: ip, info: "", os: "Nao informado", result }));
-    return applyEvidenceResultsToServers(servers, evidenceText, observations);
+    return applyEvidenceResultsToServers(servers, evidenceText, observations, evidenceState);
   }
 
   return [];
@@ -1574,7 +1642,10 @@ function getClosurePayload() {
   const observations = document.getElementById("closureObservations").value.trim();
   const servers = getClosureServerItems(data, observations);
   const osNames = suggestedKbs.length > 0 ? [...new Set(suggestedKbs.map(getKbOsLabel))] : [];
+  const evidenceAnalysisState = getClosureEvidenceAnalysisState();
   const missingEvidenceServers = servers.filter(server => server.evidenceState === "missing");
+  const pendingOcrServers = servers.filter(server => server.evidenceState === "pending_ocr");
+  const manualReviewServers = servers.filter(server => server.evidenceState === "ocr_unmatched" || server.evidenceState === "ocr_failed");
 
   return {
     gmudNumber,
@@ -1586,7 +1657,10 @@ function getClosurePayload() {
     closureDateTime: formatDisplayDateTime(closureDate, closureTime),
     observations,
     servers,
+    evidenceAnalysisState,
     missingEvidenceServers,
+    pendingOcrServers,
+    manualReviewServers,
     suggestedKbs,
     osNames,
     evidenceFiles: closureEvidenceFiles
@@ -1618,6 +1692,9 @@ function handleClosureEvidenceFiles(fileList) {
     type: file.type || "",
     size: file.size || 0,
     dataUrl: "",
+    ocrText: "",
+    ocrAnalyzed: false,
+    ocrError: "",
     file
   }));
   updateClosureEvidenceList();
@@ -1641,6 +1718,73 @@ function clearClosureEvidence() {
   const input = document.getElementById("closureEvidenceInput");
   if (input) input.value = "";
   updateClosureEvidenceList();
+}
+
+function getEvidenceImageSource(file) {
+  if (file.dataUrl) return Promise.resolve(file.dataUrl);
+  if (file.file && typeof FileReader !== "undefined") {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = event => resolve(event.target.result || file.file);
+      reader.onerror = () => reject(new Error("Nao foi possivel ler a imagem da evidencia."));
+      reader.readAsDataURL(file.file);
+    });
+  }
+  return Promise.resolve(file.file || file.dataUrl);
+}
+
+function preprocessImageForOcr(source) {
+  if (!source || typeof Image === "undefined" || typeof document === "undefined" || !document.createElement) {
+    return Promise.resolve(source);
+  }
+
+  return new Promise(resolve => {
+    const image = new Image();
+    image.onload = () => {
+      try {
+        const scale = Math.min(4, Math.max(2, 2200 / Math.max(image.width || 1, image.height || 1)));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round((image.width || 1) * scale));
+        canvas.height = Math.max(1, Math.round((image.height || 1) * scale));
+        const context = canvas.getContext && canvas.getContext("2d");
+        if (!context) {
+          resolve(source);
+          return;
+        }
+
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.imageSmoothingEnabled = false;
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        let totalLuminance = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          totalLuminance += (0.299 * data[i]) + (0.587 * data[i + 1]) + (0.114 * data[i + 2]);
+        }
+        const averageLuminance = totalLuminance / Math.max(1, data.length / 4);
+        const shouldInvert = averageLuminance < 128;
+
+        for (let i = 0; i < data.length; i += 4) {
+          let luminance = (0.299 * data[i]) + (0.587 * data[i + 1]) + (0.114 * data[i + 2]);
+          if (shouldInvert) luminance = 255 - luminance;
+          luminance = Math.max(0, Math.min(255, ((luminance - 128) * 1.65) + 128));
+          data[i] = luminance;
+          data[i + 1] = luminance;
+          data[i + 2] = luminance;
+          data[i + 3] = 255;
+        }
+
+        context.putImageData(imageData, 0, 0);
+        resolve(canvas.toDataURL("image/png"));
+      } catch (err) {
+        resolve(source);
+      }
+    };
+    image.onerror = () => resolve(source);
+    image.src = source;
+  });
 }
 
 function loadTesseractOcr() {
@@ -1690,39 +1834,78 @@ async function runTesseractRecognize(source, progressCallback) {
   throw new Error("API de OCR indisponivel no Tesseract.js carregado.");
 }
 
-async function analyzeClosureEvidenceStatus() {
+async function analyzeClosureEvidenceStatus(options = {}) {
   const feedback = document.getElementById("closureOcrFeedback");
-  const imageEvidence = closureEvidenceFiles.find(file => String(file.type || "").toLowerCase().startsWith("image/"));
+  const imageEvidences = closureEvidenceFiles.filter(isClosureImageEvidence);
+  const force = options.force !== false;
+  const targets = force
+    ? imageEvidences
+    : imageEvidences.filter(file => !closureImageHasOcrText(file) && !file.ocrAnalyzed && !file.ocrError);
 
-  if (!imageEvidence) {
+  if (imageEvidences.length === 0) {
     feedback.textContent = "OCR: selecione ao menos uma imagem de evidencia para analisar.";
     feedback.style.color = "#fbbf24";
     return null;
   }
 
+  if (targets.length === 0) {
+    const existingText = getClosureEvidenceText();
+    if (existingText) {
+      const existingInference = inferClosureStatusFromEvidenceText(existingText);
+      document.getElementById("closureStatus").value = existingInference.status;
+      feedback.textContent = `OCR: evidencias ja analisadas. ${existingInference.status} sugerido.`;
+      feedback.style.color = existingInference.status.includes("sucesso") ? "#86efac" : "#fde68a";
+      if (!options.skipGenerate) generateClosure();
+      return existingInference;
+    }
+    return null;
+  }
+
   try {
-    feedback.textContent = "OCR: carregando motor de leitura...";
+    feedback.textContent = `OCR: carregando motor de leitura para ${targets.length} imagem(ns)...`;
     feedback.style.color = "#93c5fd";
 
-    const source = imageEvidence.file || imageEvidence.dataUrl;
-    const result = await runTesseractRecognize(source, step => {
-      feedback.textContent = `OCR: ${step}`;
-    });
-    const text = result && result.data && result.data.text ? result.data.text : "";
-    const inference = inferClosureStatusFromEvidenceText(text);
-    imageEvidence.ocrText = text;
-    imageEvidence.ocrInference = inference;
+    for (let index = 0; index < targets.length; index++) {
+      const imageEvidence = targets[index];
+      feedback.textContent = `OCR: preparando ${imageEvidence.name || `imagem ${index + 1}`} (${index + 1}/${targets.length})...`;
+
+      const rawSource = await getEvidenceImageSource(imageEvidence);
+      const source = await preprocessImageForOcr(rawSource);
+      const result = await runTesseractRecognize(source, step => {
+        feedback.textContent = `OCR: ${imageEvidence.name || `imagem ${index + 1}`} - ${step}`;
+      });
+      const text = result && result.data && result.data.text ? result.data.text : "";
+      const inference = inferClosureStatusFromEvidenceText(text);
+      imageEvidence.ocrText = text;
+      imageEvidence.ocrInference = inference;
+      imageEvidence.ocrAnalyzed = true;
+      imageEvidence.ocrError = "";
+    }
+
+    const combinedText = getClosureEvidenceText();
+    const inference = inferClosureStatusFromEvidenceText(combinedText);
 
     document.getElementById("closureStatus").value = inference.status;
-    feedback.textContent = `OCR: ${inference.status} sugerido. ${inference.reason}`;
+    feedback.textContent = `OCR: ${targets.length} imagem(ns) analisada(s). ${inference.status} sugerido. ${inference.reason}`;
     feedback.style.color = inference.status.includes("sucesso") ? "#86efac" : "#fde68a";
-    generateClosure();
+    if (!options.skipGenerate) generateClosure();
     return inference;
   } catch (err) {
+    targets.forEach(file => {
+      if (!file.ocrAnalyzed && !closureImageHasOcrText(file)) {
+        file.ocrError = err.message;
+      }
+    });
     feedback.textContent = `OCR: falha ao analisar evidencia (${err.message}). Ajuste o status manualmente.`;
     feedback.style.color = "#fca5a5";
     return null;
   }
+}
+
+async function ensureClosureEvidenceOcr() {
+  const state = getClosureEvidenceAnalysisState();
+  if (!state.hasPending) return null;
+  return await analyzeClosureEvidenceStatus({ force: false, skipGenerate: true });
 }
 
 function buildClosureEmailHtml() {
@@ -1749,6 +1932,18 @@ function buildClosureEmailHtml() {
       html += `- <strong>${escapeHtml(server.name)}</strong>: nao localizado na evidencia OCR e sem citacao nas observacoes finais da GMUD.<br>`;
     });
     html += "Esses itens devem ser tratados como nao atualizados ou com pendencia/problema sem evidencia registrada no encerramento.<br>";
+  }
+
+  if (payload.pendingOcrServers.length > 0) {
+    html += "<br><strong>Analise OCR pendente:</strong><br>";
+    html += "Ha imagem(ns) de evidencia anexada(s), mas a leitura OCR ainda nao foi concluida. Clique em Analisar evidencia e sugerir status antes de enviar o encerramento ou gerar o PDF final.<br>";
+  }
+
+  if (payload.manualReviewServers.length > 0) {
+    html += "<br><strong>Servidores com validacao manual necessaria:</strong><br>";
+    payload.manualReviewServers.forEach(server => {
+      html += `- <strong>${escapeHtml(server.name)}</strong>: ${escapeHtml(server.result)}.<br>`;
+    });
   }
 
   html += "<br><strong>Sistemas Operacionais afetados:</strong><br>";
@@ -1795,10 +1990,21 @@ function generateClosure() {
   return html;
 }
 
+async function generateClosureFromEvidence() {
+  await ensureClosureEvidenceOcr();
+  return generateClosure();
+}
+
 function buildClosureExecutiveSummary(payload) {
   const osText = payload.osNames.length > 0 ? payload.osNames.join(" e ") : "servidores contemplados no escopo";
   const missingCount = payload.missingEvidenceServers.length;
-  const statusText = missingCount > 0
+  const pendingCount = payload.pendingOcrServers.length;
+  const manualReviewCount = payload.manualReviewServers.length;
+  const statusText = pendingCount > 0
+    ? `A evidencia de imagem foi anexada, mas a leitura OCR ainda esta pendente para ${pendingCount} servidor(es), portanto o resultado final deve ser gerado novamente apos a analise OCR.`
+    : manualReviewCount > 0
+    ? `A leitura OCR foi executada, porem ${manualReviewCount} servidor(es) exigem validacao manual porque o OCR nao conseguiu correlacionar a evidencia aos hostnames ou IPs do escopo.`
+    : missingCount > 0
     ? `Foram identificados ${missingCount} servidor(es) do escopo sem localizacao na evidencia OCR e sem citacao nas observacoes finais, devendo ser tratados como nao atualizados ou pendentes ate validacao complementar.`
     : normalizeEvidenceText(payload.status).includes("sucesso")
     ? "A execução foi concluída com 100% de sucesso, sem pendências identificadas."
@@ -1809,6 +2015,15 @@ function buildClosureExecutiveSummary(payload) {
 
 function buildClosureConclusion(payload) {
   const success = normalizeEvidenceText(payload.status).includes("sucesso");
+  if (payload.pendingOcrServers.length > 0) {
+    return `A GMUD ${escapeHtml(payload.gmudNumber)} possui evidencia de imagem anexada, porem a leitura OCR ainda nao foi concluida. Gere novamente o encerramento apos a analise OCR para que o relatorio classifique os servidores conforme a evidencia.`;
+  }
+
+  if (payload.manualReviewServers.length > 0) {
+    const names = payload.manualReviewServers.map(server => server.name).join(", ");
+    return `A GMUD ${escapeHtml(payload.gmudNumber)} possui evidencia analisada por OCR, mas os seguintes servidores exigem validacao manual porque nao houve correlacao confiavel com hostname ou IP: ${escapeHtml(names)}. Confirme a evidencia visualmente ou registre a situacao nas observacoes finais da GMUD.`;
+  }
+
   if (payload.missingEvidenceServers.length > 0) {
     const names = payload.missingEvidenceServers.map(server => server.name).join(", ");
     return `A GMUD ${escapeHtml(payload.gmudNumber)} possui servidor(es) do escopo original sem evidencia ou observacao registrada no encerramento: ${escapeHtml(names)}. Esses itens nao devem ser considerados atualizados ate que haja evidencia complementar no console de gerenciamento ou registro formal nas observacoes da GMUD.`;
@@ -1846,6 +2061,15 @@ function buildClosureReportHtml() {
     ? `<h2>Servidores sem evidencia ou observacao no encerramento</h2>
     <p>Os servidores abaixo constavam no escopo original, mas nao foram localizados no texto OCR da evidencia e tambem nao foram citados nas observacoes finais da GMUD. Devem ser tratados como nao atualizados ou com pendencia/problema sem evidencia registrada no encerramento.</p>
     <ul>${payload.missingEvidenceServers.map(server => `<li>${escapeHtml(server.name)}</li>`).join("")}</ul>`
+    : "";
+  const pendingOcrHtml = payload.pendingOcrServers.length > 0
+    ? `<h2>Analise OCR pendente</h2>
+    <p>Ha imagem(ns) de evidencia anexada(s), mas a leitura OCR ainda nao foi concluida. Clique em Analisar evidencia e sugerir status ou abra novamente o relatorio para que o gerador processe as imagens antes da emissao final.</p>`
+    : "";
+  const manualReviewHtml = payload.manualReviewServers.length > 0
+    ? `<h2>Servidores com validacao manual necessaria</h2>
+    <p>A leitura OCR foi executada, mas nao houve correlacao confiavel entre a evidencia e os hostnames/IPs abaixo. Valide a evidencia visualmente ou registre a situacao nas observacoes finais da GMUD.</p>
+    <ul>${payload.manualReviewServers.map(server => `<li>${escapeHtml(server.name)} - ${escapeHtml(server.result)}</li>`).join("")}</ul>`
     : "";
 
   return `<!DOCTYPE html>
@@ -1899,6 +2123,10 @@ function buildClosureReportHtml() {
       <tbody>${serversHtml}</tbody>
     </table>
 
+    ${pendingOcrHtml}
+
+    ${manualReviewHtml}
+
     ${missingEvidenceHtml}
 
     <h2>Atualizações de Segurança Aplicadas</h2>
@@ -1916,7 +2144,8 @@ function buildClosureReportHtml() {
 </html>`;
 }
 
-function openClosureReportForPdf() {
+async function openClosureReportForPdf() {
+  await ensureClosureEvidenceOcr();
   generateClosure();
   const reportHtml = buildClosureReportHtml();
   const reportWindow = window.open("", "_blank");

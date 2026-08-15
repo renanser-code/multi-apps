@@ -232,6 +232,29 @@ assert(perServerReportHtml.includes("<td>VISA011-B</td><td>Windows Server 2022</
 assert(perServerReportHtml.includes("<td>VISA029-1</td><td>Windows Server 2016</td><td>Validado com ressalvas</td>"));
 
 getElement("closureStatus").value = "Concluída com sucesso";
+getElement("closureObservations").value = "";
+sandbox.__setClosureEvidenceFiles([
+  { name: "tanium-pendente.png", type: "image/png", size: 4096, dataUrl: "data:image/png;base64,DD==" }
+]);
+const pendingOcrReportHtml = sandbox.__buildClosureReportHtml();
+assert(pendingOcrReportHtml.includes("Aguardando analise OCR da evidencia"));
+assert(!pendingOcrReportHtml.includes("Servidores sem evidencia ou observacao no encerramento"));
+
+sandbox.__setClosureEvidenceFiles([
+  {
+    name: "tanium-sem-hostname.png",
+    type: "image/png",
+    size: 4096,
+    dataUrl: "data:image/png;base64,EE==",
+    ocrAnalyzed: true,
+    ocrText: "Parent Status Complete Status Complete All Patches Applied Currently Targeted Yes"
+  }
+]);
+const unmatchedOcrReportHtml = sandbox.__buildClosureReportHtml();
+assert(unmatchedOcrReportHtml.includes("OCR sem correspondencia com o servidor; validar manualmente"));
+assert(!unmatchedOcrReportHtml.includes("Servidores sem evidencia ou observacao no encerramento"));
+
+getElement("closureStatus").value = "Concluída com sucesso";
 getElement("closureObservations").value = "VISA050-X: patch nao aplicado, com acompanhamento registrado nas observacoes da GMUD.";
 sandbox.__setClosureEvidenceFiles([
   {
