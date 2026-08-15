@@ -164,7 +164,8 @@ assert(catalogNameItems.some(item => item.kb === "KB5120233"), "nome do Microsof
 getElement("schedGmud").value = "GMUD-TESTE";
 getElement("input").value = [
   "VISA011-B Microsoft Windows Server 2022 (64-bit)",
-  "VISA029-1 Microsoft Windows Server 2016 (64-bit)"
+  "VISA029-1 Microsoft Windows Server 2016 (64-bit)",
+  "VISA050-X Microsoft Windows Server 2022 (64-bit)"
 ].join("\n");
 sandbox.__generate();
 const emailHtml = getElement("emailText").innerHTML;
@@ -229,6 +230,26 @@ sandbox.__setClosureEvidenceFiles([
 const perServerReportHtml = sandbox.__buildClosureReportHtml();
 assert(perServerReportHtml.includes("<td>VISA011-B</td><td>Windows Server 2022</td><td>Complete, All Patches Applied</td>"));
 assert(perServerReportHtml.includes("<td>VISA029-1</td><td>Windows Server 2016</td><td>Validado com ressalvas</td>"));
+
+getElement("closureStatus").value = "Concluída com sucesso";
+getElement("closureObservations").value = "VISA050-X: patch nao aplicado, com acompanhamento registrado nas observacoes da GMUD.";
+sandbox.__setClosureEvidenceFiles([
+  {
+    name: "tanium-final-parcial.png",
+    type: "image/png",
+    size: 4096,
+    dataUrl: "data:image/png;base64,CC==",
+    ocrText: "VISA011-B Parent Status Complete Status Complete, All Patches Applied Currently Targeted Yes"
+  }
+]);
+sandbox.__generateClosure();
+const missingEvidenceEmailHtml = getElement("closureEmailText").innerHTML;
+const missingEvidenceReportHtml = sandbox.__buildClosureReportHtml();
+assert(missingEvidenceEmailHtml.includes("Servidores sem evidencia ou observacao no encerramento"));
+assert(missingEvidenceEmailHtml.includes("VISA029-1"));
+assert(missingEvidenceReportHtml.includes("<td>VISA029-1</td><td>Windows Server 2016</td><td>Nao evidenciado no encerramento</td>"));
+assert(missingEvidenceReportHtml.includes("<td>VISA050-X</td><td>Windows Server 2022</td><td>Registrado nas observacoes da GMUD</td>"));
+assert(missingEvidenceReportHtml.includes("Servidores sem evidencia ou observacao no encerramento"));
 
 const successStatus = sandbox.__inferClosureStatusFromEvidenceText("Parent Status Complete Status Complete, All Patches Applied Currently Targeted Yes");
 assert.strictEqual(successStatus.status, "Concluída com sucesso");

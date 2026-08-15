@@ -1418,6 +1418,12 @@ function textContainsAnyAlias(text, aliases) {
   return aliases.some(alias => normalized.includes(alias));
 }
 
+function serverIsMentionedInText(server, text) {
+  const aliases = getClosureServerAliases(server).map(normalizeEvidenceText);
+  if (aliases.length === 0) return false;
+  return textContainsAnyAlias(text, aliases);
+}
+
 function getServerEvidenceContext(evidenceText, server, allServers) {
   const text = String(evidenceText || "");
   if (!text.trim()) return "";
@@ -1464,8 +1470,7 @@ function getServerEvidenceContext(evidenceText, server, allServers) {
   return text.slice(hitIndex, endIndex);
 }
 
-function inferClosureResultFromEvidence(server, evidenceText, allServers) {
-  const context = getServerEvidenceContext(evidenceText, server, allServers);
+function inferClosureResultFromEvidenceContext(context) {
   if (!context) return "";
 
   const normalized = normalizeEvidenceText(context);
@@ -1479,11 +1484,29 @@ function inferClosureResultFromEvidence(server, evidenceText, allServers) {
   return "";
 }
 
-function applyEvidenceResultsToServers(servers, evidenceText, fallbackResult) {
-  return servers.map(server => ({
-    ...server,
-    result: inferClosureResultFromEvidence(server, evidenceText, servers) || server.result || fallbackResult
-  }));
+function inferClosureResultFromEvidence(server, evidenceText, allServers) {
+  return inferClosureResultFromEvidenceContext(getServerEvidenceContext(evidenceText, server, allServers));
+}
+
+function applyEvidenceResultsToServers(servers, evidenceText, observationText) {
+  return servers.map(server => {
+    const evidenceContext = getServerEvidenceContext(evidenceText, server, servers);
+    const evidenceResult = inferClosureResultFromEvidenceContext(evidenceContext);
+
+    if (evidenceResult) {
+      return { ...server, result: evidenceResult, evidenceState: "evidenced" };
+    }
+
+    if (evidenceContext) {
+      return { ...server, result: "Consta na evidencia; validar status", evidenceState: "evidenced" };
+    }
+
+    if (serverIsMentionedInText(server, observationText)) {
+      return { ...server, result: "Registrado nas observacoes da GMUD", evidenceState: "observed" };
+    }
+
+    return { ...server, result: "Nao evidenciado no encerramento", evidenceState: "missing" };
+  });
 }
 
 function getClosureClientName(data) {
@@ -1499,7 +1522,7 @@ function getClosureClientName(data) {
   return "Nao informado";
 }
 
-function getClosureServerItems(data) {
+function getClosureServerItems(data, observations = "") {
   const result = getClosureResultLabel(document.getElementById("closureStatus").value || "");
   const evidenceText = getClosureEvidenceText();
   let servers = [];
@@ -1511,7 +1534,7 @@ function getClosureServerItems(data) {
       os: getOsFromText(vm.info || ""),
       result
     }));
-    return applyEvidenceResultsToServers(servers, evidenceText, result);
+    return applyEvidenceResultsToServers(servers, evidenceText, observations);
   }
 
   const seen = new Set();
@@ -1529,11 +1552,11 @@ function getClosureServerItems(data) {
     });
   });
 
-  if (servers.length > 0) return applyEvidenceResultsToServers(servers, evidenceText, result);
+  if (servers.length > 0) return applyEvidenceResultsToServers(servers, evidenceText, observations);
 
   if (data.ips && data.ips.length > 0) {
     servers = data.ips.map(ip => ({ name: ip, info: "", os: "Nao informado", result }));
-    return applyEvidenceResultsToServers(servers, evidenceText, result);
+    return applyEvidenceResultsToServers(servers, evidenceText, observations);
   }
 
   return [];
@@ -1549,8 +1572,9 @@ function getClosurePayload() {
   const closureDate = document.getElementById("closureDate").value || "";
   const closureTime = document.getElementById("closureTime").value || "";
   const observations = document.getElementById("closureObservations").value.trim();
-  const servers = getClosureServerItems(data);
+  const servers = getClosureServerItems(data, observations);
   const osNames = suggestedKbs.length > 0 ? [...new Set(suggestedKbs.map(getKbOsLabel))] : [];
+  const missingEvidenceServers = servers.filter(server => server.evidenceState === "missing");
 
   return {
     gmudNumber,
@@ -1562,6 +1586,7 @@ function getClosurePayload() {
     closureDateTime: formatDisplayDateTime(closureDate, closureTime),
     observations,
     servers,
+    missingEvidenceServers,
     suggestedKbs,
     osNames,
     evidenceFiles: closureEvidenceFiles
@@ -1708,14 +1733,22 @@ function buildClosureEmailHtml() {
   html += `<strong>Status final:</strong> ${escapeHtml(payload.status)}<br>`;
   html += `<strong>Data/Hora de encerramento:</strong> ${escapeHtml(payload.closureDateTime)}<br><br>`;
 
-  html += "<strong>Servidores atualizados:</strong><br>";
+  html += "<strong>Servidores do escopo e resultado no encerramento:</strong><br>";
   if (payload.servers.length > 0) {
     payload.servers.forEach(server => {
       const info = server.info ? ` (${escapeHtml(server.info)})` : "";
-      html += `- <strong>${escapeHtml(server.name)}</strong>${info}<br>`;
+      html += `- <strong>${escapeHtml(server.name)}</strong>${info} - ${escapeHtml(server.result || "Validacao nao informada")}<br>`;
     });
   } else {
     html += "- Nao informado<br>";
+  }
+
+  if (payload.missingEvidenceServers.length > 0) {
+    html += "<br><strong>Servidores sem evidencia ou observacao no encerramento:</strong><br>";
+    payload.missingEvidenceServers.forEach(server => {
+      html += `- <strong>${escapeHtml(server.name)}</strong>: nao localizado na evidencia OCR e sem citacao nas observacoes finais da GMUD.<br>`;
+    });
+    html += "Esses itens devem ser tratados como nao atualizados ou com pendencia/problema sem evidencia registrada no encerramento.<br>";
   }
 
   html += "<br><strong>Sistemas Operacionais afetados:</strong><br>";
@@ -1764,7 +1797,10 @@ function generateClosure() {
 
 function buildClosureExecutiveSummary(payload) {
   const osText = payload.osNames.length > 0 ? payload.osNames.join(" e ") : "servidores contemplados no escopo";
-  const statusText = normalizeEvidenceText(payload.status).includes("sucesso")
+  const missingCount = payload.missingEvidenceServers.length;
+  const statusText = missingCount > 0
+    ? `Foram identificados ${missingCount} servidor(es) do escopo sem localizacao na evidencia OCR e sem citacao nas observacoes finais, devendo ser tratados como nao atualizados ou pendentes ate validacao complementar.`
+    : normalizeEvidenceText(payload.status).includes("sucesso")
     ? "A execução foi concluída com 100% de sucesso, sem pendências identificadas."
     : `A execução foi encerrada com o status "${payload.status}", conforme observações e evidências registradas.`;
 
@@ -1773,6 +1809,11 @@ function buildClosureExecutiveSummary(payload) {
 
 function buildClosureConclusion(payload) {
   const success = normalizeEvidenceText(payload.status).includes("sucesso");
+  if (payload.missingEvidenceServers.length > 0) {
+    const names = payload.missingEvidenceServers.map(server => server.name).join(", ");
+    return `A GMUD ${escapeHtml(payload.gmudNumber)} possui servidor(es) do escopo original sem evidencia ou observacao registrada no encerramento: ${escapeHtml(names)}. Esses itens nao devem ser considerados atualizados ate que haja evidencia complementar no console de gerenciamento ou registro formal nas observacoes da GMUD.`;
+  }
+
   if (success) {
     return `A GMUD ${escapeHtml(payload.gmudNumber)} foi executada conforme o planejamento aprovado e concluída com 100% de sucesso. Os servidores contemplados foram validados após a execução, sem falhas ou pendências de segurança identificadas. No console de gerenciamento, os deployments evidenciados apresentam Parent Status Complete e Status Complete, All Patches Applied. Não foram identificadas ações corretivas adicionais necessárias para o encerramento da mudança.`;
   }
@@ -1800,6 +1841,11 @@ function buildClosureReportHtml() {
     : "<p>Nenhuma evidencia selecionada no gerador.</p>";
   const linuxLine = payload.servers.some(server => /linux|ubuntu|centos|rocky/i.test(server.os || ""))
     ? "<li>Servidores Linux - validação concluída conforme evidências registradas.</li>"
+    : "";
+  const missingEvidenceHtml = payload.missingEvidenceServers.length > 0
+    ? `<h2>Servidores sem evidencia ou observacao no encerramento</h2>
+    <p>Os servidores abaixo constavam no escopo original, mas nao foram localizados no texto OCR da evidencia e tambem nao foram citados nas observacoes finais da GMUD. Devem ser tratados como nao atualizados ou com pendencia/problema sem evidencia registrada no encerramento.</p>
+    <ul>${payload.missingEvidenceServers.map(server => `<li>${escapeHtml(server.name)}</li>`).join("")}</ul>`
     : "";
 
   return `<!DOCTYPE html>
@@ -1852,6 +1898,8 @@ function buildClosureReportHtml() {
       <thead><tr><th>Servidor</th><th>SO</th><th>Resultado</th></tr></thead>
       <tbody>${serversHtml}</tbody>
     </table>
+
+    ${missingEvidenceHtml}
 
     <h2>Atualizações de Segurança Aplicadas</h2>
     <ul>${kbHtml}${linuxLine}</ul>
