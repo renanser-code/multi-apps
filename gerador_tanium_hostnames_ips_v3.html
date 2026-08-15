@@ -139,6 +139,17 @@
     @media(max-width:700px){ .parsed-section{grid-template-columns:1fr;} }
     .extract-label { font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
     .extract-block { display: flex; flex-direction: column; gap: 4px; }
+    .closure-form { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-top: 12px; }
+    .closure-form div { display:flex; flex-direction: column; }
+    .closure-form input, .closure-form select {
+      background:#1f2937; border:1px solid #334155; color:#f9fafb; padding:9px 12px; border-radius:8px; font-size:14px; outline:none;
+    }
+    .closure-form textarea {
+      min-height:90px; background:#020617; border:1px solid #334155; color:#f9fafb; border-radius:10px; padding:12px; font-family:Arial, Helvetica, sans-serif;
+    }
+    .closure-file-list { margin-top:10px; background:#020617; border:1px solid #334155; border-radius:10px; padding:10px; color:#cbd5e1; font-size:13px; line-height:1.5; }
+    .closure-file-item { display:flex; justify-content:space-between; gap:12px; padding:6px 0; border-bottom:1px solid #1f2937; }
+    .closure-file-item:last-child { border-bottom:0; }
   </style>
 </head>
 <body>
@@ -353,6 +364,55 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
         <div class="hint">Este texto já vem estruturado em formato Rich Text (HTML). Ao clicar em "Copiar texto p/ E-mail", as VMs em <strong>negrito</strong> serão copiadas formatadas e prontas para colar diretamente no corpo do e-mail do Outlook.</div>
       </div>
 
+      <div class="result-box" style="border-left: 4px solid #22c55e; background: #102016;">
+        <label style="color: #86efac; font-size: 16px;">Encerramento da GMUD</label>
+        <div class="hint">
+          Preencha o status final, observacoes e evidencias do encerramento. O gerador cria o texto do e-mail final e abre um relatorio pronto para imprimir ou salvar como PDF.
+        </div>
+
+        <div class="closure-form">
+          <div>
+            <label for="closureStatus">Status final</label>
+            <select id="closureStatus">
+              <option>Concluida com sucesso</option>
+              <option>Concluida com ressalvas</option>
+              <option>Concluida parcialmente</option>
+              <option>Cancelada</option>
+              <option>Rollback executado</option>
+            </select>
+          </div>
+          <div>
+            <label for="closureDate">Data de encerramento</label>
+            <input type="date" id="closureDate">
+          </div>
+          <div>
+            <label for="closureTime">Hora de encerramento</label>
+            <input type="time" id="closureTime">
+          </div>
+          <div style="grid-column: 1 / -1;">
+            <label for="closureObservations">Observacoes finais</label>
+            <textarea id="closureObservations" placeholder="Ex: Atualizacao finalizada sem incidentes. Validacao realizada com evidencias anexadas."></textarea>
+          </div>
+          <div style="grid-column: 1 / -1;">
+            <label for="closureEvidenceInput">Evidencias do encerramento (imagens ou PDF)</label>
+            <input type="file" id="closureEvidenceInput" multiple accept="image/*,.pdf,application/pdf" onchange="handleClosureEvidenceFiles(this.files)">
+            <div class="hint">Imagens entram visualmente no relatorio. PDFs entram como referencia de evidencia para anexar junto ao encerramento.</div>
+            <div id="closureEvidenceList" class="closure-file-list">Nenhuma evidencia selecionada.</div>
+          </div>
+        </div>
+
+        <div class="row" style="margin: 14px 0 0 0;">
+          <button class="success" onclick="generateClosure()">Gerar encerramento</button>
+          <button class="purple" onclick="copyText('closureEmailText')">Copiar e-mail de encerramento</button>
+          <button class="blue" onclick="openClosureReportForPdf()">Abrir relatorio para PDF</button>
+          <button class="secondary" onclick="clearClosureEvidence()">Limpar evidencias</button>
+          <span class="copy-feedback" id="closureFeedback">Encerramento atualizado.</span>
+        </div>
+
+        <label style="color: #86efac; font-size: 14px; margin-top: 16px;">Texto pronto para E-mail de Encerramento</label>
+        <div id="closureEmailText" contenteditable="true" style="min-height: 150px; font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; background: #020617; border: 1px solid #334155; border-radius: 10px; padding: 12px; overflow-y: auto; color: #f9fafb; white-space: pre-wrap; line-height: 1.5;"></div>
+      </div>
+
       <div class="result-box">
         <label for="combinedRegex">Resultado principal - Hostnames + IPs</label>
         <textarea id="combinedRegex" readonly></textarea>
@@ -390,6 +450,7 @@ let kbCatalogDocumentId = "";
 // CMDB Data Cache
 let cmdbDatabase = [];
 let isCmdbLoaded = false;
+let closureEvidenceFiles = [];
 
 // Initialize form default dates (today)
 const today = new Date();
@@ -397,6 +458,8 @@ document.getElementById("schedDate").value = today.toISOString().split("T")[0];
 const currentHours = String(today.getHours()).padStart(2, '0');
 const currentMinutes = String(today.getMinutes()).padStart(2, '0');
 document.getElementById("schedTime").value = `${currentHours}:${currentMinutes}`;
+document.getElementById("closureDate").value = today.toISOString().split("T")[0];
+document.getElementById("closureTime").value = `${currentHours}:${currentMinutes}`;
 
 const MSRC_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const SECURITY_UPDATE_RANK = {
@@ -1233,10 +1296,276 @@ function generate() {
   document.getElementById("emailText").innerHTML = emailHtml;
 }
 
+function escapeHtml(value) {
+  return String(value || "").replace(/[&<>"']/g, char => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  }[char]));
+}
+
+function formatDisplayDateTime(dateValue, timeValue) {
+  if (!dateValue && !timeValue) return "Nao informado";
+  if (!dateValue) return `Hora: ${escapeHtml(timeValue)}`;
+  const parts = dateValue.split("-");
+  const dateText = parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : dateValue;
+  return timeValue ? `${dateText} as ${timeValue}` : dateText;
+}
+
+function formatFileSize(bytes) {
+  const size = Number(bytes) || 0;
+  if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  if (size >= 1024) return `${Math.round(size / 1024)} KB`;
+  return `${size} bytes`;
+}
+
+function getClosureServerItems(data) {
+  if (data.isCmdbApplied && data.activeVMs && data.activeVMs.length > 0) {
+    return data.activeVMs.map(vm => ({ name: vm.name, info: vm.info || "" }));
+  }
+
+  if (data.hostnames && data.hostnames.length > 0) {
+    return data.hostnames.map(host => ({ name: host, info: "" }));
+  }
+
+  if (data.ips && data.ips.length > 0) {
+    return data.ips.map(ip => ({ name: ip, info: "" }));
+  }
+
+  return [];
+}
+
+function getClosurePayload() {
+  const data = processInput();
+  const suggestedKbs = suggestKBs(data.lines).filter(isDeployableCumulativeKb);
+  const gmudNumber = document.getElementById("schedGmud").value.trim() || "XXX";
+  const status = document.getElementById("closureStatus").value || "Concluida com sucesso";
+  const closureDate = document.getElementById("closureDate").value || "";
+  const closureTime = document.getElementById("closureTime").value || "";
+  const observations = document.getElementById("closureObservations").value.trim();
+  const servers = getClosureServerItems(data);
+  const osNames = suggestedKbs.length > 0 ? [...new Set(suggestedKbs.map(getKbOsLabel))] : [];
+
+  return {
+    gmudNumber,
+    status,
+    closureDate,
+    closureTime,
+    closureDateTime: formatDisplayDateTime(closureDate, closureTime),
+    observations,
+    servers,
+    suggestedKbs,
+    osNames,
+    evidenceFiles: closureEvidenceFiles
+  };
+}
+
+function renderEvidenceList(files) {
+  if (!files || files.length === 0) {
+    return "Nenhuma evidencia selecionada.";
+  }
+
+  return files.map(file => {
+    const typeKey = String(file.type || "").toLowerCase();
+    const typeLabel = typeKey.includes("pdf") ? "PDF" : (typeKey.startsWith("image/") ? "Imagem" : "Arquivo");
+    return `<div class="closure-file-item"><span>${escapeHtml(file.name)} (${typeLabel})</span><span>${formatFileSize(file.size)}</span></div>`;
+  }).join("");
+}
+
+function updateClosureEvidenceList() {
+  const container = document.getElementById("closureEvidenceList");
+  if (!container) return;
+  container.innerHTML = renderEvidenceList(closureEvidenceFiles);
+}
+
+function handleClosureEvidenceFiles(fileList) {
+  const files = Array.from(fileList || []);
+  closureEvidenceFiles = files.map(file => ({
+    name: file.name,
+    type: file.type || "",
+    size: file.size || 0,
+    dataUrl: ""
+  }));
+  updateClosureEvidenceList();
+
+  files.forEach((file, index) => {
+    if (!file.type || !file.type.toLowerCase().startsWith("image/") || typeof FileReader === "undefined") return;
+
+    const reader = new FileReader();
+    reader.onload = event => {
+      if (closureEvidenceFiles[index]) {
+        closureEvidenceFiles[index].dataUrl = event.target.result || "";
+        updateClosureEvidenceList();
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function clearClosureEvidence() {
+  closureEvidenceFiles = [];
+  const input = document.getElementById("closureEvidenceInput");
+  if (input) input.value = "";
+  updateClosureEvidenceList();
+}
+
+function buildClosureEmailHtml() {
+  const payload = getClosurePayload();
+  const observations = payload.observations || "Sem observacoes adicionais.";
+  let html = `Senhores, boa noite.<br><br>Encerramento da GMUD ${escapeHtml(payload.gmudNumber)}.<br><br>`;
+
+  html += `<strong>Status final:</strong> ${escapeHtml(payload.status)}<br>`;
+  html += `<strong>Data/Hora de encerramento:</strong> ${escapeHtml(payload.closureDateTime)}<br><br>`;
+
+  html += "<strong>Servidores atualizados:</strong><br>";
+  if (payload.servers.length > 0) {
+    payload.servers.forEach(server => {
+      const info = server.info ? ` (${escapeHtml(server.info)})` : "";
+      html += `- <strong>${escapeHtml(server.name)}</strong>${info}<br>`;
+    });
+  } else {
+    html += "- Nao informado<br>";
+  }
+
+  html += "<br><strong>Sistemas Operacionais afetados:</strong><br>";
+  if (payload.osNames.length > 0) {
+    payload.osNames.forEach(os => {
+      html += `- ${escapeHtml(os)}<br>`;
+    });
+  } else {
+    html += "- Windows Server / Client<br>";
+  }
+
+  html += "<br><strong>Patches cumulativos aplicados:</strong><br>";
+  if (payload.suggestedKbs.length > 0) {
+    payload.suggestedKbs.forEach(item => {
+      html += `- ${escapeHtml(item.kb)} (${escapeHtml(item.name)})<br>`;
+    });
+  } else {
+    html += "- Cumulative Security Updates (Tanium Patch)<br>";
+  }
+
+  html += `<br><strong>Observacoes finais:</strong><br>${escapeHtml(observations).replace(/\r?\n/g, "<br>")}<br>`;
+
+  html += "<br><strong>Evidencias de encerramento:</strong><br>";
+  if (payload.evidenceFiles.length > 0) {
+    payload.evidenceFiles.forEach(file => {
+      html += `- ${escapeHtml(file.name)} (${formatFileSize(file.size)})<br>`;
+    });
+  } else {
+    html += "- Evidencias serao anexadas ao e-mail de encerramento.<br>";
+  }
+
+  html += "<br>Qualquer duvida, estamos a disposicao.<br>Atenciosamente,";
+  return html;
+}
+
+function generateClosure() {
+  const html = buildClosureEmailHtml();
+  document.getElementById("closureEmailText").innerHTML = html;
+  const feedback = document.getElementById("closureFeedback");
+  if (feedback) {
+    feedback.style.display = "inline";
+    setTimeout(() => feedback.style.display = "none", 1200);
+  }
+  return html;
+}
+
+function buildClosureReportHtml() {
+  const payload = getClosurePayload();
+  const emailHtml = buildClosureEmailHtml();
+  const generatedAt = formatDisplayDateTime(today.toISOString().split("T")[0], `${currentHours}:${currentMinutes}`);
+  const serversHtml = payload.servers.length > 0
+    ? payload.servers.map(server => `<tr><td>${escapeHtml(server.name)}</td><td>${escapeHtml(server.info || "-")}</td></tr>`).join("")
+    : "<tr><td colspan='2'>Nao informado</td></tr>";
+  const kbHtml = payload.suggestedKbs.length > 0
+    ? payload.suggestedKbs.map(item => `<tr><td>${escapeHtml(item.kb)}</td><td>${escapeHtml(item.name)}</td></tr>`).join("")
+    : "<tr><td colspan='2'>Cumulative Security Updates (Tanium Patch)</td></tr>";
+  const evidenceHtml = payload.evidenceFiles.length > 0
+    ? payload.evidenceFiles.map(file => {
+        const isImage = file.type && file.type.toLowerCase().startsWith("image/") && file.dataUrl;
+        if (isImage) {
+          return `<figure class="evidence"><img src="${file.dataUrl}" alt="${escapeHtml(file.name)}"><figcaption>${escapeHtml(file.name)} - ${formatFileSize(file.size)}</figcaption></figure>`;
+        }
+        return `<div class="evidence-file"><strong>${escapeHtml(file.name)}</strong><br><span>Arquivo anexado como referencia de evidencia (${formatFileSize(file.size)}). Para PDF, anexe tambem o arquivo original ao e-mail de encerramento.</span></div>`;
+      }).join("")
+    : "<p>Nenhuma evidencia selecionada no gerador.</p>";
+
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Relatorio de Encerramento da GMUD ${escapeHtml(payload.gmudNumber)}</title>
+  <style>
+    body { margin:0; padding:32px; color:#111827; font-family:Arial, Helvetica, sans-serif; background:#f8fafc; }
+    .sheet { max-width: 980px; margin: 0 auto; background:white; border:1px solid #d1d5db; padding:28px; }
+    h1 { margin:0 0 8px; font-size:24px; color:#0f172a; }
+    h2 { font-size:16px; margin:24px 0 8px; color:#1f2937; border-bottom:1px solid #d1d5db; padding-bottom:6px; }
+    .meta { display:grid; grid-template-columns: repeat(2, 1fr); gap:10px; margin-top:16px; }
+    .box { border:1px solid #d1d5db; padding:10px; background:#f9fafb; }
+    table { width:100%; border-collapse:collapse; margin-top:8px; font-size:13px; }
+    th, td { border:1px solid #d1d5db; padding:8px; text-align:left; vertical-align:top; }
+    th { background:#f3f4f6; }
+    .email-body { border:1px solid #d1d5db; background:#f9fafb; padding:14px; line-height:1.45; }
+    .evidence { margin:14px 0; page-break-inside:avoid; }
+    .evidence img { max-width:100%; border:1px solid #d1d5db; }
+    .evidence figcaption, .evidence-file { font-size:12px; color:#4b5563; margin-top:6px; }
+    .evidence-file { border:1px dashed #9ca3af; padding:10px; margin:10px 0; background:#f9fafb; }
+    .print-button { position:fixed; top:14px; right:14px; background:#2563eb; color:white; border:0; padding:10px 14px; border-radius:6px; font-weight:700; cursor:pointer; }
+    @media print { body { background:white; padding:0; } .sheet { border:0; max-width:none; } .print-button { display:none; } }
+  </style>
+</head>
+<body>
+  <button class="print-button" onclick="window.print()">Salvar como PDF</button>
+  <main class="sheet">
+    <h1>Relatorio de Encerramento da GMUD</h1>
+    <div>Documento gerado pelo Gerador Tanium para evidencia de encerramento.</div>
+    <div class="meta">
+      <div class="box"><strong>GMUD</strong><br>${escapeHtml(payload.gmudNumber)}</div>
+      <div class="box"><strong>Status final</strong><br>${escapeHtml(payload.status)}</div>
+      <div class="box"><strong>Encerramento</strong><br>${escapeHtml(payload.closureDateTime)}</div>
+      <div class="box"><strong>Gerado em</strong><br>${escapeHtml(generatedAt)}</div>
+    </div>
+
+    <h2>Observacoes finais</h2>
+    <p>${escapeHtml(payload.observations || "Sem observacoes adicionais.").replace(/\r?\n/g, "<br>")}</p>
+
+    <h2>Servidores atualizados</h2>
+    <table><thead><tr><th>Servidor</th><th>Informacoes</th></tr></thead><tbody>${serversHtml}</tbody></table>
+
+    <h2>Patches cumulativos aplicados</h2>
+    <table><thead><tr><th>KB</th><th>Descricao</th></tr></thead><tbody>${kbHtml}</tbody></table>
+
+    <h2>Texto do e-mail de encerramento</h2>
+    <div class="email-body">${emailHtml}</div>
+
+    <h2>Evidencias anexadas</h2>
+    ${evidenceHtml}
+  </main>
+</body>
+</html>`;
+}
+
+function openClosureReportForPdf() {
+  generateClosure();
+  const reportHtml = buildClosureReportHtml();
+  const reportWindow = window.open("", "_blank");
+  if (!reportWindow) {
+    alert("Nao foi possivel abrir o relatorio. Verifique o bloqueador de pop-ups do navegador.");
+    return;
+  }
+  reportWindow.document.open();
+  reportWindow.document.write(reportHtml);
+  reportWindow.document.close();
+  reportWindow.focus();
+}
+
 function copyText(id) {
   const el = document.getElementById(id);
   
-  if (id === "emailText") {
+  if (id === "emailText" || id === "closureEmailText") {
     const htmlContent = el.innerHTML;
     const plainText = el.innerText || el.textContent;
     
@@ -1660,21 +1989,29 @@ function parseFreeDateTime(el) {
 
 function clearAll() {
   document.getElementById("input").value = "";
+  document.getElementById("closureObservations").value = "";
+  document.getElementById("closureEmailText").innerHTML = "";
+  clearClosureEvidence();
   generate();
 }
 
-document.getElementById("input").addEventListener("input", generate);
-document.querySelectorAll("input[type=checkbox]").forEach(el => el.addEventListener("change", generate));
-document.getElementById("schedGmud").addEventListener("input", () => { generate(); updateScriptPreview(); });
+document.getElementById("input").addEventListener("input", () => { generate(); generateClosure(); });
+document.querySelectorAll("input[type=checkbox]").forEach(el => el.addEventListener("change", () => { generate(); generateClosure(); }));
+document.getElementById("schedGmud").addEventListener("input", () => { generate(); generateClosure(); updateScriptPreview(); });
 ["schedDate","schedTime","schedTo","schedCc"].forEach(id => {
   document.getElementById(id).addEventListener("input", updateScriptPreview);
   document.getElementById(id).addEventListener("change", updateScriptPreview);
+});
+["closureStatus","closureDate","closureTime","closureObservations"].forEach(id => {
+  document.getElementById(id).addEventListener("input", generateClosure);
+  document.getElementById(id).addEventListener("change", generateClosure);
 });
 // Also update preview when email body is re-generated
 const origGenerate = generate;
 
 
 generate();
+generateClosure();
 updateScriptPreview();
 loadLatestKBsFromMicrosoft();
 </script>

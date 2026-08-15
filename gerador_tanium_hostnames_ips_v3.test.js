@@ -37,7 +37,17 @@ const sandbox = {
   Blob: function Blob() {},
   URL: { createObjectURL() { return "blob:test"; }, revokeObjectURL() {} },
   navigator: { clipboard: { writeText() { return Promise.resolve(); }, write() { return Promise.resolve(); } } },
-  window: { ClipboardItem: function ClipboardItem() {}, getSelection() { return { removeAllRanges() {}, addRange() {} }; } },
+  window: {
+    ClipboardItem: function ClipboardItem() {},
+    getSelection() { return { removeAllRanges() {}, addRange() {} }; },
+    open() {
+      return {
+        document: { open() {}, write() {}, close() {} },
+        focus() {},
+        print() {},
+      };
+    },
+  },
   document: {
     getElementById: getElement,
     querySelectorAll() { return []; },
@@ -53,14 +63,16 @@ const sandbox = {
 };
 
 let script = scriptMatch[1];
-script = script.replace(/generate\(\);\s*updateScriptPreview\(\);\s*loadLatestKBsFromMicrosoft\(\);/, "");
+script = script.replace(/generate\(\);\s*(?:generateClosure\(\);\s*)?updateScriptPreview\(\);\s*loadLatestKBsFromMicrosoft\(\);/, "");
 
 vm.createContext(sandbox);
-vm.runInContext(`${script}\nthis.__buildKbCatalogFromMsrc = buildKbCatalogFromMsrc;\nthis.__suggestKBs = suggestKBs;\nthis.__generate = generate;\nthis.__setKbCatalog = (catalog) => { KB_CATALOG = catalog; };`, sandbox);
+vm.runInContext(`${script}\nthis.__buildKbCatalogFromMsrc = buildKbCatalogFromMsrc;\nthis.__suggestKBs = suggestKBs;\nthis.__generate = generate;\nthis.__setKbCatalog = (catalog) => { KB_CATALOG = catalog; };\nthis.__generateClosure = typeof generateClosure === "function" ? generateClosure : undefined;\nthis.__buildClosureReportHtml = typeof buildClosureReportHtml === "function" ? buildClosureReportHtml : undefined;\nthis.__setClosureEvidenceFiles = (files) => { closureEvidenceFiles = files; };`, sandbox);
 
 assert.strictEqual(typeof sandbox.__buildKbCatalogFromMsrc, "function");
 assert.strictEqual(typeof sandbox.__suggestKBs, "function");
 assert.strictEqual(typeof sandbox.__generate, "function");
+assert.strictEqual(typeof sandbox.__generateClosure, "function");
+assert.strictEqual(typeof sandbox.__buildClosureReportHtml, "function");
 
 const baseCatalog = {
   "2016": { kb: "KB0000001", name: "old 2016" },
@@ -160,3 +172,31 @@ assert(emailHtml.includes("KB5120418"), "email deve citar cumulativo do Windows 
 assert(!emailHtml.includes("KB5123303"), "email nao deve citar security update avulso");
 assert(!emailHtml.includes("KB5120714"), "email nao deve citar .NET Framework 4.8.1");
 assert(!emailHtml.includes("KB5120705"), "email nao deve citar .NET Framework 4.8");
+
+getElement("closureStatus").value = "Concluida com sucesso";
+getElement("closureDate").value = "2026-08-15";
+getElement("closureTime").value = "23:40";
+getElement("closureObservations").value = "Atualizacao finalizada sem incidentes. Evidencias anexadas no encerramento.";
+sandbox.__setClosureEvidenceFiles([
+  { name: "print-finalizacao.png", type: "image/png", size: 2048, dataUrl: "data:image/png;base64,AA==" },
+  { name: "Relatorio_Tecnico_Evidencia_GMUD481_GER7.pdf", type: "application/pdf", size: 379849, dataUrl: "" },
+]);
+sandbox.__generateClosure();
+
+const closureEmailHtml = getElement("closureEmailText").innerHTML;
+assert(closureEmailHtml.includes("Encerramento da GMUD GMUD-TESTE"));
+assert(closureEmailHtml.includes("Concluida com sucesso"));
+assert(closureEmailHtml.includes("Atualizacao finalizada sem incidentes"));
+assert(closureEmailHtml.includes("KB5120242"));
+assert(closureEmailHtml.includes("VISA011-B"));
+assert(closureEmailHtml.includes("print-finalizacao.png"));
+assert(closureEmailHtml.includes("Relatorio_Tecnico_Evidencia_GMUD481_GER7.pdf"));
+
+const closureReportHtml = sandbox.__buildClosureReportHtml();
+assert(closureReportHtml.includes("Relatorio de Encerramento da GMUD"));
+assert(closureReportHtml.includes("GMUD-TESTE"));
+assert(closureReportHtml.includes("Atualizacao finalizada sem incidentes"));
+assert(closureReportHtml.includes("<img"));
+assert(closureReportHtml.includes("data:image/png;base64,AA=="));
+assert(closureReportHtml.includes("Relatorio_Tecnico_Evidencia_GMUD481_GER7.pdf"));
+assert(closureReportHtml.includes("Salvar como PDF"));
