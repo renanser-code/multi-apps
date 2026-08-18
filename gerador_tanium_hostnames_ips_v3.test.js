@@ -161,6 +161,19 @@ assert(!genericServerItems.some(item => item.name.includes(".NET Framework")), "
 const catalogNameItems = sandbox.__suggestKBs(["Microsoft server operating system version 24H2 for x64-based Systems"]);
 assert(catalogNameItems.some(item => item.kb === "KB5120233"), "nome do Microsoft Update Catalog 24H2 deve mapear para Server 2025");
 
+const server2012Items = sandbox.__suggestKBs(["LEGADO01 Microsoft Windows Server 2012 R2 (64-bit)"]);
+assert.strictEqual(server2012Items.length, 0, "Windows Server 2012/R2 nao deve receber sugestao automatica de KB");
+assert(getElement("kbSuggestions").innerHTML.includes("Windows Server 2012/2012 R2 sem suporte padrao"));
+assert(getElement("kbSuggestions").innerHTML.includes("10/10/2023"));
+assert(getElement("kbSuggestions").innerHTML.includes("13/10/2026"));
+
+getElement("input").value = "LEGADO01 Microsoft Windows Server 2012 R2 (64-bit)";
+sandbox.__generate();
+const server2012EmailHtml = getElement("emailText").innerHTML;
+assert(server2012EmailHtml.includes("Sistemas operacionais sem suporte padrao"));
+assert(server2012EmailHtml.includes("Windows Server 2012/2012 R2 sem suporte padrao"));
+assert(!server2012EmailHtml.includes("Cumulative Security Updates (Tanium Patch)"));
+
 getElement("schedGmud").value = "GMUD-TESTE";
 getElement("input").value = [
   "VISA011-B Microsoft Windows Server 2022 (64-bit)",
