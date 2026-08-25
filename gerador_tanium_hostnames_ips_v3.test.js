@@ -174,6 +174,23 @@ assert(server2012EmailHtml.includes("Sistemas operacionais sem suporte padrao"))
 assert(server2012EmailHtml.includes("Windows Server 2012/2012 R2 nao sao mais atualizados no ciclo padrao"));
 assert(!server2012EmailHtml.includes("Cumulative Security Updates (Tanium Patch)"));
 
+getElement("input").value = [
+  "PPCFXPRDDB2 Microsoft Windows Server 2022 (64-bit)",
+  "PPCFXPRDFTPE1 Microsoft Windows Server 2022 (64-bit)",
+  "PPSPFSV1 Microsoft Windows Server 2022 (64-bit)"
+].join("\n");
+sandbox.__generate();
+const monitoredAlertsHtml = getElement("monitoredVmAlerts").innerHTML;
+const monitoredAlertEmailHtml = getElement("emailText").innerHTML;
+assert(monitoredAlertsHtml.includes("Alertas de VMs monitoradas"));
+assert(monitoredAlertsHtml.includes("PPCFXPRDDB2"));
+assert(monitoredAlertsHtml.includes("PPCFXPRDFTPE1"));
+assert(monitoredAlertsHtml.includes("PPSPFSV1"));
+assert(monitoredAlertEmailHtml.includes("Alertas de VMs monitoradas"));
+assert(monitoredAlertEmailHtml.includes("PPCFXPRDDB2"));
+assert(monitoredAlertEmailHtml.includes("PPCFXPRDFTPE1"));
+assert(monitoredAlertEmailHtml.includes("PPSPFSV1"));
+
 getElement("schedGmud").value = "GMUD-TESTE";
 getElement("input").value = [
   "VISA011-B Microsoft Windows Server 2022 (64-bit)",

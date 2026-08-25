@@ -86,6 +86,10 @@
       font-size: 11px;
       font-weight: bold;
     }
+    .vm-alert-panel { display:none; border-left:4px solid #ef4444; background:#231316; }
+    .vm-alert-list { padding:10px; line-height:1.55; color:#fecaca; }
+    .vm-alert-item { margin:6px 0; padding:8px; border:1px solid #7f1d1d; background:#1f0f12; border-radius:8px; }
+    .vm-alert-item strong { color:#fff; }
     .status-ligada {
       background: #065f46;
       color: #34d399;
@@ -351,6 +355,11 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
         </div>
       </div>
 
+      <div class="result-box vm-alert-panel" id="monitoredVmAlertsBox">
+        <label style="color: #fecaca; font-size: 16px;">Alertas de VMs monitoradas</label>
+        <div id="monitoredVmAlerts" class="vm-alert-list"></div>
+      </div>
+
       <div class="stats">
         <div class="stat"><strong id="hostCount">0</strong><span>hostnames</span></div>
         <div class="stat"><strong id="ipCount">0</strong><span>IPs</span></div>
@@ -456,6 +465,12 @@ const WINDOWS_SERVER_2012_UNSUPPORTED_NOTICE = {
   os: "Windows Server 2012/2012 R2 nao sao mais atualizados no ciclo padrao",
   message: "O suporte estendido Microsoft encerrou em 10/10/2023. O gerador nao sugere KB automaticamente para este SO. Apenas ambientes/licencas elegiveis com ESU podem receber atualizacoes criticas/importantes ate 13/10/2026; recomenda-se upgrade para uma versao suportada."
 };
+
+const MONITORED_VM_ALERTS = [
+  { name: "PPCFXPRDDB2", message: "VM monitorada: validar tratamento especifico antes do deploy e registrar evidencia no encerramento da GMUD." },
+  { name: "PPCFXPRDFTPE1", message: "VM monitorada: validar tratamento especifico antes do deploy e registrar evidencia no encerramento da GMUD." },
+  { name: "PPSPFSV1", message: "VM monitorada: validar tratamento especifico antes do deploy e registrar evidencia no encerramento da GMUD." }
+];
 
 // API Fetch state
 let isApiLoaded = false;
@@ -580,6 +595,44 @@ function renderUnsupportedOsNotices(notices) {
   return `<div style="margin: 0 0 8px 0; padding: 8px; border-left: 4px solid #f97316; background: #2a1c10; color: #fed7aa; border-radius: 6px;">
     ${notices.map(notice => `<div><strong>${escapeHtml(notice.os)}</strong><br>${escapeHtml(notice.message)}</div>`).join("")}
   </div>`;
+}
+
+function getMonitoredVmAlerts(data) {
+  const parts = [
+    ...(data.lines || []),
+    ...(data.hostnames || []),
+    ...(data.ips || []),
+    ...((data.activeVMs || []).map(vm => `${vm.name} ${vm.info || ""}`)),
+    ...((data.offlineVMs || []).map(vm => `${vm.name} ${vm.info || ""}`)),
+    ...((data.unknownVMs || []).map(vm => `${vm.name} ${vm.info || ""}`))
+  ];
+  const searchText = compactEvidenceIdentifier(parts.join(" "));
+
+  return MONITORED_VM_ALERTS.filter(alert => {
+    const key = compactEvidenceIdentifier(alert.name);
+    return key && searchText.includes(key);
+  });
+}
+
+function renderMonitoredVmAlerts(alerts) {
+  if (!alerts || alerts.length === 0) return "";
+  return `<strong>Alertas de VMs monitoradas</strong>
+    ${alerts.map(alert => `<div class="vm-alert-item"><strong>${escapeHtml(alert.name)}</strong><br>${escapeHtml(alert.message)}</div>`).join("")}`;
+}
+
+function updateMonitoredVmAlerts(alerts) {
+  const box = document.getElementById("monitoredVmAlertsBox");
+  const container = document.getElementById("monitoredVmAlerts");
+  if (!box || !container) return;
+
+  if (!alerts || alerts.length === 0) {
+    box.style.display = "none";
+    container.innerHTML = "";
+    return;
+  }
+
+  box.style.display = "block";
+  container.innerHTML = renderMonitoredVmAlerts(alerts);
 }
 
 function compareBuild(left, right) {
@@ -1282,6 +1335,8 @@ function generate() {
 
   const suggestedKbs = suggestKBs(data.lines).filter(isDeployableCumulativeKb);
   const unsupportedNotices = getUnsupportedWindowsServerNotices(data.lines);
+  const monitoredAlerts = getMonitoredVmAlerts(data);
+  updateMonitoredVmAlerts(monitoredAlerts);
   
   let emailHtml = `Senhores, boa noite.<br><br>Informamos que estamos iniciando as atividades referentes à GMUD ${gmudNumber}, conforme planejamento aprovado.<br><br>A partir deste momento, será dado início ao processo de atualização dos servidores relacionados abaixo:<br><br>`;
   
@@ -1312,6 +1367,13 @@ function generate() {
     } else {
       emailHtml += "[Nenhum servidor identificado]";
     }
+  }
+
+  if (monitoredAlerts.length > 0) {
+    emailHtml += "<br><strong>Alertas de VMs monitoradas:</strong><br>";
+    monitoredAlerts.forEach(alert => {
+      emailHtml += `- <strong>${escapeHtml(alert.name)}</strong>: ${escapeHtml(alert.message)}<br>`;
+    });
   }
 
   emailHtml += "<br><strong>Sistemas Operacionais afetados:</strong><br>";
