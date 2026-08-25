@@ -580,6 +580,11 @@ function getKbOsLabel(item) {
 function detectWindowsServer2012(text) {
   const value = String(text || "").toLowerCase();
   return value.includes("windows server 2012")
+    || value.includes("microsoft server 2012")
+    || value.includes("server 2012")
+    || value.includes("windows 2012")
+    || value.includes("win2012")
+    || value.includes("ws2012")
     || value.includes("2012 r2")
     || value.includes("srv12")
     || value.includes("server12");
@@ -1026,17 +1031,79 @@ function findIps(line) {
   return matches.filter(ip => !ignoreInvalid || isValidIp(ip));
 }
 
+const HOSTNAME_WORD_DENYLIST = new Set([
+  "senhores", "senhoras", "boa", "bom", "noite", "dia", "tarde", "cliente", "gmud",
+  "executor", "status", "enviada", "evidencia", "observacao", "observacoes", "renan",
+  "serafim", "pires", "microsoft", "windows", "server", "linux", "ubuntu", "almalinux",
+  "centos", "redhat", "debian", "oracle", "sistema", "sistemas", "operacionais",
+  "patch", "patches", "security", "update", "updates", "cumulative", "version",
+  "based", "systems", "complete", "pending", "failed", "reboot", "required", "parent",
+  "currently", "targeted", "all", "applied"
+]);
+
+const HOSTNAME_INFRA_PREFIXES = new Set([
+  "AD", "APP", "DB", "DC", "FS", "FTP", "FW", "HYP", "LIN", "LNX", "PRD", "SAP",
+  "SQL", "SRV", "SV", "VDI", "WEB", "WIN", "WS"
+]);
+
+function normalizeHostnameToken(token) {
+  return String(token || "")
+    .trim()
+    .replace(/^[\s\-*]+/g, "")
+    .replace(/^[([{<]+/g, "")
+    .replace(/[\])}>:;,]+$/g, "")
+    .replace(/\.$/, "")
+    .trim();
+}
+
+function isKnownCmdbHostnameToken(value) {
+  const key = String(value || "").toLowerCase().split(".")[0];
+  if (!key || !Array.isArray(cmdbDatabase)) return false;
+  return cmdbDatabase.some(server => {
+    if (!server || !server.HostName) return false;
+    return String(server.HostName).toLowerCase().split(".")[0] === key;
+  });
+}
+
+function hasValidFqdnShape(value) {
+  const labels = String(value || "").split(".");
+  return labels.length > 1 && labels.every(label => /^[A-Za-z0-9][A-Za-z0-9-]{0,62}$/.test(label));
+}
+
+function isLikelyHostnameToken(token) {
+  const value = normalizeHostnameToken(token);
+  if (!value || value.length < 3 || value.length > 253) return false;
+  if (isValidIp(value)) return false;
+  if (!/[A-Za-z]/.test(value)) return false;
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)) return false;
+  if (/@/.test(value)) return false;
+
+  const shortName = value.split(".")[0];
+  const lowerShortName = shortName.toLowerCase();
+  if (HOSTNAME_WORD_DENYLIST.has(lowerShortName)) return false;
+  if (/^(gmud|kb|os|ip|ipv)\b/i.test(shortName)) return false;
+  if (/^\d/.test(shortName)) return false;
+  if (/^(x86|x64|amd64|arm64)(-|$)/i.test(shortName)) return false;
+
+  if (isKnownCmdbHostnameToken(value)) return true;
+  if (/[0-9]/.test(shortName)) return true;
+  if (hasValidFqdnShape(value)) return true;
+
+  if (shortName.includes("-")) {
+    const prefix = shortName.split("-")[0].toUpperCase();
+    return HOSTNAME_INFRA_PREFIXES.has(prefix);
+  }
+
+  return false;
+}
+
 function findHostname(line) {
   const tokens = line.trim().split(/\s+/);
   const beforeDot = document.getElementById("beforeDot").checked;
 
   for (let token of tokens) {
-    token = token.replace(/[;,]+$/g, "").trim();
-    if (!token) continue;
-    if (isValidIp(token)) continue;
-    if (!/[A-Za-z]/.test(token)) continue;
-
-    if (/^[A-Za-z0-9][A-Za-z0-9.-]*$/.test(token)) {
+    token = normalizeHostnameToken(token);
+    if (isLikelyHostnameToken(token)) {
       return beforeDot ? token.split(".")[0] : token;
     }
   }
@@ -1370,7 +1437,8 @@ function generate() {
   }
 
   if (monitoredAlerts.length > 0) {
-    emailHtml += "<br><strong>Alertas de VMs monitoradas:</strong><br>";
+    emailHtml += "<br><strong>ATENCAO - VMs PRIORITARIAS:</strong><br>";
+    emailHtml += "As VMs abaixo exigem acompanhamento prioritario e devem ficar evidentes para o cliente durante a comunicacao da GMUD:<br>";
     monitoredAlerts.forEach(alert => {
       emailHtml += `- <strong>${escapeHtml(alert.name)}</strong>: ${escapeHtml(alert.message)}<br>`;
     });
@@ -1382,6 +1450,8 @@ function generate() {
     osNames.forEach(os => {
       emailHtml += `- ${os}<br>`;
     });
+  } else if (unsupportedNotices.length > 0) {
+    emailHtml += "- Windows Server 2012/2012 R2 (sem atualizacao padrao)<br>";
   } else {
     emailHtml += "- Windows Server / Client (Padrão)<br>";
   }
