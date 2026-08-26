@@ -31,6 +31,8 @@
     .stat strong { display:block; font-size:22px; margin-bottom:4px; }
     .stat span { color:#94a3b8; font-size:13px; }
     .badge { display:inline-block; padding:4px 8px; border-radius:999px; background:#0b3b5f; color:#bfdbfe; font-size:12px; font-weight:700; margin-left:8px; }
+    .kb-copy-btn { margin-left:8px; padding:5px 9px; border-radius:6px; background:#2563eb; color:#fff; font-size:12px; line-height:1; vertical-align:middle; }
+    .kb-copy-btn:hover { background:#1d4ed8; }
     .copy-feedback { color:#86efac; font-size:13px; margin-left:4px; display:none; }
     .example { background:#0b1220; border:1px solid #334155; border-radius:10px; padding:10px; color:#cbd5e1; font-family:Consolas, monospace; font-size:13px; line-height:1.45; margin-top:10px; }
     
@@ -1140,6 +1142,15 @@ function makeCombined(hostnames, ips) {
   return "(" + all.join("|") + ")" + (appendWildcard ? ".*" : "");
 }
 
+function renderKbCopyButton(kb) {
+  const kbText = escapeHtml(kb);
+  return `<button type="button" class='kb-copy-btn' data-kb="${kbText}" onclick="copyKbName(this.dataset.kb)" title="Copiar ${kbText}">Copiar KB</button>`;
+}
+
+function renderKbSuggestionItem(item, badgeText, badgeColor) {
+  return `<li><strong>${escapeHtml(item.kb)}</strong> - ${escapeHtml(item.name)} ${renderKbCopyButton(item.kb)} <span class='badge' style='background:${badgeColor}; color:#fff;'>${escapeHtml(badgeText)}</span></li>`;
+}
+
 function suggestKBs(lines) {
   const suggested = new Set();
   const text = lines.join(" ").toLowerCase();
@@ -1191,7 +1202,7 @@ function suggestKBs(lines) {
     const badgeColor = isApiLoaded ? "#8b5cf6" : "#10b981";
     kbItems.forEach(item => {
       items.push(item);
-      html += `<li><strong>${item.kb}</strong> - ${item.name} <span class='badge' style='background:${badgeColor}; color:#fff;'>${badgeText}</span></li>`;
+      html += renderKbSuggestionItem(item, badgeText, badgeColor);
     });
   });
   html += "</ul>";
@@ -2348,6 +2359,29 @@ async function openClosureReportForPdf() {
   reportWindow.focus();
 }
 
+function showCopyFeedback(message = "Copiado!") {
+  const feedback = document.getElementById("feedback");
+  if (!feedback) return;
+  feedback.textContent = message;
+  feedback.style.display = "inline";
+  setTimeout(() => {
+    feedback.style.display = "none";
+    feedback.textContent = "Copiado!";
+  }, 1200);
+}
+
+function copyKbName(kb) {
+  const value = String(kb || "").trim();
+  if (!value) return;
+  const clipboardWrite = typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText
+    ? navigator.clipboard.writeText(value)
+    : null;
+  if (clipboardWrite && clipboardWrite.catch) {
+    clipboardWrite.catch(err => console.warn("Falha ao copiar KB:", err));
+  }
+  showCopyFeedback(`${value} copiado!`);
+}
+
 function copyText(id) {
   const el = document.getElementById(id);
   
@@ -2394,9 +2428,7 @@ function copyText(id) {
     navigator.clipboard.writeText(el.value || "");
   }
   
-  const feedback = document.getElementById("feedback");
-  feedback.style.display = "inline";
-  setTimeout(() => feedback.style.display = "none", 1200);
+  showCopyFeedback();
 }
 
 

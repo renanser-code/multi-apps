@@ -66,13 +66,14 @@ let script = scriptMatch[1];
 script = script.replace(/generate\(\);\s*(?:generateClosure\(\);\s*)?updateScriptPreview\(\);\s*loadLatestKBsFromMicrosoft\(\);/, "");
 
 vm.createContext(sandbox);
-vm.runInContext(`${script}\nthis.__buildKbCatalogFromMsrc = buildKbCatalogFromMsrc;\nthis.__suggestKBs = suggestKBs;\nthis.__generate = generate;\nthis.__processInput = processInput;\nthis.__findHostname = findHostname;\nthis.__setKbCatalog = (catalog) => { KB_CATALOG = catalog; };\nthis.__generateClosure = typeof generateClosure === "function" ? generateClosure : undefined;\nthis.__buildClosureReportHtml = typeof buildClosureReportHtml === "function" ? buildClosureReportHtml : undefined;\nthis.__inferClosureStatusFromEvidenceText = typeof inferClosureStatusFromEvidenceText === "function" ? inferClosureStatusFromEvidenceText : undefined;\nthis.__analyzeClosureEvidenceStatus = typeof analyzeClosureEvidenceStatus === "function" ? analyzeClosureEvidenceStatus : undefined;\nthis.__setClosureEvidenceFiles = (files) => { closureEvidenceFiles = files; };`, sandbox);
+vm.runInContext(`${script}\nthis.__buildKbCatalogFromMsrc = buildKbCatalogFromMsrc;\nthis.__suggestKBs = suggestKBs;\nthis.__generate = generate;\nthis.__processInput = processInput;\nthis.__findHostname = findHostname;\nthis.__copyKbName = typeof copyKbName === "function" ? copyKbName : undefined;\nthis.__setKbCatalog = (catalog) => { KB_CATALOG = catalog; };\nthis.__generateClosure = typeof generateClosure === "function" ? generateClosure : undefined;\nthis.__buildClosureReportHtml = typeof buildClosureReportHtml === "function" ? buildClosureReportHtml : undefined;\nthis.__inferClosureStatusFromEvidenceText = typeof inferClosureStatusFromEvidenceText === "function" ? inferClosureStatusFromEvidenceText : undefined;\nthis.__analyzeClosureEvidenceStatus = typeof analyzeClosureEvidenceStatus === "function" ? analyzeClosureEvidenceStatus : undefined;\nthis.__setClosureEvidenceFiles = (files) => { closureEvidenceFiles = files; };`, sandbox);
 
 assert.strictEqual(typeof sandbox.__buildKbCatalogFromMsrc, "function");
 assert.strictEqual(typeof sandbox.__suggestKBs, "function");
 assert.strictEqual(typeof sandbox.__generate, "function");
 assert.strictEqual(typeof sandbox.__processInput, "function");
 assert.strictEqual(typeof sandbox.__findHostname, "function");
+assert.strictEqual(typeof sandbox.__copyKbName, "function");
 assert.strictEqual(typeof sandbox.__generateClosure, "function");
 assert.strictEqual(typeof sandbox.__buildClosureReportHtml, "function");
 assert.strictEqual(typeof sandbox.__inferClosureStatusFromEvidenceText, "function");
@@ -159,6 +160,11 @@ const genericServerItems = sandbox.__suggestKBs(["Aplicar patch em servidores Wi
 assert(genericServerItems.some(item => item.kb === "KB5120233"), "fallback Windows Server deve incluir Server 2025");
 assert(!genericServerItems.some(item => item.kb === "KB5123303"), "fallback Windows Server nao deve incluir security update avulso");
 assert(!genericServerItems.some(item => item.name.includes(".NET Framework")), "fallback Windows Server nao deve incluir .NET Framework");
+const kbSuggestionHtml = getElement("kbSuggestions").innerHTML;
+assert(kbSuggestionHtml.includes("class='kb-copy-btn'"), "sugestao de KB deve exibir botao para copiar KB");
+assert(kbSuggestionHtml.includes("copyKbName(this.dataset.kb)"), "botao deve chamar copyKbName com data-kb");
+assert(kbSuggestionHtml.includes('data-kb="KB5120233"'), "botao deve carregar o identificador do KB no data-kb");
+assert(kbSuggestionHtml.indexOf("Copiar KB") < kbSuggestionHtml.indexOf("Backup Local"), "botao Copiar KB deve ficar antes do selo Backup Local");
 
 const catalogNameItems = sandbox.__suggestKBs(["Microsoft server operating system version 24H2 for x64-based Systems"]);
 assert(catalogNameItems.some(item => item.kb === "KB5120233"), "nome do Microsoft Update Catalog 24H2 deve mapear para Server 2025");

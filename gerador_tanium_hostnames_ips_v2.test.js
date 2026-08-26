@@ -64,11 +64,21 @@ vm.runInContext(`${script}
 this.__suggestKBs = suggestKBs;
 this.__generate = generate;
 this.__processInput = processInput;
+this.__copyKbName = typeof copyKbName === "function" ? copyKbName : undefined;
 `, sandbox);
 
 assert.strictEqual(typeof sandbox.__suggestKBs, "function");
 assert.strictEqual(typeof sandbox.__generate, "function");
 assert.strictEqual(typeof sandbox.__processInput, "function");
+assert.strictEqual(typeof sandbox.__copyKbName, "function");
+
+const kbItems = sandbox.__suggestKBs(["VISA011-B Microsoft Windows Server 2022 (64-bit)"]);
+assert(kbItems.some(item => item.kb), "entrada Windows Server 2022 deve sugerir KB");
+const kbSuggestionHtml = getElement("kbSuggestions").innerHTML;
+assert(kbSuggestionHtml.includes("class='kb-copy-btn'"), "sugestao de KB deve exibir botao para copiar KB");
+assert(kbSuggestionHtml.includes("copyKbName(this.dataset.kb)"), "botao deve chamar copyKbName com data-kb");
+assert(kbSuggestionHtml.includes('data-kb="'), "botao deve carregar o identificador do KB no data-kb");
+assert(kbSuggestionHtml.indexOf("Copiar KB") < kbSuggestionHtml.indexOf("Backup Local"), "botao Copiar KB deve ficar antes do selo Backup Local");
 
 const shortServer2012Items = sandbox.__suggestKBs(["LEGADO02 Microsoft Server 2012 x64"]);
 assert.strictEqual(shortServer2012Items.length, 0, "Server 2012 escrito de forma curta nao deve receber sugestao automatica de KB");
