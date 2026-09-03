@@ -175,6 +175,8 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
       <div class="row">
         <button class="primary" onclick="generate()">Gerar padrão Tanium</button>
         <button class="blue" onclick="copyText('combinedRegex')">Copiar resultado principal</button>
+        <button class="blue" onclick="copyText('windowsCombinedRegex')">Copiar Windows</button>
+        <button class="success" onclick="copyText('linuxCombinedRegex')">Copiar Linux</button>
         <button class="success" onclick="copyText('hostnameRegex')">Copiar só hostnames</button>
         <button class="success" onclick="copyText('ipRegex')">Copiar só IPs</button>
         <button class="purple" onclick="copyText('emailText')">Copiar texto p/ E-mail</button>
@@ -201,19 +203,6 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
         <div class="stat"><strong id="lineCount">0</strong><span>linhas processadas</span></div>
       </div>
 
-      <!-- Generated Email text area box -->
-      <div class="result-box" style="border-left: 4px solid #8b5cf6; background: #1a1525;">
-        <label style="color: #c084fc; font-size: 16px;">📧 Texto pronto para E-mail (Lista de VMs)</label>
-        <div id="emailText" contenteditable="true" style="min-height: 180px; font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; background: #020617; border: 1px solid #334155; border-radius: 10px; padding: 12px; overflow-y: auto; color: #f9fafb; white-space: pre-wrap; line-height: 1.5;"></div>
-        <div class="hint">Este texto já vem estruturado em formato Rich Text (HTML). Ao clicar em "Copiar texto p/ E-mail", as VMs em <strong>negrito</strong> serão copiadas formatadas e prontas para colar diretamente no corpo do e-mail do Outlook.</div>
-      </div>
-
-      <div class="result-box">
-        <label for="combinedRegex">Resultado principal - Hostnames + IPs</label>
-        <textarea id="combinedRegex" readonly></textarea>
-        <div class="hint">Este é o resultado no formato: hostnames e IPs dentro do mesmo parêntese, separados por |.</div>
-      </div>
-
       <div class="os-split-grid">
         <div class="result-box">
           <div class="result-title-row">
@@ -232,6 +221,19 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
           <textarea id="linuxCombinedRegex" readonly></textarea>
           <div class="hint">Resultado separado para inserir no Tanium somente com servidores Linux.</div>
         </div>
+      </div>
+
+      <!-- Generated Email text area box -->
+      <div class="result-box" style="border-left: 4px solid #8b5cf6; background: #1a1525;">
+        <label style="color: #c084fc; font-size: 16px;">📧 Texto pronto para E-mail (Lista de VMs)</label>
+        <div id="emailText" contenteditable="true" style="min-height: 180px; font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; background: #020617; border: 1px solid #334155; border-radius: 10px; padding: 12px; overflow-y: auto; color: #f9fafb; white-space: pre-wrap; line-height: 1.5;"></div>
+        <div class="hint">Este texto já vem estruturado em formato Rich Text (HTML). Ao clicar em "Copiar texto p/ E-mail", as VMs em <strong>negrito</strong> serão copiadas formatadas e prontas para colar diretamente no corpo do e-mail do Outlook.</div>
+      </div>
+
+      <div class="result-box">
+        <label for="combinedRegex">Resultado principal - Hostnames + IPs</label>
+        <textarea id="combinedRegex" readonly></textarea>
+        <div class="hint">Este é o resultado no formato: hostnames e IPs dentro do mesmo parêntese, separados por |.</div>
       </div>
 
       <div class="result-box">

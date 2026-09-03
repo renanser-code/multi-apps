@@ -346,6 +346,8 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
       <div class="row">
         <button class="primary" onclick="generate()">Gerar padrão Tanium</button>
         <button class="blue" onclick="copyText('combinedRegex')">Copiar resultado principal</button>
+        <button class="blue" onclick="copyText('windowsCombinedRegex')">Copiar Windows</button>
+        <button class="success" onclick="copyText('linuxCombinedRegex')">Copiar Linux</button>
         <button class="success" onclick="copyText('hostnameRegex')">Copiar só hostnames</button>
         <button class="success" onclick="copyText('ipRegex')">Copiar só IPs</button>
         <button class="purple" onclick="copyText('emailText')">Copiar texto p/ E-mail</button>
@@ -370,6 +372,26 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
         <div class="stat"><strong id="hostCount">0</strong><span>hostnames</span></div>
         <div class="stat"><strong id="ipCount">0</strong><span>IPs</span></div>
         <div class="stat"><strong id="lineCount">0</strong><span>linhas processadas</span></div>
+      </div>
+
+      <div class="os-split-grid">
+        <div class="result-box">
+          <div class="result-title-row">
+            <label for="windowsCombinedRegex">Windows - Hostnames + IPs</label>
+            <button class="secondary mini-copy-btn" onclick="copyText('windowsCombinedRegex')">Copiar Windows</button>
+          </div>
+          <textarea id="windowsCombinedRegex" readonly></textarea>
+          <div class="hint">Resultado separado para inserir no Tanium somente com servidores Windows.</div>
+        </div>
+
+        <div class="result-box">
+          <div class="result-title-row">
+            <label for="linuxCombinedRegex">Linux - Hostnames + IPs</label>
+            <button class="secondary mini-copy-btn" onclick="copyText('linuxCombinedRegex')">Copiar Linux</button>
+          </div>
+          <textarea id="linuxCombinedRegex" readonly></textarea>
+          <div class="hint">Resultado separado para inserir no Tanium somente com servidores Linux.</div>
+        </div>
       </div>
 
       <!-- Generated Email text area box -->
@@ -442,26 +464,6 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
         <label for="combinedRegex">Resultado principal - Hostnames + IPs</label>
         <textarea id="combinedRegex" readonly></textarea>
         <div class="hint">Este é o resultado no formato: hostnames e IPs dentro do mesmo parêntese, separados por |.</div>
-      </div>
-
-      <div class="os-split-grid">
-        <div class="result-box">
-          <div class="result-title-row">
-            <label for="windowsCombinedRegex">Windows - Hostnames + IPs</label>
-            <button class="secondary mini-copy-btn" onclick="copyText('windowsCombinedRegex')">Copiar Windows</button>
-          </div>
-          <textarea id="windowsCombinedRegex" readonly></textarea>
-          <div class="hint">Resultado separado para inserir no Tanium somente com servidores Windows.</div>
-        </div>
-
-        <div class="result-box">
-          <div class="result-title-row">
-            <label for="linuxCombinedRegex">Linux - Hostnames + IPs</label>
-            <button class="secondary mini-copy-btn" onclick="copyText('linuxCombinedRegex')">Copiar Linux</button>
-          </div>
-          <textarea id="linuxCombinedRegex" readonly></textarea>
-          <div class="hint">Resultado separado para inserir no Tanium somente com servidores Linux.</div>
-        </div>
       </div>
 
       <div class="result-box">

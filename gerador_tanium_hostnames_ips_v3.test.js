@@ -78,6 +78,10 @@ assert.strictEqual(typeof sandbox.__generateClosure, "function");
 assert.strictEqual(typeof sandbox.__buildClosureReportHtml, "function");
 assert.strictEqual(typeof sandbox.__inferClosureStatusFromEvidenceText, "function");
 assert.strictEqual(typeof sandbox.__analyzeClosureEvidenceStatus, "function");
+assert(html.includes("copyText('windowsCombinedRegex')"), "acao principal deve permitir copiar somente Windows");
+assert(html.includes("copyText('linuxCombinedRegex')"), "acao principal deve permitir copiar somente Linux");
+assert(html.indexOf("Copiar Windows") < html.indexOf("Copiar só hostnames"), "botao Copiar Windows deve aparecer junto dos botoes principais");
+assert(html.indexOf('id="windowsCombinedRegex"') < html.indexOf('id="emailText"'), "resultado Windows/Linux deve aparecer antes do texto de e-mail");
 
 const baseCatalog = {
   "2016": { kb: "KB0000001", name: "old 2016" },

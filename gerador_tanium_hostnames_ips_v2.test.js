@@ -71,6 +71,10 @@ assert.strictEqual(typeof sandbox.__suggestKBs, "function");
 assert.strictEqual(typeof sandbox.__generate, "function");
 assert.strictEqual(typeof sandbox.__processInput, "function");
 assert.strictEqual(typeof sandbox.__copyKbName, "function");
+assert(html.includes("copyText('windowsCombinedRegex')"), "acao principal deve permitir copiar somente Windows");
+assert(html.includes("copyText('linuxCombinedRegex')"), "acao principal deve permitir copiar somente Linux");
+assert(html.indexOf("Copiar Windows") < html.indexOf("Copiar só hostnames"), "botao Copiar Windows deve aparecer junto dos botoes principais");
+assert(html.indexOf('id="windowsCombinedRegex"') < html.indexOf('id="emailText"'), "resultado Windows/Linux deve aparecer antes do texto de e-mail");
 
 const kbItems = sandbox.__suggestKBs(["VISA011-B Microsoft Windows Server 2022 (64-bit)"]);
 assert(kbItems.some(item => item.kb), "entrada Windows Server 2022 deve sugerir KB");
