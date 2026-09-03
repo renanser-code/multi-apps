@@ -30,6 +30,8 @@
     .workflow-grid { display:grid; grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr); gap:12px; align-items:start; }
     .workflow-grid > .cmdb-section { margin-top:10px; }
     .communication-grid { display:grid; grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr); gap:10px; align-items:start; }
+    .communication-left { min-width:0; }
+    .communication-left .regex-grid { grid-template-columns:1fr; }
     .regex-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; align-items:start; }
     .result-title-row { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:7px; }
     .result-title-row label { margin:0; }
@@ -403,11 +405,31 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
       </div>
 
       <div class="communication-grid">
+      <div class="communication-left">
       <!-- Generated Email text area box -->
       <div class="result-box" style="border-left: 4px solid #8b5cf6; background: #1a1525;">
         <label style="color: #c084fc; font-size: 16px;">📧 Texto pronto para E-mail (Lista de VMs)</label>
         <div id="emailText" contenteditable="true" style="min-height: 180px; font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; background: #020617; border: 1px solid #334155; border-radius: 10px; padding: 12px; overflow-y: auto; color: #f9fafb; white-space: pre-wrap; line-height: 1.5;"></div>
         <div class="hint">Este texto já vem estruturado em formato Rich Text (HTML). Ao clicar em "Copiar texto p/ E-mail", as VMs em <strong>negrito</strong> serão copiadas formatadas e prontas para colar diretamente no corpo do e-mail do Outlook.</div>
+      </div>
+
+      <div class="regex-grid">
+        <div class="result-box">
+          <label for="combinedRegex">Resultado principal - Hostnames + IPs</label>
+          <textarea id="combinedRegex" readonly></textarea>
+          <div class="hint">Este é o resultado no formato: hostnames e IPs dentro do mesmo parêntese, separados por |.</div>
+        </div>
+
+        <div class="result-box">
+          <label for="hostnameRegex">Somente Hostnames</label>
+          <textarea id="hostnameRegex" readonly></textarea>
+        </div>
+
+        <div class="result-box">
+          <label for="ipRegex">Somente IPs</label>
+          <textarea id="ipRegex" readonly></textarea>
+        </div>
+      </div>
       </div>
 
       <div class="result-box" style="border-left: 4px solid #22c55e; background: #102016;">
@@ -468,24 +490,6 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
         <label style="color: #86efac; font-size: 14px; margin-top: 16px;">Texto pronto para E-mail de Encerramento</label>
         <div id="closureEmailText" contenteditable="true" style="min-height: 150px; font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; background: #020617; border: 1px solid #334155; border-radius: 10px; padding: 12px; overflow-y: auto; color: #f9fafb; white-space: pre-wrap; line-height: 1.5;"></div>
       </div>
-      </div>
-
-      <div class="regex-grid">
-        <div class="result-box">
-          <label for="combinedRegex">Resultado principal - Hostnames + IPs</label>
-          <textarea id="combinedRegex" readonly></textarea>
-          <div class="hint">Este é o resultado no formato: hostnames e IPs dentro do mesmo parêntese, separados por |.</div>
-        </div>
-
-        <div class="result-box">
-          <label for="hostnameRegex">Somente Hostnames</label>
-          <textarea id="hostnameRegex" readonly></textarea>
-        </div>
-
-        <div class="result-box">
-          <label for="ipRegex">Somente IPs</label>
-          <textarea id="ipRegex" readonly></textarea>
-        </div>
       </div>
     </div>
   </div>

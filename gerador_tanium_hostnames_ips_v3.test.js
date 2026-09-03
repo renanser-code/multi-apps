@@ -85,6 +85,8 @@ assert(html.indexOf('id="windowsCombinedRegex"') < html.indexOf('id="emailText"'
 assert(html.includes(".container { width:100%; max-width:none;"), "layout deve ocupar toda a largura disponivel");
 assert(html.includes('class="workflow-grid"'), "parser e agendador devem usar grade compacta");
 assert(html.includes('class="communication-grid"'), "e-mails de inicio e encerramento devem usar grade compacta");
+assert(html.includes('class="communication-left"'), "resultados finais devem ocupar o espaco abaixo do e-mail inicial");
+assert(html.includes(".communication-left .regex-grid { grid-template-columns:1fr; }"), "resultados finais devem ficar empilhados na coluna esquerda");
 assert(html.includes('class="regex-grid"'), "resultados finais devem usar grade compacta");
 assert(html.includes("grid-template-columns:repeat(3,minmax(0,1fr))"), "resultados finais devem ter tres colunas em telas largas");
 
