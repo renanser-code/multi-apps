@@ -227,6 +227,22 @@ assert(monitoredAlertEmailHtml.includes("PPCFXPRDFTPE1"));
 assert(monitoredAlertEmailHtml.includes("PPSPFSV1"));
 
 getElement("input").value = [
+  "SV-DBS-BARUEL02 Microsoft Windows Server 2022 (64-bit)",
+  "rdgw\\.mandic.net.br Microsoft Windows Server 2019 (64-bit)",
+  "GER7-PROD01 Microsoft Windows Server 2019 (64-bit)"
+].join("\n");
+sandbox.__generate();
+const databaseAlertsHtml = getElement("monitoredVmAlerts").innerHTML;
+const databaseAlertEmailHtml = getElement("emailText").innerHTML;
+assert(databaseAlertsHtml.includes("Banco de Dados"));
+assert(databaseAlertsHtml.includes("SV-DBS-BARUEL02"));
+assert(databaseAlertsHtml.includes("rdgw.mandic.net.br"));
+assert(databaseAlertsHtml.includes("GER7-PROD01"));
+assert(!databaseAlertsHtml.includes("<strong>GER7-PROD</strong>"));
+assert(databaseAlertEmailHtml.includes("ATENCAO - VMs PRIORITARIAS / BANCO DE DADOS"));
+assert(databaseAlertEmailHtml.includes("[Banco de Dados]"));
+
+getElement("input").value = [
   "WINAPP01 Microsoft Windows Server 2019 (64-bit) 10.10.10.1",
   "SUSEAPP01 SUSE Linux Enterprise 15 10.10.20.1"
 ].join("\n");
