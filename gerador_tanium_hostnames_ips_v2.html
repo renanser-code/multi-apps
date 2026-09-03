@@ -25,6 +25,10 @@
     .purple{background:#8b5cf6;} .orange{background:#f97316;}
     .result-box { background:#111827; border:1px solid #334155; border-radius:12px; padding:14px; margin-top:15px; }
     .result-box textarea { min-height:80px; }
+    .os-split-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px; margin-top:15px; }
+    .result-title-row { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:7px; }
+    .result-title-row label { margin:0; }
+    .mini-copy-btn { padding:8px 10px; border-radius:8px; font-size:12px; white-space:nowrap; }
     .hint { color:#94a3b8; font-size:13px; margin-top:8px; }
     .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; margin-top:15px; }
     .stat { background:#0b1220; border:1px solid #334155; border-radius:12px; padding:12px; }
@@ -208,6 +212,26 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
         <label for="combinedRegex">Resultado principal - Hostnames + IPs</label>
         <textarea id="combinedRegex" readonly></textarea>
         <div class="hint">Este é o resultado no formato: hostnames e IPs dentro do mesmo parêntese, separados por |.</div>
+      </div>
+
+      <div class="os-split-grid">
+        <div class="result-box">
+          <div class="result-title-row">
+            <label for="windowsCombinedRegex">Windows - Hostnames + IPs</label>
+            <button class="secondary mini-copy-btn" onclick="copyText('windowsCombinedRegex')">Copiar Windows</button>
+          </div>
+          <textarea id="windowsCombinedRegex" readonly></textarea>
+          <div class="hint">Resultado separado para inserir no Tanium somente com servidores Windows.</div>
+        </div>
+
+        <div class="result-box">
+          <div class="result-title-row">
+            <label for="linuxCombinedRegex">Linux - Hostnames + IPs</label>
+            <button class="secondary mini-copy-btn" onclick="copyText('linuxCombinedRegex')">Copiar Linux</button>
+          </div>
+          <textarea id="linuxCombinedRegex" readonly></textarea>
+          <div class="hint">Resultado separado para inserir no Tanium somente com servidores Linux.</div>
+        </div>
       </div>
 
       <div class="result-box">
@@ -610,6 +634,124 @@ function makeCombined(hostnames, ips) {
   return "(" + all.join("|") + ")" + (appendWildcard ? ".*" : "");
 }
 
+function normalizeOsDetectionText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function getOsLabelFromText(text) {
+  const value = String(text || "");
+  const normalized = normalizeOsDetectionText(value);
+
+  if (detectWindowsServer2012(value)) return "Windows Server 2012/2012 R2 (sem atualizacao padrao)";
+
+  const serverMatch = value.match(/Windows\s+Server\s+(2016|2019|2022|2025)/i);
+  if (serverMatch) return `Windows Server ${serverMatch[1]}`;
+
+  if (/(?:^|\b)(windows|microsoft)\s+server\s+2016\b|srv16|server16/.test(normalized)) return "Windows Server 2016";
+  if (/(?:^|\b)(windows|microsoft)\s+server\s+2019\b|srv19|server19/.test(normalized)) return "Windows Server 2019";
+  if (/(?:^|\b)(windows|microsoft)\s+server\s+2022\b|srv22|server22|version 21h2/.test(normalized)) return "Windows Server 2022";
+  if (/(?:^|\b)(windows|microsoft)\s+server\s+2025\b|srv25|server25|version 24h2/.test(normalized)) return "Windows Server 2025";
+  if (/windows\s*11|win11|w11/.test(normalized)) return "Windows 11";
+  if (/windows\s*10|win10|w10/.test(normalized)) return "Windows 10";
+  if (/suse linux enterprise|sles/.test(normalized)) return "SUSE Linux Enterprise";
+  if (/red hat enterprise linux|rhel/.test(normalized)) return "Red Hat Enterprise Linux";
+  if (/oracle linux/.test(normalized)) return "Oracle Linux";
+  if (/almalinux/.test(normalized)) return "AlmaLinux";
+  if (/rocky linux/.test(normalized)) return "Rocky Linux";
+
+  const centosMatch = value.match(/CentOS\s+\d+/i);
+  if (centosMatch) return centosMatch[0];
+  if (/centos/.test(normalized)) return "CentOS";
+  if (/ubuntu/.test(normalized)) return "Ubuntu Linux";
+  if (/debian/.test(normalized)) return "Debian Linux";
+  if (/linux/.test(normalized)) return "Linux";
+
+  return "";
+}
+
+function getOsFamily(osLabel) {
+  const normalized = normalizeOsDetectionText(osLabel);
+  if (normalized.includes("windows")) return "windows";
+  if (/linux|ubuntu|centos|suse|sles|rhel|red hat|almalinux|rocky|debian|oracle/.test(normalized)) return "linux";
+  return "";
+}
+
+function createOsEntry(hostname, ips, osText) {
+  const os = getOsLabelFromText(osText);
+  return {
+    hostname: hostname || "",
+    ips: ips || [],
+    os,
+    family: getOsFamily(os)
+  };
+}
+
+function buildOsGroups(entries) {
+  const groups = {
+    windows: { hostnames: [], ips: [] },
+    linux: { hostnames: [], ips: [] }
+  };
+  const osNames = [];
+
+  entries.forEach(entry => {
+    if (entry.os && !osNames.includes(entry.os)) osNames.push(entry.os);
+    if (!entry.family || !groups[entry.family]) return;
+    if (entry.hostname && !isValidIp(entry.hostname)) groups[entry.family].hostnames.push(entry.hostname);
+    (entry.ips || []).forEach(ip => groups[entry.family].ips.push(ip));
+  });
+
+  ["windows", "linux"].forEach(key => {
+    groups[key].hostnames = unique(groups[key].hostnames);
+    groups[key].ips = unique(groups[key].ips);
+    if (document.getElementById("sortList").checked) {
+      groups[key].hostnames.sort((a,b) => a.localeCompare(b));
+      groups[key].ips.sort(numericIpCompare);
+    }
+  });
+
+  return { groups, osNames };
+}
+
+function getKbOsLabel(item) {
+  const name = String(item && item.name ? item.name : "");
+  const serverMatch = name.match(/Windows Server\s+\d{4}/i);
+  if (serverMatch) return serverMatch[0];
+  const windowsMatch = name.match(/Windows\s+(10|11)/i);
+  if (windowsMatch) return windowsMatch[0];
+  return name.split(" Cumulative")[0].split(" Monthly")[0].split(" Security")[0];
+}
+
+function getAffectedOsNames(data, suggestedKbs, unsupportedNotices) {
+  const names = [];
+  (data.osNames || []).forEach(os => {
+    if (os && !names.includes(os)) names.push(os);
+  });
+
+  if (names.length === 0 && suggestedKbs.length > 0) {
+    suggestedKbs.map(getKbOsLabel).forEach(os => {
+      if (os && !names.includes(os)) names.push(os);
+    });
+  }
+
+  if (unsupportedNotices.length > 0 && !names.some(os => os.includes("2012"))) {
+    names.push("Windows Server 2012/2012 R2 (sem atualizacao padrao)");
+  }
+
+  return names;
+}
+
+function updateOsSplitOutputs(data) {
+  const emptyGroups = { windows: { hostnames: [], ips: [] }, linux: { hostnames: [], ips: [] } };
+  const groups = data.osGroups || emptyGroups;
+  const windowsOutput = document.getElementById("windowsCombinedRegex");
+  const linuxOutput = document.getElementById("linuxCombinedRegex");
+  if (windowsOutput) windowsOutput.value = makeCombined(groups.windows.hostnames, groups.windows.ips);
+  if (linuxOutput) linuxOutput.value = makeCombined(groups.linux.hostnames, groups.linux.ips);
+}
+
 function renderKbCopyButton(kb) {
   const kbText = escapeHtml(kb);
   return `<button type="button" class='kb-copy-btn' data-kb="${kbText}" onclick="copyKbName(this.dataset.kb)" title="Copiar ${kbText}">Copiar KB</button>`;
@@ -678,11 +820,14 @@ function processInput() {
 
   let rawHostnames = [];
   let rawIps = [];
+  let rawEntries = [];
 
   lines.forEach(line => {
     const host = findHostname(line);
+    const lineIps = findIps(line);
     if (host) rawHostnames.push(host);
-    rawIps.push(...findIps(line));
+    rawIps.push(...lineIps);
+    rawEntries.push(createOsEntry(host, lineIps, line));
   });
 
   if (document.getElementById("removeDuplicates").checked) {
@@ -751,7 +896,9 @@ function processInput() {
             isRegistered: true,
             serverInfo: matchedServer,
             displayName: matchedServer.HostName || lineHost || matchedServer.IP,
-            ip: matchedServer.IP || (lineIps.length > 0 ? lineIps[0] : "")
+            ip: matchedServer.IP || (lineIps.length > 0 ? lineIps[0] : ""),
+            sourceLine: line,
+            lineOs: getOsLabelFromText(line)
           });
         }
       } else {
@@ -764,7 +911,9 @@ function processInput() {
             detectedServers.push({
               isRegistered: false,
               displayName: nameOrIp,
-              ip: lineIps.length > 0 ? lineIps[0] : ""
+              ip: lineIps.length > 0 ? lineIps[0] : "",
+              sourceLine: line,
+              lineOs: getOsLabelFromText(line)
             });
           }
         }
@@ -777,6 +926,7 @@ function processInput() {
     
     const filteredHostnames = [];
     const filteredIps = [];
+    const scopedEntries = [];
 
     // Second pass: Classify and compile the outputs
     detectedServers.forEach(srv => {
@@ -792,6 +942,11 @@ function processInput() {
           badgeClass = "status-ligada";
           if (info.HostName) filteredHostnames.push(info.HostName.split(".")[0]);
           if (info.IP) filteredIps.push(info.IP);
+          scopedEntries.push(createOsEntry(
+            info.HostName ? info.HostName.split(".")[0] : srv.displayName,
+            info.IP ? [info.IP] : [],
+            info.SO || srv.lineOs || srv.sourceLine
+          ));
           activeVMs.push({ name: srv.displayName, info: details });
         } else if (status.toLowerCase() === "desligada") {
           badgeClass = "status-desligada";
@@ -799,12 +954,22 @@ function processInput() {
           if (!onlyPoweredOn) {
             if (info.HostName) filteredHostnames.push(info.HostName.split(".")[0]);
             if (info.IP) filteredIps.push(info.IP);
+            scopedEntries.push(createOsEntry(
+              info.HostName ? info.HostName.split(".")[0] : srv.displayName,
+              info.IP ? [info.IP] : [],
+              info.SO || srv.lineOs || srv.sourceLine
+            ));
           }
         } else {
           unknownVMs.push({ name: srv.displayName, info: details, reason: `Status do CMDB: ${status}` });
           if (!onlyPoweredOn) {
             if (info.HostName) filteredHostnames.push(info.HostName.split(".")[0]);
             if (info.IP) filteredIps.push(info.IP);
+            scopedEntries.push(createOsEntry(
+              info.HostName ? info.HostName.split(".")[0] : srv.displayName,
+              info.IP ? [info.IP] : [],
+              info.SO || srv.lineOs || srv.sourceLine
+            ));
           }
         }
         
@@ -824,6 +989,9 @@ function processInput() {
             filteredHostnames.push(srv.displayName.split(".")[0]);
             if (srv.ip) filteredIps.push(srv.ip);
           }
+          const entryHost = isValidIp(srv.displayName) ? "" : srv.displayName.split(".")[0];
+          const entryIps = srv.ip ? [srv.ip] : (isValidIp(srv.displayName) ? [srv.displayName] : []);
+          scopedEntries.push(createOsEntry(entryHost, entryIps, srv.lineOs || srv.sourceLine));
         }
         
         listHtml += `<div class="vm-item">
@@ -843,8 +1011,9 @@ function processInput() {
       offlineVMs.sort((a,b) => a.name.localeCompare(b.name));
       unknownVMs.sort((a,b) => a.name.localeCompare(b.name));
     }
-    
-    return { lines, hostnames: finalHostnames, ips: finalIps, activeVMs, offlineVMs, unknownVMs, isCmdbApplied: true };
+
+    const osData = buildOsGroups(scopedEntries);
+    return { lines, hostnames: finalHostnames, ips: finalIps, osGroups: osData.groups, osNames: osData.osNames, activeVMs, offlineVMs, unknownVMs, isCmdbApplied: true };
   } else {
     vmStatusPanel.style.display = "none";
   }
@@ -854,7 +1023,8 @@ function processInput() {
     finalIps.sort(numericIpCompare);
   }
 
-  return { lines, hostnames: finalHostnames, ips: finalIps, isCmdbApplied: false };
+  const osData = buildOsGroups(rawEntries);
+  return { lines, hostnames: finalHostnames, ips: finalIps, osGroups: osData.groups, osNames: osData.osNames, isCmdbApplied: false };
 }
 
 function generate() {
@@ -866,6 +1036,7 @@ function generate() {
   document.getElementById("combinedRegex").value = makeCombined(data.hostnames, data.ips);
   document.getElementById("hostnameRegex").value = makeRegex(data.hostnames, false);
   document.getElementById("ipRegex").value = makeRegex(data.ips, true);
+  updateOsSplitOutputs(data);
 
   document.getElementById("hostCount").innerText = data.hostnames.length;
   document.getElementById("ipCount").innerText = data.ips.length;
@@ -916,13 +1087,11 @@ function generate() {
   }
 
   emailHtml += "<br><strong>Sistemas Operacionais afetados:</strong><br>";
-  if (suggestedKbs.length > 0) {
-    const osNames = suggestedKbs.map(item => item.name.split(" Cumulative")[0].split(" Cumulative Security")[0]);
-    osNames.forEach(os => {
+  const affectedOsNames = getAffectedOsNames(data, suggestedKbs, unsupportedNotices);
+  if (affectedOsNames.length > 0) {
+    affectedOsNames.forEach(os => {
       emailHtml += `- ${os}<br>`;
     });
-  } else if (unsupportedNotices.length > 0) {
-    emailHtml += "- Windows Server 2012/2012 R2 (sem atualizacao padrao)<br>";
   } else {
     emailHtml += "- Windows Server / Client (Padrão)<br>";
   }

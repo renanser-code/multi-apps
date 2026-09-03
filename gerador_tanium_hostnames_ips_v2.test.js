@@ -116,3 +116,20 @@ assert(monitoredAlertEmailHtml.includes("acompanhamento prioritario"));
 assert(monitoredAlertEmailHtml.includes("PPCFXPRDDB2"));
 assert(monitoredAlertEmailHtml.includes("PPCFXPRDFTPE1"));
 assert(monitoredAlertEmailHtml.includes("PPSPFSV1"));
+
+getElement("input").value = [
+  "WINAPP01 Microsoft Windows Server 2019 (64-bit) 10.10.10.1",
+  "SUSEAPP01 SUSE Linux Enterprise 15 10.10.20.1"
+].join("\n");
+sandbox.__generate();
+const windowsRegex = getElement("windowsCombinedRegex").value;
+const linuxRegex = getElement("linuxCombinedRegex").value;
+const mixedOsEmailHtml = getElement("emailText").innerHTML;
+assert(windowsRegex.includes("WINAPP01"));
+assert(windowsRegex.includes("10.10.10.1"));
+assert(!windowsRegex.includes("SUSEAPP01"));
+assert(linuxRegex.includes("SUSEAPP01"));
+assert(linuxRegex.includes("10.10.20.1"));
+assert(!linuxRegex.includes("WINAPP01"));
+assert(mixedOsEmailHtml.includes("Windows Server 2019"));
+assert(mixedOsEmailHtml.includes("SUSE Linux Enterprise"));
