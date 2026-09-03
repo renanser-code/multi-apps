@@ -86,9 +86,11 @@ assert(html.includes(".container { width:100%; max-width:none;"), "layout deve o
 assert(html.includes('class="workflow-grid"'), "parser e agendador devem usar grade compacta");
 assert(html.includes('class="communication-grid"'), "e-mails de inicio e encerramento devem usar grade compacta");
 assert(html.includes('class="communication-left"'), "resultados finais devem ocupar o espaco abaixo do e-mail inicial");
-assert(html.includes(".communication-left .regex-grid { grid-template-columns:1fr; }"), "resultados finais devem ficar empilhados na coluna esquerda");
+assert(html.includes(".communication-left .regex-grid { flex:1; grid-template-columns:1fr;"), "resultados finais devem ficar empilhados na coluna esquerda");
 assert(html.includes('class="regex-grid"'), "resultados finais devem usar grade compacta");
 assert(html.includes("grid-template-columns:repeat(3,minmax(0,1fr))"), "resultados finais devem ter tres colunas em telas largas");
+assert(html.includes("align-items:stretch"), "paineis paralelos devem preencher toda a altura disponivel");
+assert(html.includes("grid-template-rows:repeat(3,minmax(0,1fr))"), "resultados da coluna esquerda devem preencher o espaco vertical");
 
 const baseCatalog = {
   "2016": { kb: "KB0000001", name: "old 2016" },

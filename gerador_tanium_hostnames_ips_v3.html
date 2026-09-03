@@ -27,11 +27,15 @@
     .result-box { background:#111827; border:1px solid #334155; border-radius:8px; padding:11px; margin-top:10px; }
     .result-box textarea { min-height:80px; }
     .os-split-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:10px; margin-top:10px; }
-    .workflow-grid { display:grid; grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr); gap:12px; align-items:start; }
-    .workflow-grid > .cmdb-section { margin-top:10px; }
-    .communication-grid { display:grid; grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr); gap:10px; align-items:start; }
-    .communication-left { min-width:0; }
-    .communication-left .regex-grid { grid-template-columns:1fr; }
+    .workflow-grid { display:grid; grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr); gap:12px; align-items:stretch; }
+    .workflow-grid > .cmdb-section { display:flex; flex-direction:column; height:100%; margin-top:10px; }
+    .workflow-grid > .cmdb-section:first-child #gmudEmailRaw { flex:1; }
+    .communication-grid { display:grid; grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr); gap:10px; align-items:stretch; }
+    .communication-grid > .result-box { height:100%; }
+    .communication-left { display:flex; flex-direction:column; min-width:0; }
+    .communication-left .regex-grid { flex:1; grid-template-columns:1fr; grid-template-rows:repeat(3,minmax(0,1fr)); }
+    .communication-left .regex-grid .result-box { display:flex; flex-direction:column; min-height:0; }
+    .communication-left .regex-grid textarea { flex:1; min-height:80px; }
     .regex-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; align-items:start; }
     .result-title-row { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:7px; }
     .result-title-row label { margin:0; }
@@ -167,7 +171,11 @@
     .closure-file-list { margin-top:10px; background:#020617; border:1px solid #334155; border-radius:10px; padding:10px; color:#cbd5e1; font-size:13px; line-height:1.5; }
     .closure-file-item { display:flex; justify-content:space-between; gap:12px; padding:6px 0; border-bottom:1px solid #1f2937; }
     .closure-file-item:last-child { border-bottom:0; }
-    @media (max-width:1100px){ .workflow-grid,.communication-grid,.regex-grid{grid-template-columns:1fr;} }
+    @media (max-width:1100px){
+      .workflow-grid,.communication-grid,.regex-grid{grid-template-columns:1fr;}
+      .communication-left .regex-grid{grid-template-rows:none;}
+      .workflow-grid > .cmdb-section,.communication-grid > .result-box{height:auto;}
+    }
   </style>
 </head>
 <body>
