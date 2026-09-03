@@ -82,6 +82,11 @@ assert(html.includes("copyText('windowsCombinedRegex')"), "acao principal deve p
 assert(html.includes("copyText('linuxCombinedRegex')"), "acao principal deve permitir copiar somente Linux");
 assert(html.indexOf("Copiar Windows") < html.indexOf("Copiar só hostnames"), "botao Copiar Windows deve aparecer junto dos botoes principais");
 assert(html.indexOf('id="windowsCombinedRegex"') < html.indexOf('id="emailText"'), "resultado Windows/Linux deve aparecer antes do texto de e-mail");
+assert(html.includes(".container { width:100%; max-width:none;"), "layout deve ocupar toda a largura disponivel");
+assert(html.includes('class="workflow-grid"'), "parser e agendador devem usar grade compacta");
+assert(html.includes('class="communication-grid"'), "e-mails de inicio e encerramento devem usar grade compacta");
+assert(html.includes('class="regex-grid"'), "resultados finais devem usar grade compacta");
+assert(html.includes("grid-template-columns:repeat(3,minmax(0,1fr))"), "resultados finais devem ter tres colunas em telas largas");
 
 const baseCatalog = {
   "2016": { kb: "KB0000001", name: "old 2016" },
