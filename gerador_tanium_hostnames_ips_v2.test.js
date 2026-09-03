@@ -134,8 +134,11 @@ assert(databaseAlertsHtml.includes("SV-DBS-BARUEL02"));
 assert(databaseAlertsHtml.includes("rdgw.mandic.net.br"));
 assert(databaseAlertsHtml.includes("GER7-PROD01"));
 assert(!databaseAlertsHtml.includes("<strong>GER7-PROD</strong>"));
-assert(databaseAlertEmailHtml.includes("ATENCAO - VMs PRIORITARIAS / BANCO DE DADOS"));
-assert(databaseAlertEmailHtml.includes("[Banco de Dados]"));
+assert(databaseAlertEmailHtml.includes("ATENCAO: SERVIDORES DE BANCO DE DADOS"));
+assert(databaseAlertEmailHtml.includes("[BANCO DE DADOS]"));
+assert(databaseAlertEmailHtml.includes("background-color:#b91c1c"));
+assert(databaseAlertEmailHtml.includes("background-color:#fff1f2"));
+assert(databaseAlertEmailHtml.includes("acompanhamento prioritario durante toda a GMUD"));
 
 getElement("input").value = [
   "WINAPP01 Microsoft Windows Server 2019 (64-bit) 10.10.10.1",

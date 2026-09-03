@@ -1144,12 +1144,23 @@ function generate() {
     }
   }
 
-  if (monitoredAlerts.length > 0) {
-    emailHtml += "<br><strong>ATENCAO - VMs PRIORITARIAS / BANCO DE DADOS:</strong><br>";
-    emailHtml += "As VMs abaixo exigem acompanhamento prioritario e devem ficar evidentes para o cliente durante a comunicacao da GMUD:<br>";
-    monitoredAlerts.forEach(alert => {
-      const typeText = alert.type ? ` [${escapeHtml(alert.type)}]` : "";
-      emailHtml += `- <strong>${escapeHtml(alert.name)}</strong>${typeText}: ${escapeHtml(alert.message)}<br>`;
+  const databaseAlerts = monitoredAlerts.filter(alert => alert.type && alert.type.includes("Banco de Dados"));
+  const priorityAlerts = monitoredAlerts.filter(alert => !alert.type || !alert.type.includes("Banco de Dados"));
+
+  if (databaseAlerts.length > 0) {
+    emailHtml += '<br><table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;font-family:Segoe UI,Arial,sans-serif;">';
+    emailHtml += '<tr><td style="background-color:#b91c1c;color:#ffffff;padding:10px 12px;border:1px solid #991b1b;font-size:16px;"><strong>ATENCAO: SERVIDORES DE BANCO DE DADOS</strong></td></tr>';
+    emailHtml += '<tr><td style="background-color:#fff1f2;color:#7f1d1d;padding:12px;border:1px solid #f87171;"><strong>Os servidores abaixo sao bancos de dados e exigem acompanhamento prioritario durante toda a GMUD:</strong><br><br>';
+    databaseAlerts.forEach(alert => {
+      emailHtml += `&#9888; <strong style="color:#b91c1c;font-size:15px;">${escapeHtml(alert.name)}</strong> <strong>[BANCO DE DADOS]</strong><br>${escapeHtml(alert.message)}<br><br>`;
+    });
+    emailHtml += '</td></tr></table>';
+  }
+
+  if (priorityAlerts.length > 0) {
+    emailHtml += "<br><strong>ATENCAO - VMs PRIORITARIAS:</strong><br>";
+    priorityAlerts.forEach(alert => {
+      emailHtml += `- <strong>${escapeHtml(alert.name)}</strong>: ${escapeHtml(alert.message)}<br>`;
     });
   }
 
