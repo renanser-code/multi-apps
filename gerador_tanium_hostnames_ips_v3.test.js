@@ -66,7 +66,7 @@ let script = scriptMatch[1];
 script = script.replace(/generate\(\);\s*(?:generateClosure\(\);\s*)?updateScriptPreview\(\);\s*loadLatestKBsFromMicrosoft\(\);/, "");
 
 vm.createContext(sandbox);
-vm.runInContext(`${script}\nthis.__buildKbCatalogFromMsrc = buildKbCatalogFromMsrc;\nthis.__suggestKBs = suggestKBs;\nthis.__generate = generate;\nthis.__processInput = processInput;\nthis.__findHostname = findHostname;\nthis.__copyKbName = typeof copyKbName === "function" ? copyKbName : undefined;\nthis.__setKbCatalog = (catalog) => { KB_CATALOG = catalog; };\nthis.__generateClosure = typeof generateClosure === "function" ? generateClosure : undefined;\nthis.__buildClosureReportHtml = typeof buildClosureReportHtml === "function" ? buildClosureReportHtml : undefined;\nthis.__inferClosureStatusFromEvidenceText = typeof inferClosureStatusFromEvidenceText === "function" ? inferClosureStatusFromEvidenceText : undefined;\nthis.__analyzeClosureEvidenceStatus = typeof analyzeClosureEvidenceStatus === "function" ? analyzeClosureEvidenceStatus : undefined;\nthis.__setClosureEvidenceFiles = (files) => { closureEvidenceFiles = files; };`, sandbox);
+vm.runInContext(`${script}\nthis.__buildKbCatalogFromMsrc = buildKbCatalogFromMsrc;\nthis.__suggestKBs = suggestKBs;\nthis.__generate = generate;\nthis.__processInput = processInput;\nthis.__findHostname = findHostname;\nthis.__copyKbName = typeof copyKbName === "function" ? copyKbName : undefined;\nthis.__setKbCatalog = (catalog) => { KB_CATALOG = catalog; };\nthis.__generateClosure = typeof generateClosure === "function" ? generateClosure : undefined;\nthis.__buildClosureReportHtml = typeof buildClosureReportHtml === "function" ? buildClosureReportHtml : undefined;\nthis.__inferClosureStatusFromEvidenceText = typeof inferClosureStatusFromEvidenceText === "function" ? inferClosureStatusFromEvidenceText : undefined;\nthis.__analyzeClosureEvidenceStatus = typeof analyzeClosureEvidenceStatus === "function" ? analyzeClosureEvidenceStatus : undefined;\nthis.__enrichEvidenceTextWithFuzzyServerAliases = typeof enrichEvidenceTextWithFuzzyServerAliases === "function" ? enrichEvidenceTextWithFuzzyServerAliases : undefined;\nthis.__reconcileClosureInferenceWithScope = typeof reconcileClosureInferenceWithScope === "function" ? reconcileClosureInferenceWithScope : undefined;\nthis.__setClosureEvidenceFiles = (files) => { closureEvidenceFiles = files; };`, sandbox);
 
 assert.strictEqual(typeof sandbox.__buildKbCatalogFromMsrc, "function");
 assert.strictEqual(typeof sandbox.__suggestKBs, "function");
@@ -78,6 +78,8 @@ assert.strictEqual(typeof sandbox.__generateClosure, "function");
 assert.strictEqual(typeof sandbox.__buildClosureReportHtml, "function");
 assert.strictEqual(typeof sandbox.__inferClosureStatusFromEvidenceText, "function");
 assert.strictEqual(typeof sandbox.__analyzeClosureEvidenceStatus, "function");
+assert.strictEqual(typeof sandbox.__enrichEvidenceTextWithFuzzyServerAliases, "function");
+assert.strictEqual(typeof sandbox.__reconcileClosureInferenceWithScope, "function");
 assert(html.includes("copyText('windowsCombinedRegex')"), "acao principal deve permitir copiar somente Windows");
 assert(html.includes("copyText('linuxCombinedRegex')"), "acao principal deve permitir copiar somente Linux");
 assert(html.indexOf("Copiar Windows") < html.indexOf("Copiar só hostnames"), "botao Copiar Windows deve aparecer junto dos botoes principais");
@@ -391,3 +393,59 @@ assert(successStatus.reason.includes("Complete"));
 const warningStatus = sandbox.__inferClosureStatusFromEvidenceText("Status Pending Error Failed Reboot Required");
 assert.strictEqual(warningStatus.status, "Concluída com ressalvas");
 assert(warningStatus.reason.includes("pendencia"));
+
+getElement("input").value = [
+  "VWCSC001 Microsoft Windows Server 2022 (64-bit)",
+  "VWCSC014 Microsoft Windows Server 2022 (64-bit)",
+  "VWCSC016 Microsoft Windows Server 2022 (64-bit)",
+  "VWCSC017 Microsoft Windows Server 2022 (64-bit)",
+  "VWCSC018 Microsoft Windows Server 2022 (64-bit)",
+  "VWCSC019 Microsoft Windows Server 2022 (64-bit)"
+].join("\n");
+getElement("closureObservations").value = "";
+sandbox.__setClosureEvidenceFiles([{
+  name: "gmud-701.png",
+  type: "image/png",
+  size: 731136,
+  dataUrl: "data:image/png;base64,FF==",
+  ocrAnalyzed: true,
+  ocrText: [
+    "VWCSC001.grupo.jm Complete All Patches Applied Yes",
+    "VWCSC014.grupo.jm Complete All Patches Applied Yes",
+    "VWCSC0G16.grupo.jm Complete All Patches Applied Yes",
+    "VWCSC0T7.grupo.jm Complete All Patches Applied Yes",
+    "VWCSC018.grupo.jm Complete All Patches Applied Yes",
+    "VWCSC019.grupo.jm Complete All Patches Applied Yes"
+  ].join("\n")
+}]);
+const fuzzyOcrReportHtml = sandbox.__buildClosureReportHtml();
+["VWCSC001", "VWCSC014", "VWCSC016", "VWCSC017", "VWCSC018", "VWCSC019"].forEach(host => {
+  assert(fuzzyOcrReportHtml.includes(`<td>${host}</td><td>Windows Server 2022</td><td>Complete, All Patches Applied</td>`), `${host} deve ser correlacionado mesmo com erro simples de OCR`);
+});
+assert(!fuzzyOcrReportHtml.includes("Nao evidenciado no encerramento"));
+const completeScopeInference = sandbox.__reconcileClosureInferenceWithScope(successStatus);
+assert.strictEqual(completeScopeInference.status, "Concluída com sucesso", "todos os hosts evidenciados devem permitir sucesso");
+
+sandbox.__setClosureEvidenceFiles([{
+  name: "gmud-701-incompleta.png",
+  type: "image/png",
+  size: 731136,
+  dataUrl: "data:image/png;base64,GG==",
+  ocrAnalyzed: true,
+  ocrText: [
+    "VWCSC001.grupo.jm Complete All Patches Applied Yes",
+    "VWCSC014.grupo.jm Complete All Patches Applied Yes",
+    "VWCSC018.grupo.jm Complete All Patches Applied Yes",
+    "VWCSC019.grupo.jm Complete All Patches Applied Yes"
+  ].join("\n")
+}]);
+const incompleteScopeInference = sandbox.__reconcileClosureInferenceWithScope(successStatus);
+assert.strictEqual(incompleteScopeInference.status, "Concluída com ressalvas", "status geral nao pode ser sucesso com hosts ausentes");
+assert(incompleteScopeInference.reason.includes("2 de 6 servidor(es)"));
+
+const ambiguousOcrText = sandbox.__enrichEvidenceTextWithFuzzyServerAliases(
+  "VWCSC01G Complete All Patches Applied",
+  [{ name: "VWCSC016", info: "" }, { name: "VWCSC018", info: "" }]
+);
+assert(!ambiguousOcrText.includes("VWCSC016"), "OCR ambiguo nao deve validar VWCSC016 automaticamente");
+assert(!ambiguousOcrText.includes("VWCSC018"), "OCR ambiguo nao deve validar VWCSC018 automaticamente");

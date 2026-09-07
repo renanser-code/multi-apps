@@ -1866,6 +1866,107 @@ function canonicalEvidenceIdentifier(value) {
     .replace(/s/g, "5");
 }
 
+function evidenceIdentifierDistance(left, right) {
+  const a = String(left || "");
+  const b = String(right || "");
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+
+  let previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+  for (let row = 1; row <= a.length; row++) {
+    const current = [row];
+    for (let column = 1; column <= b.length; column++) {
+      const substitution = previous[column - 1] + (a[row - 1] === b[column - 1] ? 0 : 1);
+      current[column] = Math.min(previous[column] + 1, current[column - 1] + 1, substitution);
+    }
+    previous = current;
+  }
+  return previous[b.length];
+}
+
+function getEvidenceIdentifierTokens(text) {
+  const tokens = [];
+  String(text || "").split(/\r?\n/).forEach((line, lineIndex) => {
+    const matches = line.match(/[a-z0-9][a-z0-9._-]{4,}/gi) || [];
+    matches.forEach(raw => {
+      const variants = unique([raw, raw.split(".")[0]]);
+      variants.forEach(variant => {
+        const compact = compactEvidenceIdentifier(variant);
+        if (compact.length < 6 || !/[a-z]/i.test(variant) || !/\d/.test(variant)) return;
+        tokens.push({ raw: variant, compact, canonical: canonicalEvidenceIdentifier(variant), lineIndex });
+      });
+    });
+  });
+  return tokens;
+}
+
+function enrichEvidenceTextWithFuzzyServerAliases(text, servers) {
+  const source = String(text || "");
+  if (!source.trim() || !Array.isArray(servers) || servers.length === 0) return source;
+
+  const tokens = getEvidenceIdentifierTokens(source);
+  if (tokens.length === 0) return source;
+
+  const serverAliases = servers.map(server => getClosureServerAliases(server)
+    .map(alias => ({ compact: compactEvidenceIdentifier(alias), canonical: canonicalEvidenceIdentifier(alias) }))
+    .filter(alias => alias.compact.length >= 6));
+  const exactServerIndexes = new Set();
+  const reservedTokenIndexes = new Set();
+
+  serverAliases.forEach((aliases, serverIndex) => {
+    tokens.forEach((token, tokenIndex) => {
+      if (aliases.some(alias => alias.compact === token.compact || alias.canonical === token.canonical)) {
+        exactServerIndexes.add(serverIndex);
+        reservedTokenIndexes.add(tokenIndex);
+      }
+    });
+  });
+
+  const candidates = [];
+  serverAliases.forEach((aliases, serverIndex) => {
+    if (exactServerIndexes.has(serverIndex)) return;
+    tokens.forEach((token, tokenIndex) => {
+      if (reservedTokenIndexes.has(tokenIndex)) return;
+      let distance = Infinity;
+      aliases.forEach(alias => {
+        if (Math.abs(alias.compact.length - token.compact.length) > 1) return;
+        distance = Math.min(
+          distance,
+          evidenceIdentifierDistance(alias.compact, token.compact),
+          evidenceIdentifierDistance(alias.canonical, token.canonical)
+        );
+      });
+      if (distance === 1) candidates.push({ serverIndex, tokenIndex, distance });
+    });
+  });
+
+  const additionsByLine = new Map();
+  const assignedServers = new Set();
+  const assignedTokens = new Set();
+  candidates.forEach(candidate => {
+    if (assignedServers.has(candidate.serverIndex) || assignedTokens.has(candidate.tokenIndex)) return;
+    const competingServers = candidates.filter(item =>
+      item.tokenIndex === candidate.tokenIndex
+      && !assignedServers.has(item.serverIndex)
+      && item.distance === candidate.distance
+    );
+    if (competingServers.length !== 1) return;
+
+    assignedServers.add(candidate.serverIndex);
+    assignedTokens.add(candidate.tokenIndex);
+    const lineIndex = tokens[candidate.tokenIndex].lineIndex;
+    if (!additionsByLine.has(lineIndex)) additionsByLine.set(lineIndex, []);
+    additionsByLine.get(lineIndex).push(String(servers[candidate.serverIndex].name || ""));
+  });
+
+  if (additionsByLine.size === 0) return source;
+  return source.split(/\r?\n/).map((line, lineIndex) => {
+    const additions = additionsByLine.get(lineIndex);
+    return additions && additions.length ? `${line} ${additions.join(" ")}` : line;
+  }).join("\n");
+}
+
 function getClosureServerAliases(server) {
   const aliases = [];
   const name = String(server && server.name ? server.name : "").trim();
@@ -1969,12 +2070,13 @@ function inferClosureResultFromEvidence(server, evidenceText, allServers) {
 }
 
 function applyEvidenceResultsToServers(servers, evidenceText, observationText, evidenceState) {
-  const hasEvidenceText = !!String(evidenceText || "").trim();
+  const correlatedEvidenceText = enrichEvidenceTextWithFuzzyServerAliases(evidenceText, servers);
+  const hasEvidenceText = !!String(correlatedEvidenceText || "").trim();
   const hasAnyServerEvidenceContext = hasEvidenceText
-    && servers.some(server => !!getServerEvidenceContext(evidenceText, server, servers));
+    && servers.some(server => !!getServerEvidenceContext(correlatedEvidenceText, server, servers));
 
   return servers.map(server => {
-    const evidenceContext = getServerEvidenceContext(evidenceText, server, servers);
+    const evidenceContext = getServerEvidenceContext(correlatedEvidenceText, server, servers);
     const evidenceResult = inferClosureResultFromEvidenceContext(evidenceContext);
 
     if (evidenceResult) {
@@ -2061,6 +2163,26 @@ function getClosureServerItems(data, observations = "") {
   }
 
   return [];
+}
+
+function reconcileClosureInferenceWithScope(inference) {
+  const data = processInput();
+  const observationsElement = document.getElementById("closureObservations");
+  const observations = observationsElement ? observationsElement.value : "";
+  const servers = getClosureServerItems(data, observations);
+  if (servers.length === 0) return inference;
+
+  const reviewServers = servers.filter(server => {
+    const result = normalizeEvidenceText(server.result || "");
+    return server.evidenceState !== "evidenced"
+      || /ressalva|falha|pendente|nao evidenciado|validar/.test(result);
+  });
+
+  if (reviewServers.length === 0) return inference;
+  return {
+    status: "Concluída com ressalvas",
+    reason: `${reviewServers.length} de ${servers.length} servidor(es) do escopo exigem validacao ou nao foram correlacionados com seguranca na evidencia.`
+  };
 }
 
 function getClosurePayload() {
@@ -2177,10 +2299,60 @@ function preprocessImageForOcr(source) {
     const image = new Image();
     image.onload = () => {
       try {
-        const scale = Math.min(4, Math.max(2, 2200 / Math.max(image.width || 1, image.height || 1)));
+        const imageWidth = Math.max(1, image.width || 1);
+        const imageHeight = Math.max(1, image.height || 1);
+        const probe = document.createElement("canvas");
+        probe.width = imageWidth;
+        probe.height = imageHeight;
+        const probeContext = probe.getContext && probe.getContext("2d");
+        let cropX = 0;
+        let cropY = 0;
+        let cropWidth = imageWidth;
+        let cropHeight = imageHeight;
+
+        if (probeContext) {
+          probeContext.drawImage(image, 0, 0, imageWidth, imageHeight);
+          const probeData = probeContext.getImageData(0, 0, imageWidth, imageHeight).data;
+          const cornerIndexes = [
+            0,
+            (imageWidth - 1) * 4,
+            ((imageHeight - 1) * imageWidth) * 4,
+            ((imageHeight * imageWidth) - 1) * 4
+          ];
+          const backgroundLuminance = cornerIndexes.reduce((sum, index) => (
+            sum + (0.299 * probeData[index]) + (0.587 * probeData[index + 1]) + (0.114 * probeData[index + 2])
+          ), 0) / cornerIndexes.length;
+          let minX = imageWidth;
+          let minY = imageHeight;
+          let maxX = -1;
+          let maxY = -1;
+          const scanStep = imageWidth * imageHeight > 1800000 ? 2 : 1;
+
+          for (let y = 0; y < imageHeight; y += scanStep) {
+            for (let x = 0; x < imageWidth; x += scanStep) {
+              const index = ((y * imageWidth) + x) * 4;
+              const luminance = (0.299 * probeData[index]) + (0.587 * probeData[index + 1]) + (0.114 * probeData[index + 2]);
+              if (Math.abs(luminance - backgroundLuminance) < 12) continue;
+              minX = Math.min(minX, x);
+              minY = Math.min(minY, y);
+              maxX = Math.max(maxX, x);
+              maxY = Math.max(maxY, y);
+            }
+          }
+
+          if (maxX >= minX && maxY >= minY) {
+            const padding = 10;
+            cropX = Math.max(0, minX - padding);
+            cropY = Math.max(0, minY - padding);
+            cropWidth = Math.min(imageWidth - cropX, (maxX - minX + 1) + (padding * 2));
+            cropHeight = Math.min(imageHeight - cropY, (maxY - minY + 1) + (padding * 2));
+          }
+        }
+
+        const scale = Math.min(4, Math.max(2, 2800 / cropWidth, 1200 / cropHeight));
         const canvas = document.createElement("canvas");
-        canvas.width = Math.max(1, Math.round((image.width || 1) * scale));
-        canvas.height = Math.max(1, Math.round((image.height || 1) * scale));
+        canvas.width = Math.max(1, Math.round(cropWidth * scale));
+        canvas.height = Math.max(1, Math.round(cropHeight * scale));
         const context = canvas.getContext && canvas.getContext("2d");
         if (!context) {
           resolve(source);
@@ -2190,7 +2362,7 @@ function preprocessImageForOcr(source) {
         context.fillStyle = "#ffffff";
         context.fillRect(0, 0, canvas.width, canvas.height);
         context.imageSmoothingEnabled = false;
-        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        context.drawImage(image, cropX, cropY, cropWidth, cropHeight, 0, 0, canvas.width, canvas.height);
 
         const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
         const data = imageData.data;
@@ -2286,7 +2458,7 @@ async function analyzeClosureEvidenceStatus(options = {}) {
   if (targets.length === 0) {
     const existingText = getClosureEvidenceText();
     if (existingText) {
-      const existingInference = inferClosureStatusFromEvidenceText(existingText);
+      const existingInference = reconcileClosureInferenceWithScope(inferClosureStatusFromEvidenceText(existingText));
       document.getElementById("closureStatus").value = existingInference.status;
       feedback.textContent = `OCR: evidencias ja analisadas. ${existingInference.status} sugerido.`;
       feedback.style.color = existingInference.status.includes("sucesso") ? "#86efac" : "#fde68a";
@@ -2318,7 +2490,7 @@ async function analyzeClosureEvidenceStatus(options = {}) {
     }
 
     const combinedText = getClosureEvidenceText();
-    const inference = inferClosureStatusFromEvidenceText(combinedText);
+    const inference = reconcileClosureInferenceWithScope(inferClosureStatusFromEvidenceText(combinedText));
 
     document.getElementById("closureStatus").value = inference.status;
     feedback.textContent = `OCR: ${targets.length} imagem(ns) analisada(s). ${inference.status} sugerido. ${inference.reason}`;
