@@ -33,10 +33,10 @@
     .communication-grid { display:grid; grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr); gap:10px; align-items:stretch; }
     .communication-grid > .result-box { height:100%; }
     .communication-left { display:flex; flex-direction:column; min-width:0; }
-    .communication-left .regex-grid { flex:1; grid-template-columns:1fr; grid-template-rows:repeat(3,minmax(0,1fr)); }
+    .communication-left .regex-grid { flex:1; grid-template-columns:1fr; grid-template-rows:repeat(2,minmax(0,1fr)); }
     .communication-left .regex-grid .result-box { display:flex; flex-direction:column; min-height:0; }
     .communication-left .regex-grid textarea { flex:1; min-height:80px; }
-    .regex-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; align-items:start; }
+    .regex-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; align-items:start; }
     .result-title-row { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:7px; }
     .result-title-row label { margin:0; }
     .mini-copy-btn { padding:8px 10px; border-radius:8px; font-size:12px; white-space:nowrap; }
@@ -183,7 +183,7 @@
     <div class="header">
       <h1>Gerador Tanium <span class="badge" style="background:#8b5cf6;">V3 - ClaraHub Pilot (Agendador)</span></h1>
       <div class="subtitle">
-        Integração com a API CMDB ClaraHub para filtrar VMs ligadas e **Gerador de Script de Agendamento de E-mail do Outlook**.
+        Integração com a API CMDB ClaraHub, saídas de hostnames e IPs separadas por SO e gerador de agendamento de e-mail do Outlook.
       </div>
     </div>
 
@@ -363,9 +363,10 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
 
       <div class="row">
         <button class="primary" onclick="generate()">Gerar padrão Tanium</button>
-        <button class="blue" onclick="copyText('combinedRegex')">Copiar resultado principal</button>
-        <button class="blue" onclick="copyText('windowsCombinedRegex')">Copiar Windows</button>
-        <button class="success" onclick="copyText('linuxCombinedRegex')">Copiar Linux</button>
+        <button class="blue" onclick="copyText('windowsHostnameRegex')">Copiar hostnames Windows</button>
+        <button class="blue" onclick="copyText('windowsIpRegex')">Copiar IPs Windows</button>
+        <button class="success" onclick="copyText('linuxHostnameRegex')">Copiar hostnames Linux</button>
+        <button class="success" onclick="copyText('linuxIpRegex')">Copiar IPs Linux</button>
         <button class="success" onclick="copyText('hostnameRegex')">Copiar só hostnames</button>
         <button class="success" onclick="copyText('ipRegex')">Copiar só IPs</button>
         <button class="purple" onclick="copyText('emailText')">Copiar texto p/ E-mail</button>
@@ -395,20 +396,38 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
       <div class="os-split-grid">
         <div class="result-box">
           <div class="result-title-row">
-            <label for="windowsCombinedRegex">Windows - Hostnames + IPs</label>
-            <button class="secondary mini-copy-btn" onclick="copyText('windowsCombinedRegex')">Copiar Windows</button>
+            <label for="windowsHostnameRegex">Windows - Somente Hostnames</label>
+            <button class="secondary mini-copy-btn" onclick="copyText('windowsHostnameRegex')">Copiar hostnames</button>
           </div>
-          <textarea id="windowsCombinedRegex" readonly></textarea>
-          <div class="hint">Resultado separado para inserir no Tanium somente com servidores Windows.</div>
+          <textarea id="windowsHostnameRegex" readonly></textarea>
+          <div class="hint">Somente hostnames de servidores Windows.</div>
         </div>
 
         <div class="result-box">
           <div class="result-title-row">
-            <label for="linuxCombinedRegex">Linux - Hostnames + IPs</label>
-            <button class="secondary mini-copy-btn" onclick="copyText('linuxCombinedRegex')">Copiar Linux</button>
+            <label for="windowsIpRegex">Windows - Somente IPs</label>
+            <button class="secondary mini-copy-btn" onclick="copyText('windowsIpRegex')">Copiar IPs</button>
           </div>
-          <textarea id="linuxCombinedRegex" readonly></textarea>
-          <div class="hint">Resultado separado para inserir no Tanium somente com servidores Linux.</div>
+          <textarea id="windowsIpRegex" readonly></textarea>
+          <div class="hint">Somente IPs de servidores Windows.</div>
+        </div>
+
+        <div class="result-box">
+          <div class="result-title-row">
+            <label for="linuxHostnameRegex">Linux - Somente Hostnames</label>
+            <button class="secondary mini-copy-btn" onclick="copyText('linuxHostnameRegex')">Copiar hostnames</button>
+          </div>
+          <textarea id="linuxHostnameRegex" readonly></textarea>
+          <div class="hint">Somente hostnames de servidores Linux.</div>
+        </div>
+
+        <div class="result-box">
+          <div class="result-title-row">
+            <label for="linuxIpRegex">Linux - Somente IPs</label>
+            <button class="secondary mini-copy-btn" onclick="copyText('linuxIpRegex')">Copiar IPs</button>
+          </div>
+          <textarea id="linuxIpRegex" readonly></textarea>
+          <div class="hint">Somente IPs de servidores Linux.</div>
         </div>
       </div>
 
@@ -422,12 +441,6 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
       </div>
 
       <div class="regex-grid">
-        <div class="result-box">
-          <label for="combinedRegex">Resultado principal - Hostnames + IPs</label>
-          <textarea id="combinedRegex" readonly></textarea>
-          <div class="hint">Este é o resultado no formato: hostnames e IPs dentro do mesmo parêntese, separados por |.</div>
-        </div>
-
         <div class="result-box">
           <label for="hostnameRegex">Somente Hostnames</label>
           <textarea id="hostnameRegex" readonly></textarea>
@@ -1247,15 +1260,6 @@ function makeRegex(list, isIpList=false) {
   return "(" + processed.join("|") + ")" + (appendWildcard ? ".*" : "");
 }
 
-function makeCombined(hostnames, ips) {
-  const appendWildcard = document.getElementById("appendWildcard").checked;
-  const escapeIps = document.getElementById("escapeIps").checked;
-  const processedIps = ips.map(ip => escapeIps ? escapeIp(ip) : ip);
-  const all = [...hostnames, ...processedIps];
-  if (!all.length) return "";
-  return "(" + all.join("|") + ")" + (appendWildcard ? ".*" : "");
-}
-
 function normalizeOsDetectionText(value) {
   return String(value || "")
     .normalize("NFD")
@@ -1359,10 +1363,16 @@ function getAffectedOsNames(data, suggestedKbs, unsupportedNotices) {
 function updateOsSplitOutputs(data) {
   const emptyGroups = { windows: { hostnames: [], ips: [] }, linux: { hostnames: [], ips: [] } };
   const groups = data.osGroups || emptyGroups;
-  const windowsOutput = document.getElementById("windowsCombinedRegex");
-  const linuxOutput = document.getElementById("linuxCombinedRegex");
-  if (windowsOutput) windowsOutput.value = makeCombined(groups.windows.hostnames, groups.windows.ips);
-  if (linuxOutput) linuxOutput.value = makeCombined(groups.linux.hostnames, groups.linux.ips);
+  const outputs = {
+    windowsHostnameRegex: makeRegex(groups.windows.hostnames, false),
+    windowsIpRegex: makeRegex(groups.windows.ips, true),
+    linuxHostnameRegex: makeRegex(groups.linux.hostnames, false),
+    linuxIpRegex: makeRegex(groups.linux.ips, true)
+  };
+  Object.entries(outputs).forEach(([id, value]) => {
+    const output = document.getElementById(id);
+    if (output) output.value = value;
+  });
 }
 
 function renderKbCopyButton(kb) {
@@ -1654,7 +1664,6 @@ function generate() {
   document.getElementById("cleanHostnames").value = data.hostnames.join("\n");
   document.getElementById("cleanIps").value = data.ips.join("\n");
 
-  document.getElementById("combinedRegex").value = makeCombined(data.hostnames, data.ips);
   document.getElementById("hostnameRegex").value = makeRegex(data.hostnames, false);
   document.getElementById("ipRegex").value = makeRegex(data.ips, true);
   updateOsSplitOutputs(data);

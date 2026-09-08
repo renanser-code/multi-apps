@@ -80,19 +80,23 @@ assert.strictEqual(typeof sandbox.__inferClosureStatusFromEvidenceText, "functio
 assert.strictEqual(typeof sandbox.__analyzeClosureEvidenceStatus, "function");
 assert.strictEqual(typeof sandbox.__enrichEvidenceTextWithFuzzyServerAliases, "function");
 assert.strictEqual(typeof sandbox.__reconcileClosureInferenceWithScope, "function");
-assert(html.includes("copyText('windowsCombinedRegex')"), "acao principal deve permitir copiar somente Windows");
-assert(html.includes("copyText('linuxCombinedRegex')"), "acao principal deve permitir copiar somente Linux");
-assert(html.indexOf("Copiar Windows") < html.indexOf("Copiar só hostnames"), "botao Copiar Windows deve aparecer junto dos botoes principais");
-assert(html.indexOf('id="windowsCombinedRegex"') < html.indexOf('id="emailText"'), "resultado Windows/Linux deve aparecer antes do texto de e-mail");
+assert(html.includes("copyText('windowsHostnameRegex')"), "acao principal deve copiar hostnames Windows");
+assert(html.includes("copyText('windowsIpRegex')"), "acao principal deve copiar IPs Windows");
+assert(html.includes("copyText('linuxHostnameRegex')"), "acao principal deve copiar hostnames Linux");
+assert(html.includes("copyText('linuxIpRegex')"), "acao principal deve copiar IPs Linux");
+assert(html.indexOf("Copiar hostnames Windows") < html.indexOf("Copiar só hostnames"), "botoes por SO devem aparecer junto dos botoes principais");
+assert(html.indexOf('id="windowsHostnameRegex"') < html.indexOf('id="emailText"'), "resultados Windows/Linux devem aparecer antes do texto de e-mail");
+assert(!html.includes('id="combinedRegex"'), "nao deve existir campo misturando hostnames e IPs");
+assert(!html.includes("function makeCombined"), "nao deve existir geracao combinada de hostnames e IPs");
 assert(html.includes(".container { width:100%; max-width:none;"), "layout deve ocupar toda a largura disponivel");
 assert(html.includes('class="workflow-grid"'), "parser e agendador devem usar grade compacta");
 assert(html.includes('class="communication-grid"'), "e-mails de inicio e encerramento devem usar grade compacta");
 assert(html.includes('class="communication-left"'), "resultados finais devem ocupar o espaco abaixo do e-mail inicial");
 assert(html.includes(".communication-left .regex-grid { flex:1; grid-template-columns:1fr;"), "resultados finais devem ficar empilhados na coluna esquerda");
 assert(html.includes('class="regex-grid"'), "resultados finais devem usar grade compacta");
-assert(html.includes("grid-template-columns:repeat(3,minmax(0,1fr))"), "resultados finais devem ter tres colunas em telas largas");
+assert(html.includes("grid-template-columns:repeat(2,minmax(0,1fr))"), "resultados gerais separados devem ter duas colunas em telas largas");
 assert(html.includes("align-items:stretch"), "paineis paralelos devem preencher toda a altura disponivel");
-assert(html.includes("grid-template-rows:repeat(3,minmax(0,1fr))"), "resultados da coluna esquerda devem preencher o espaco vertical");
+assert(html.includes("grid-template-rows:repeat(2,minmax(0,1fr))"), "resultados da coluna esquerda devem preencher o espaco vertical");
 
 const baseCatalog = {
   "2016": { kb: "KB0000001", name: "old 2016" },
@@ -261,15 +265,21 @@ getElement("input").value = [
   "SUSEAPP01 SUSE Linux Enterprise 15 10.10.20.1"
 ].join("\n");
 sandbox.__generate();
-const windowsRegex = getElement("windowsCombinedRegex").value;
-const linuxRegex = getElement("linuxCombinedRegex").value;
+const windowsHostnameRegex = getElement("windowsHostnameRegex").value;
+const windowsIpRegex = getElement("windowsIpRegex").value;
+const linuxHostnameRegex = getElement("linuxHostnameRegex").value;
+const linuxIpRegex = getElement("linuxIpRegex").value;
 const mixedOsEmailHtml = getElement("emailText").innerHTML;
-assert(windowsRegex.includes("WINAPP01"));
-assert(windowsRegex.includes("10.10.10.1"));
-assert(!windowsRegex.includes("SUSEAPP01"));
-assert(linuxRegex.includes("SUSEAPP01"));
-assert(linuxRegex.includes("10.10.20.1"));
-assert(!linuxRegex.includes("WINAPP01"));
+assert(windowsHostnameRegex.includes("WINAPP01"));
+assert(!windowsHostnameRegex.includes("10.10.10.1"));
+assert(!windowsHostnameRegex.includes("SUSEAPP01"));
+assert(windowsIpRegex.includes("10.10.10.1"));
+assert(!windowsIpRegex.includes("WINAPP01"));
+assert(linuxHostnameRegex.includes("SUSEAPP01"));
+assert(!linuxHostnameRegex.includes("10.10.20.1"));
+assert(!linuxHostnameRegex.includes("WINAPP01"));
+assert(linuxIpRegex.includes("10.10.20.1"));
+assert(!linuxIpRegex.includes("SUSEAPP01"));
 assert(mixedOsEmailHtml.includes("Windows Server 2019"));
 assert(mixedOsEmailHtml.includes("SUSE Linux Enterprise"));
 
