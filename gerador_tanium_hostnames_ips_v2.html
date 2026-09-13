@@ -203,6 +203,8 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
       <div class="stats">
         <div class="stat"><strong id="hostCount">0</strong><span>hostnames</span></div>
         <div class="stat"><strong id="ipCount">0</strong><span>IPs</span></div>
+        <div class="stat"><strong id="windowsMachineCount">0</strong><span>maquinas Windows</span></div>
+        <div class="stat"><strong id="linuxMachineCount">0</strong><span>maquinas Linux</span></div>
         <div class="stat"><strong id="lineCount">0</strong><span>linhas processadas</span></div>
       </div>
 
@@ -1136,6 +1138,8 @@ function generate() {
 
   document.getElementById("hostCount").innerText = data.hostnames.length;
   document.getElementById("ipCount").innerText = data.ips.length;
+  document.getElementById("windowsMachineCount").innerText = data.osGroups?.windows?.hostnames?.length || 0;
+  document.getElementById("linuxMachineCount").innerText = data.osGroups?.linux?.hostnames?.length || 0;
   document.getElementById("lineCount").innerText = data.lines.length;
 
   const suggestedKbs = suggestKBs(data.lines);

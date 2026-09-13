@@ -282,6 +282,8 @@ assert(linuxIpRegex.includes("10.10.20.1"));
 assert(!linuxIpRegex.includes("SUSEAPP01"));
 assert(mixedOsEmailHtml.includes("Windows Server 2019"));
 assert(mixedOsEmailHtml.includes("SUSE Linux Enterprise"));
+assert.strictEqual(getElement("windowsMachineCount").innerText, 1);
+assert.strictEqual(getElement("linuxMachineCount").innerText, 1);
 
 getElement("schedGmud").value = "GMUD-TESTE";
 getElement("input").value = [
