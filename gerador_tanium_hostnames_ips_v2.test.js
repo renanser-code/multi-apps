@@ -169,3 +169,6 @@ assert(linuxIpRegex.includes("10.10.20.1"));
 assert(!linuxIpRegex.includes("SUSEAPP01"));
 assert(mixedOsEmailHtml.includes("Windows Server 2019"));
 assert(mixedOsEmailHtml.includes("SUSE Linux Enterprise"));
+assert(html.includes("tanium_kb_catalog.json"), "deve consultar o catalogo automatico publicado no GitHub");
+assert(html.includes('cache: "no-store"'), "deve ignorar cache antigo do catalogo mensal");
+assert(html.includes("KB5122882"), "backup local deve conter o KB de setembro do Server 2022");

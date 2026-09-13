@@ -459,3 +459,6 @@ const ambiguousOcrText = sandbox.__enrichEvidenceTextWithFuzzyServerAliases(
 );
 assert(!ambiguousOcrText.includes("VWCSC016"), "OCR ambiguo nao deve validar VWCSC016 automaticamente");
 assert(!ambiguousOcrText.includes("VWCSC018"), "OCR ambiguo nao deve validar VWCSC018 automaticamente");
+assert(html.includes("tanium_kb_catalog.json"), "deve consultar o catalogo automatico publicado no GitHub");
+assert(html.includes('cache: "no-store"'), "deve ignorar cache antigo do catalogo mensal");
+assert(html.includes("KB5122882"), "backup local deve conter o KB de setembro do Server 2022");
