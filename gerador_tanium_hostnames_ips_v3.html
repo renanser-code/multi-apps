@@ -2847,6 +2847,24 @@ function copyKbName(kb) {
   showCopyFeedback(`${value} copiado!`);
 }
 
+function copyEmailAddress(button) {
+  const value = String(button?.dataset?.email || "").trim();
+  if (!value) return;
+  const originalText = button.textContent;
+  const clipboardWrite = navigator.clipboard?.writeText
+    ? navigator.clipboard.writeText(value)
+    : Promise.reject(new Error("Clipboard API indisponivel"));
+
+  clipboardWrite.then(() => {
+    button.textContent = "Copiado";
+    setTimeout(() => { button.textContent = originalText; }, 1200);
+  }).catch(err => {
+    console.warn("Falha ao copiar e-mail:", err);
+    button.textContent = "Erro";
+    setTimeout(() => { button.textContent = originalText; }, 1200);
+  });
+}
+
 function copyText(id) {
   const el = document.getElementById(id);
   
@@ -3130,6 +3148,7 @@ function parseGmudEmail() {
       row.style.cssText = 'display:flex; align-items:center; gap:10px; background:#0f172a; border:1px solid #1e3a5f; border-radius:7px; padding:6px 10px;';
       row.innerHTML = `
         <span style="flex:1; font-family:Consolas,monospace; font-size:13px; color:#93c5fd;">${email}</span>
+        <button type="button" data-email="${email}" onclick="copyEmailAddress(this)" title="Copiar ${email}" style="background:#2563eb; border:1px solid #3b82f6; color:#fff; border-radius:6px; padding:4px 10px; font-size:12px; font-weight:700; cursor:pointer; min-width:66px;">Copiar</button>
         <select style="background:#1e293b; border:1px solid #334155; color:#f9fafb; border-radius:6px; padding:4px 8px; font-size:13px; cursor:pointer;">
           <option value="to" ${defaultVal==='to'?'selected':''}>Para (To)</option>
           <option value="cc" ${defaultVal==='cc'?'selected':''}>Cópia (Cc)</option>

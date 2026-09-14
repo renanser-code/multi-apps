@@ -464,3 +464,5 @@ assert(!ambiguousOcrText.includes("VWCSC018"), "OCR ambiguo nao deve validar VWC
 assert(html.includes("tanium_kb_catalog.json"), "deve consultar o catalogo automatico publicado no GitHub");
 assert(html.includes('cache: "no-store"'), "deve ignorar cache antigo do catalogo mensal");
 assert(html.includes("KB5122882"), "backup local deve conter o KB de setembro do Server 2022");
+assert(html.includes('onclick="copyEmailAddress(this)"'), "cada e-mail encontrado deve ter botao individual para copiar");
+assert(html.includes('data-email="${email}"'), "o botao deve usar o endereco da propria linha");
