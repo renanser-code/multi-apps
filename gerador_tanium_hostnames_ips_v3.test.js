@@ -461,6 +461,10 @@ const ambiguousOcrText = sandbox.__enrichEvidenceTextWithFuzzyServerAliases(
 );
 assert(!ambiguousOcrText.includes("VWCSC016"), "OCR ambiguo nao deve validar VWCSC016 automaticamente");
 assert(!ambiguousOcrText.includes("VWCSC018"), "OCR ambiguo nao deve validar VWCSC018 automaticamente");
+const visaEmailInfo = vm.runInContext('getCustomerEmailVmInfo({ name: "VISA011-B", info: "Cliente: VISA-HYPERATIVA | IP: 10.0.0.1 | OS: Windows Server 2022" })', sandbox);
+const regularEmailInfo = vm.runInContext('getCustomerEmailVmInfo({ name: "CLIENTE01", info: "Cliente: OUTRO | IP: 10.0.0.2 | OS: Windows Server 2022" })', sandbox);
+assert.strictEqual(visaEmailInfo, "Cliente: VISA-HYPERATIVA | OS: Windows Server 2022");
+assert.strictEqual(regularEmailInfo, "Cliente: OUTRO | IP: 10.0.0.2 | OS: Windows Server 2022");
 assert(html.includes("tanium_kb_catalog.json"), "deve consultar o catalogo automatico publicado no GitHub");
 assert(html.includes('cache: "no-store"'), "deve ignorar cache antigo do catalogo mensal");
 assert(html.includes("KB5122882"), "backup local deve conter o KB de setembro do Server 2022");

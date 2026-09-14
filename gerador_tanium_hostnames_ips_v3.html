@@ -1405,6 +1405,15 @@ function updateOsSplitOutputs(data) {
   });
 }
 
+function getCustomerEmailVmInfo(vm) {
+  const name = String(vm?.name || "");
+  const info = String(vm?.info || "");
+  const clientMatch = info.match(/Cliente:\s*([^|]+)/i);
+  const client = clientMatch ? clientMatch[1].trim() : "";
+  const isVisaHiperativa = /(?:visa|hiperativa)/i.test(client) || /^visa/i.test(name);
+  return isVisaHiperativa ? info.replace(/\s*\|\s*IP:\s*[^|]+\s*/i, " ") : info;
+}
+
 function renderKbCopyButton(kb) {
   const kbText = escapeHtml(kb);
   return `<button type="button" class='kb-copy-btn' data-kb="${kbText}" onclick="copyKbName(this.dataset.kb)" title="Copiar ${kbText}">Copiar KB</button>`;
@@ -1715,7 +1724,7 @@ function generate() {
     if (data.activeVMs.length > 0) {
       emailHtml += "<strong>Servidores LIGADOS (Patches serão aplicados):</strong><br>";
       data.activeVMs.forEach(vm => {
-        emailHtml += `- <strong>${vm.name}</strong> (${vm.info})<br>`;
+        emailHtml += `- <strong>${vm.name}</strong> (${getCustomerEmailVmInfo(vm)})<br>`;
       });
     } else {
       emailHtml += "<strong>Servidores LIGADOS:</strong><br>- n/a<br>";
@@ -1724,7 +1733,7 @@ function generate() {
     if (data.offlineVMs.length > 0 || data.unknownVMs.length > 0) {
       emailHtml += "<br><strong>Servidores DESLIGADOS / Fora do escopo (Não serão atualizados):</strong><br>";
       data.offlineVMs.forEach(vm => {
-        emailHtml += `- <strong>${vm.name}</strong> (Evidência: ${vm.reason} | ${vm.info})<br>`;
+        emailHtml += `- <strong>${vm.name}</strong> (Evidência: ${vm.reason} | ${getCustomerEmailVmInfo(vm)})<br>`;
       });
       data.unknownVMs.forEach(vm => {
         emailHtml += `- <strong>${vm.name}</strong> (Evidência: ${vm.reason})<br>`;
