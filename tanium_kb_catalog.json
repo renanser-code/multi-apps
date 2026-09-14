@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "documentId": "2026-Sep",
   "documentTitle": "September 2026 Security Updates",
-  "generatedAt": "2026-09-13T17:09:36.932Z",
+  "generatedAt": "2026-09-14T19:22:37.301Z",
   "sourceUrl": "https://api.msrc.microsoft.com/cvrf/v3.0/cvrf/2026-Sep",
   "catalog": {
     "10": {
@@ -10,7 +10,7 @@
       "name": "Windows 10 Cumulative Update (September 2026 Security Updates)"
     },
     "11": {
-      "kb": "KB5124012",
+      "kb": "KB5129194",
       "name": "Windows 11 Cumulative Update (September 2026 Security Updates)"
     },
     "2016": {
