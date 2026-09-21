@@ -1195,16 +1195,20 @@ function generate() {
     emailHtml += '<tr><td style="background-color:#b91c1c;color:#ffffff;padding:10px 12px;border:1px solid #991b1b;font-size:16px;"><strong>ATENCAO: SERVIDORES DE BANCO DE DADOS</strong></td></tr>';
     emailHtml += '<tr><td style="background-color:#fff1f2;color:#7f1d1d;padding:12px;border:1px solid #f87171;"><strong>Os servidores abaixo sao bancos de dados e exigem acompanhamento prioritario durante toda a GMUD:</strong><br><br>';
     databaseAlerts.forEach(alert => {
-      emailHtml += `&#9888; <strong style="color:#b91c1c;font-size:15px;">${escapeHtml(alert.name)}</strong> <strong>[BANCO DE DADOS]</strong><br>${escapeHtml(alert.message)}<br><br>`;
+      const classification = alert.type && alert.type.includes("VM prioritaria") ? "[VM PRIORITARIA / BANCO DE DADOS]" : "[BANCO DE DADOS]";
+      emailHtml += `&#9888; <strong style="color:#b91c1c;font-size:16px;">${escapeHtml(alert.name)}</strong> <strong>${classification}</strong><br>${escapeHtml(alert.message)}<br><br>`;
     });
     emailHtml += '</td></tr></table>';
   }
 
   if (priorityAlerts.length > 0) {
-    emailHtml += "<br><strong>ATENCAO - VMs PRIORITARIAS:</strong><br>";
+    emailHtml += '<br><table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;font-family:Segoe UI,Arial,sans-serif;">';
+    emailHtml += '<tr><td style="background-color:#b45309;color:#ffffff;padding:10px 12px;border:1px solid #92400e;font-size:16px;"><strong>ATENCAO: VMs PRIORITARIAS</strong></td></tr>';
+    emailHtml += '<tr><td style="background-color:#fffbeb;color:#78350f;padding:12px;border:1px solid #f59e0b;"><strong>As VMs abaixo exigem acompanhamento prioritario durante toda a GMUD:</strong><br><br>';
     priorityAlerts.forEach(alert => {
-      emailHtml += `- <strong>${escapeHtml(alert.name)}</strong>: ${escapeHtml(alert.message)}<br>`;
+      emailHtml += `&#9888; <strong style="color:#b45309;font-size:16px;">${escapeHtml(alert.name)}</strong> <strong>[VM PRIORITARIA]</strong><br>${escapeHtml(alert.message)}<br><br>`;
     });
+    emailHtml += '</td></tr></table>';
   }
 
   emailHtml += "<br><strong>Sistemas Operacionais afetados:</strong><br>";
