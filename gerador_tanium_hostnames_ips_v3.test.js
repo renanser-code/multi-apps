@@ -247,7 +247,9 @@ assert(monitoredAlertEmailHtml.includes("PPSPFSV1"));
 getElement("input").value = [
   "SV-DBS-BARUEL02 Microsoft Windows Server 2022 (64-bit)",
   "rdgw\\.mandic.net.br Microsoft Windows Server 2019 (64-bit)",
-  "GER7-PROD01 Microsoft Windows Server 2019 (64-bit)"
+  "GER7-PROD01 Microsoft Windows Server 2019 (64-bit)",
+  "SV-SQL3 Microsoft Windows Server 2022 (64-bit)",
+  "SV-SAP3 Microsoft Windows Server 2022 (64-bit)"
 ].join("\n");
 sandbox.__generate();
 const databaseAlertsHtml = getElement("monitoredVmAlerts").innerHTML;
@@ -256,9 +258,13 @@ assert(databaseAlertsHtml.includes("Banco de Dados"));
 assert(databaseAlertsHtml.includes("SV-DBS-BARUEL02"));
 assert(databaseAlertsHtml.includes("rdgw.mandic.net.br"));
 assert(databaseAlertsHtml.includes("GER7-PROD01"));
+assert(databaseAlertsHtml.includes("SV-SQL3"));
+assert(databaseAlertsHtml.includes("SV-SAP3"));
 assert(!databaseAlertsHtml.includes("<strong>GER7-PROD</strong>"));
 assert(databaseAlertEmailHtml.includes("ATENCAO: SERVIDORES DE BANCO DE DADOS"));
 assert(databaseAlertEmailHtml.includes("[BANCO DE DADOS]"));
+assert(databaseAlertEmailHtml.includes("SV-SQL3"));
+assert(databaseAlertEmailHtml.includes("SV-SAP3"));
 assert(databaseAlertEmailHtml.includes("background-color:#b91c1c"));
 assert(databaseAlertEmailHtml.includes("background-color:#fff1f2"));
 assert(databaseAlertEmailHtml.includes("acompanhamento prioritario durante toda a GMUD"));
