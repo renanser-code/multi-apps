@@ -393,6 +393,24 @@ function textContainsMonitoredVm(text, name) {
   return pattern.test(normalizeOsDetectionText(text).toUpperCase());
 }
 
+function normalizeMonitoredVmName(value) {
+  return String(value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+function getMonitoredVmAlertByName(name) {
+  const normalizedName = normalizeMonitoredVmName(name);
+  if (!normalizedName) return null;
+  return MONITORED_VM_ALERTS.find(alert => normalizeMonitoredVmName(alert.name) === normalizedName) || null;
+}
+
+function getVmEmailClassification(name) {
+  const alert = getMonitoredVmAlertByName(name);
+  if (!alert) return "";
+  if (alert.type && alert.type.includes("Banco de Dados")) return ' <strong style="color:#b91c1c;">[BANCO DE DADOS]</strong>';
+  if (alert.type && alert.type.includes("VM prioritaria")) return ' <strong style="color:#b45309;">[VM PRIORITARIA]</strong>';
+  return "";
+}
+
 function getMonitoredVmAlerts(data) {
   const parts = [
     ...(data.lines || []),
@@ -403,9 +421,16 @@ function getMonitoredVmAlerts(data) {
     ...((data.unknownVMs || []).map(vm => `${vm.name} ${vm.info || ""}`))
   ];
   const searchText = parts.join("\n");
+  const detectedNames = new Set([
+    ...(data.hostnames || []),
+    ...((data.activeVMs || []).map(vm => vm.name)),
+    ...((data.offlineVMs || []).map(vm => vm.name)),
+    ...((data.unknownVMs || []).map(vm => vm.name)),
+    ...((data.lines || []).map(findHostname).filter(Boolean))
+  ].map(normalizeMonitoredVmName));
 
   return MONITORED_VM_ALERTS.filter(alert => {
-    return textContainsMonitoredVm(searchText, alert.name);
+    return detectedNames.has(normalizeMonitoredVmName(alert.name)) || textContainsMonitoredVm(searchText, alert.name);
   });
 }
 
@@ -1165,7 +1190,7 @@ function generate() {
     if (data.activeVMs.length > 0) {
       emailHtml += "<strong>Servidores LIGADOS (Patches serão aplicados):</strong><br>";
       data.activeVMs.forEach(vm => {
-        emailHtml += `- <strong>${vm.name}</strong> (${getCustomerEmailVmInfo(vm)})<br>`;
+        emailHtml += `- <strong>${vm.name}</strong>${getVmEmailClassification(vm.name)} (${getCustomerEmailVmInfo(vm)})<br>`;
       });
     } else {
       emailHtml += "<strong>Servidores LIGADOS:</strong><br>- n/a<br>";
@@ -1174,16 +1199,16 @@ function generate() {
     if (data.offlineVMs.length > 0 || data.unknownVMs.length > 0) {
       emailHtml += "<br><strong>Servidores DESLIGADOS / Fora do escopo (Não serão atualizados):</strong><br>";
       data.offlineVMs.forEach(vm => {
-        emailHtml += `- <strong>${vm.name}</strong> (Evidência: ${vm.reason} | ${getCustomerEmailVmInfo(vm)})<br>`;
+        emailHtml += `- <strong>${vm.name}</strong>${getVmEmailClassification(vm.name)} (Evidência: ${vm.reason} | ${getCustomerEmailVmInfo(vm)})<br>`;
       });
       data.unknownVMs.forEach(vm => {
-        emailHtml += `- <strong>${vm.name}</strong> (Evidência: ${vm.reason})<br>`;
+        emailHtml += `- <strong>${vm.name}</strong>${getVmEmailClassification(vm.name)} (Evidência: ${vm.reason})<br>`;
       });
     }
   } else {
     if (data.hostnames.length > 0) {
       data.hostnames.forEach(host => {
-        emailHtml += `- <strong>${host}</strong><br>`;
+        emailHtml += `- <strong>${host}</strong>${getVmEmailClassification(host)}<br>`;
       });
     } else {
       emailHtml += "[Nenhum servidor identificado]";

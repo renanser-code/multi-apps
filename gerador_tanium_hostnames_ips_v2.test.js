@@ -155,6 +155,7 @@ assert(databaseAlertEmailHtml.includes("[BANCO DE DADOS]"));
 assert(databaseAlertEmailHtml.includes("SV-SQL3"));
 assert(databaseAlertEmailHtml.includes("SV-SAP3"));
 assert(databaseAlertEmailHtml.includes("ATB-SV-DBP-05"));
+assert(databaseAlertEmailHtml.includes('<strong>ATB-SV-DBP-05</strong> <strong style="color:#b91c1c;">[BANCO DE DADOS]</strong>'));
 assert(databaseAlertEmailHtml.includes("background-color:#b91c1c"));
 assert(databaseAlertEmailHtml.includes("background-color:#fff1f2"));
 assert(databaseAlertEmailHtml.includes("acompanhamento prioritario durante toda a GMUD"));
