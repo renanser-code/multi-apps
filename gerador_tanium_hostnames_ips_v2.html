@@ -284,7 +284,23 @@ const WINDOWS_SERVER_2012_UNSUPPORTED_NOTICE = {
 };
 
 const PRIORITY_VM_ALERT_MESSAGE = "VM monitorada: validar tratamento especifico antes do deploy e registrar evidencia no encerramento da GMUD.";
+const VISA_THIRD_WAVE_ALERT_MESSAGE = "3a onda VISA: VM prioritaria; garantir acompanhamento durante o deploy e registrar evidencia no encerramento da GMUD.";
 const DATABASE_VM_ALERT_MESSAGE = "Banco de Dados: validar janela, backup e dependencias da aplicacao antes do deploy; manter item destacado na comunicacao ao cliente.";
+const VISA_THIRD_WAVE_VM_NAMES = [
+  "VISA035",
+  "VISA034-W",
+  "VISA027-B",
+  "VISA028-B",
+  "VISA049-2",
+  "VISA049-B",
+  "VISA046",
+  "VISA048",
+  "VISA027-1",
+  "VISA012",
+  "VISA004",
+  "VISA011-A",
+  "VISA034"
+];
 const DATABASE_VM_NAMES = [
   "SV-DBS-ABOI01",
   "SV-DBS-BARUEL02",
@@ -333,6 +349,7 @@ const MONITORED_VM_ALERTS = [
   { name: "PPCFXPRDDB2", type: "VM prioritaria / Banco de Dados", message: `${PRIORITY_VM_ALERT_MESSAGE} ${DATABASE_VM_ALERT_MESSAGE}` },
   { name: "PPCFXPRDFTPE1", type: "VM prioritaria", message: PRIORITY_VM_ALERT_MESSAGE },
   { name: "PPSPFSV1", type: "VM prioritaria", message: PRIORITY_VM_ALERT_MESSAGE },
+  ...VISA_THIRD_WAVE_VM_NAMES.map(name => ({ name, type: "VM prioritaria / 3a onda VISA", message: VISA_THIRD_WAVE_ALERT_MESSAGE })),
   ...DATABASE_VM_NAMES
     .filter(name => name !== "PPCFXPRDDB2")
     .map(name => ({ name, type: "Banco de Dados", message: DATABASE_VM_ALERT_MESSAGE }))
@@ -407,6 +424,7 @@ function getVmEmailClassification(name) {
   const alert = getMonitoredVmAlertByName(name);
   if (!alert) return "";
   if (alert.type && alert.type.includes("Banco de Dados")) return ' <strong style="color:#b91c1c;">[BANCO DE DADOS]</strong>';
+  if (alert.type && alert.type.includes("3a onda VISA")) return ' <strong style="color:#b45309;">[VM PRIORITARIA - 3a ONDA VISA]</strong>';
   if (alert.type && alert.type.includes("VM prioritaria")) return ' <strong style="color:#b45309;">[VM PRIORITARIA]</strong>';
   return "";
 }
@@ -430,7 +448,10 @@ function getMonitoredVmAlerts(data) {
   ].map(normalizeMonitoredVmName));
 
   return MONITORED_VM_ALERTS.filter(alert => {
-    return detectedNames.has(normalizeMonitoredVmName(alert.name)) || textContainsMonitoredVm(searchText, alert.name);
+    const alertName = normalizeMonitoredVmName(alert.name);
+    if (detectedNames.has(alertName)) return true;
+    const isPrefixOfAnotherVm = [...detectedNames].some(name => name !== alertName && name.startsWith(alertName));
+    return !isPrefixOfAnotherVm && textContainsMonitoredVm(searchText, alert.name);
   });
 }
 
@@ -1234,7 +1255,8 @@ function generate() {
     emailHtml += '<tr><td style="background-color:#b45309;color:#ffffff;padding:10px 12px;border:1px solid #92400e;font-size:16px;"><strong>ATENCAO: VMs PRIORITARIAS</strong></td></tr>';
     emailHtml += '<tr><td style="background-color:#fffbeb;color:#78350f;padding:12px;border:1px solid #f59e0b;"><strong>As VMs abaixo exigem acompanhamento prioritario durante toda a GMUD:</strong><br><br>';
     priorityAlerts.forEach(alert => {
-      emailHtml += `&#9888; <strong style="color:#b45309;font-size:16px;">${escapeHtml(alert.name)}</strong> <strong>[VM PRIORITARIA]</strong><br>${escapeHtml(alert.message)}<br><br>`;
+      const classification = alert.type && alert.type.includes("3a onda VISA") ? "[VM PRIORITARIA - 3a ONDA VISA]" : "[VM PRIORITARIA]";
+      emailHtml += `&#9888; <strong style="color:#b45309;font-size:16px;">${escapeHtml(alert.name)}</strong> <strong>${classification}</strong><br>${escapeHtml(alert.message)}<br><br>`;
     });
     emailHtml += '</td></tr></table>';
   }

@@ -274,6 +274,19 @@ assert(databaseAlertEmailHtml.includes("background-color:#fff1f2"));
 assert(databaseAlertEmailHtml.includes("acompanhamento prioritario durante toda a GMUD"));
 
 getElement("input").value = [
+  "VISA035 Microsoft Windows Server 2016 (64-bit)",
+  "VISA034-W Microsoft Windows Server 2022 (64-bit)"
+].join("\n");
+sandbox.__generate();
+const visaThirdWaveAlertsHtml = getElement("monitoredVmAlerts").innerHTML;
+const visaThirdWaveEmailHtml = getElement("emailText").innerHTML;
+assert(visaThirdWaveAlertsHtml.includes("VISA035"));
+assert(visaThirdWaveAlertsHtml.includes("VISA034-W"));
+assert(!visaThirdWaveAlertsHtml.includes("<strong>VISA034</strong>"));
+assert(visaThirdWaveEmailHtml.includes("[VM PRIORITARIA - 3a ONDA VISA]"));
+assert(visaThirdWaveEmailHtml.includes("3a onda VISA: VM prioritaria"));
+
+getElement("input").value = [
   "WINAPP01 Microsoft Windows Server 2019 (64-bit) 10.10.10.1",
   "SUSEAPP01 SUSE Linux Enterprise 15 10.10.20.1"
 ].join("\n");
