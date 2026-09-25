@@ -1897,7 +1897,15 @@ function normalizeEvidenceText(text) {
 
 function buildStructuredOcrText(result) {
   const data = result && result.data ? result.data : {};
-  const words = Array.isArray(data.words) ? data.words.filter(word => word && word.text && word.bbox) : [];
+  const blockWords = (Array.isArray(data.blocks) ? data.blocks : []).flatMap(block =>
+    (Array.isArray(block.paragraphs) ? block.paragraphs : []).flatMap(paragraph =>
+      (Array.isArray(paragraph.lines) ? paragraph.lines : []).flatMap(line =>
+        Array.isArray(line.words) ? line.words : []
+      )
+    )
+  );
+  const words = [...(Array.isArray(data.words) ? data.words : []), ...blockWords]
+    .filter(word => word && word.text && word.bbox);
   if (words.length === 0) return String(data.text || "");
 
   const positionedWords = words.map(word => ({
@@ -2166,6 +2174,8 @@ function getServerEvidenceContext(evidenceText, server, allServers) {
     if (!textContainsAnyAlias(lines[index], aliases)) continue;
 
     const contextLines = [lines[index]];
+    const lineHasStatus = /complete|all patches|pending|restart|required|waiting|failed|failure|error|erro|falha/i.test(lines[index]);
+    if (lineHasStatus) return lines[index];
     for (let next = index + 1; next < lines.length && contextLines.length < 5; next++) {
       if (textContainsAnyAlias(lines[next], otherAliases)) break;
       contextLines.push(lines[next]);
@@ -2564,6 +2574,25 @@ function loadTesseractOcr() {
 async function runTesseractRecognize(source, progressCallback) {
   const api = await loadTesseractOcr();
 
+  if (api.createWorker) {
+    const worker = await api.createWorker("eng", 1, {
+      logger: message => {
+        if (message && message.status && progressCallback) {
+          const progress = message.progress ? ` (${Math.round(message.progress * 100)}%)` : "";
+          progressCallback(`${message.status}${progress}`);
+        }
+      }
+    });
+    try {
+      if (worker.setParameters) {
+        await worker.setParameters({ tessedit_pageseg_mode: "6", preserve_interword_spaces: "1" });
+      }
+      return await worker.recognize(source, {}, { text: true, blocks: true });
+    } finally {
+      await worker.terminate();
+    }
+  }
+
   if (api.recognize) {
     return await api.recognize(source, "eng", {
       tessedit_pageseg_mode: 6,
@@ -2575,18 +2604,6 @@ async function runTesseractRecognize(source, progressCallback) {
         }
       }
     });
-  }
-
-  if (api.createWorker) {
-    const worker = await api.createWorker("eng");
-    try {
-      if (worker.setParameters) {
-        await worker.setParameters({ tessedit_pageseg_mode: "6", preserve_interword_spaces: "1" });
-      }
-      return await worker.recognize(source);
-    } finally {
-      await worker.terminate();
-    }
   }
 
   throw new Error("API de OCR indisponivel no Tesseract.js carregado.");

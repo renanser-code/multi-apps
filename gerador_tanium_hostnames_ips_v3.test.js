@@ -500,8 +500,22 @@ const structuredOcrText = vm.runInContext(`buildStructuredOcrText({ data: { word
 ] } })`, sandbox);
 assert(structuredOcrText.includes("VISA012.VISABRASIL.local Pending Restart"));
 assert(structuredOcrText.includes("VISA035.VISABRASIL.local Waiting for Deployment"));
+const blockStructuredOcrText = vm.runInContext(`buildStructuredOcrText({ data: { blocks: [{ paragraphs: [{ lines: [{ words: [
+  { text: "VISA027-1.VISABRASIL.local", bbox: { x0: 20, y0: 100, x1: 190, y1: 120 } },
+  { text: "Complete", bbox: { x0: 900, y0: 100, x1: 970, y1: 120 } },
+  { text: "All", bbox: { x0: 980, y0: 100, x1: 1005, y1: 120 } },
+  { text: "Patches", bbox: { x0: 1010, y0: 100, x1: 1070, y1: 120 } },
+  { text: "Applied", bbox: { x0: 1075, y0: 100, x1: 1135, y1: 120 } }
+] }] }] }] } })`, sandbox);
+assert(blockStructuredOcrText.includes("VISA027-1.VISABRASIL.local Complete All Patches Applied"));
 assert.strictEqual(vm.runInContext('inferClosureResultFromEvidenceContext("VISA012 Pending Restart, Restart Required to Complete")', sandbox), "Pending Restart - reinicio necessario");
 assert.strictEqual(vm.runInContext('inferClosureResultFromEvidenceContext("VISA035 Waiting for Deployment Start Time")', sandbox), "Waiting for Deployment Start Time");
+const isolatedCompleteContext = vm.runInContext(`getServerEvidenceContext(
+  "VISA027-1.VISABRASIL.local Complete, All Patches Applied\\nVISA012.VISABRASIL.local Pending Restart",
+  { name: "VISA027-1", info: "" },
+  [{ name: "VISA027-1", info: "" }, { name: "VISA012", info: "" }]
+)`, sandbox);
+assert(!isolatedCompleteContext.includes("Pending Restart"), "status da linha seguinte nao pode contaminar a VM anterior");
 const visaEmailInfo = vm.runInContext('getCustomerEmailVmInfo({ name: "VISA011-B", info: "Cliente: VISA-HYPERATIVA | IP: 10.0.0.1 | OS: Windows Server 2022" })', sandbox);
 const regularEmailInfo = vm.runInContext('getCustomerEmailVmInfo({ name: "CLIENTE01", info: "Cliente: OUTRO | IP: 10.0.0.2 | OS: Windows Server 2022" })', sandbox);
 assert.strictEqual(visaEmailInfo, "Cliente: VISA-HYPERATIVA | OS: Windows Server 2022");
