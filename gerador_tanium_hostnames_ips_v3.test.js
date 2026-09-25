@@ -520,6 +520,23 @@ const visaEmailInfo = vm.runInContext('getCustomerEmailVmInfo({ name: "VISA011-B
 const regularEmailInfo = vm.runInContext('getCustomerEmailVmInfo({ name: "CLIENTE01", info: "Cliente: OUTRO | IP: 10.0.0.2 | OS: Windows Server 2022" })', sandbox);
 assert.strictEqual(visaEmailInfo, "Cliente: VISA-HYPERATIVA | OS: Windows Server 2022");
 assert.strictEqual(regularEmailInfo, "Cliente: OUTRO | IP: 10.0.0.2 | OS: Windows Server 2022");
+getElement("input").value = "VISA004 10.203.159.14 Microsoft Windows Server 2022 (64-bit)";
+getElement("onlyPoweredOn").checked = true;
+vm.runInContext(`isCmdbLoaded = true; cmdbDatabase = [{
+  HostName: "VISA004",
+  IP: "10.203.159.14",
+  Customer: "VISA-HYPERATIVA",
+  SO: "Microsoft Windows Server 2022 (64-bit)",
+  Status: "Ligada",
+  ServerID: "visa004-test"
+}];`, sandbox);
+sandbox.__generateClosure();
+const visaClosureEmailHtml = getElement("closureEmailText").innerHTML;
+assert(visaClosureEmailHtml.includes("VISA004"));
+assert(visaClosureEmailHtml.includes("Cliente: VISA-HYPERATIVA"));
+assert(visaClosureEmailHtml.includes("Microsoft Windows Server 2022"));
+assert(!visaClosureEmailHtml.includes("10.203.159.14"), "e-mail de encerramento da VISA nao deve exibir IP");
+vm.runInContext("isCmdbLoaded = false; cmdbDatabase = [];", sandbox);
 assert(html.includes("tanium_kb_catalog.json"), "deve consultar o catalogo automatico publicado no GitHub");
 assert(html.includes('cache: "no-store"'), "deve ignorar cache antigo do catalogo mensal");
 assert(html.includes("KB5122882"), "backup local deve conter o KB de setembro do Server 2022");

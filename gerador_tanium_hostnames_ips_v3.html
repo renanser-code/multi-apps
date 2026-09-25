@@ -2694,7 +2694,8 @@ function buildClosureEmailHtml() {
   html += "<strong>Servidores do escopo e resultado no encerramento:</strong><br>";
   if (payload.servers.length > 0) {
     payload.servers.forEach(server => {
-      const info = server.info ? ` (${escapeHtml(server.info)})` : "";
+      const filteredInfo = getCustomerEmailVmInfo(server);
+      const info = filteredInfo ? ` (${escapeHtml(filteredInfo)})` : "";
       html += `- <strong>${escapeHtml(server.name)}</strong>${info} - ${escapeHtml(server.result || "Validacao nao informada")}<br>`;
     });
   } else {
