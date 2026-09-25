@@ -457,11 +457,14 @@ function getMonitoredVmAlerts(data) {
 
 function renderMonitoredVmAlerts(alerts) {
   if (!alerts || alerts.length === 0) return "";
+  const visaThirdWaveAlerts = alerts.filter(alert => alert.type && alert.type.includes("3a onda VISA"));
+  const individualAlerts = alerts.filter(alert => !alert.type || !alert.type.includes("3a onda VISA"));
   return `<strong>Alertas de VMs monitoradas</strong>
-    ${alerts.map(alert => {
+    ${individualAlerts.map(alert => {
       const typeHtml = alert.type ? `<br><span class="badge" style="background:#7f1d1d; color:#fff; margin:4px 0 0 0;">${escapeHtml(alert.type)}</span>` : "";
       return `<div class="vm-alert-item"><strong>${escapeHtml(alert.name)}</strong>${typeHtml}<br>${escapeHtml(alert.message)}</div>`;
-    }).join("")}`;
+    }).join("")}
+    ${visaThirdWaveAlerts.length > 0 ? `<div class="vm-alert-item"><strong>3a onda VISA (${visaThirdWaveAlerts.length} VMs)</strong><br><span class="badge" style="background:#b45309;color:#fff;margin:4px 0;">VMs prioritarias</span><br><strong>${visaThirdWaveAlerts.map(alert => escapeHtml(alert.name)).join(" | ")}</strong><br>${escapeHtml(VISA_THIRD_WAVE_ALERT_MESSAGE)}</div>` : ""}`;
 }
 
 function updateMonitoredVmAlerts(alerts) {
@@ -1251,13 +1254,18 @@ function generate() {
   }
 
   if (priorityAlerts.length > 0) {
+    const visaThirdWaveAlerts = priorityAlerts.filter(alert => alert.type && alert.type.includes("3a onda VISA"));
+    const individualPriorityAlerts = priorityAlerts.filter(alert => !alert.type || !alert.type.includes("3a onda VISA"));
     emailHtml += '<br><table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;font-family:Segoe UI,Arial,sans-serif;">';
     emailHtml += '<tr><td style="background-color:#b45309;color:#ffffff;padding:10px 12px;border:1px solid #92400e;font-size:16px;"><strong>ATENCAO: VMs PRIORITARIAS</strong></td></tr>';
     emailHtml += '<tr><td style="background-color:#fffbeb;color:#78350f;padding:12px;border:1px solid #f59e0b;"><strong>As VMs abaixo exigem acompanhamento prioritario durante toda a GMUD:</strong><br><br>';
-    priorityAlerts.forEach(alert => {
-      const classification = alert.type && alert.type.includes("3a onda VISA") ? "[VM PRIORITARIA - 3a ONDA VISA]" : "[VM PRIORITARIA]";
-      emailHtml += `&#9888; <strong style="color:#b45309;font-size:16px;">${escapeHtml(alert.name)}</strong> <strong>${classification}</strong><br>${escapeHtml(alert.message)}<br><br>`;
+    individualPriorityAlerts.forEach(alert => {
+      emailHtml += `&#9888; <strong style="color:#b45309;font-size:16px;">${escapeHtml(alert.name)}</strong> <strong>[VM PRIORITARIA]</strong><br>${escapeHtml(alert.message)}<br><br>`;
     });
+    if (visaThirdWaveAlerts.length > 0) {
+      emailHtml += `<strong style="color:#b45309;font-size:16px;">3a ONDA VISA (${visaThirdWaveAlerts.length} VMs)</strong> <strong>[VMs PRIORITARIAS]</strong><br>`;
+      emailHtml += `<strong>${visaThirdWaveAlerts.map(alert => escapeHtml(alert.name)).join(" | ")}</strong><br>${escapeHtml(VISA_THIRD_WAVE_ALERT_MESSAGE)}<br>`;
+    }
     emailHtml += '</td></tr></table>';
   }
 
