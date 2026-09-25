@@ -381,7 +381,7 @@ sandbox.__setClosureEvidenceFiles([
 ]);
 const perServerReportHtml = sandbox.__buildClosureReportHtml();
 assert(perServerReportHtml.includes("<td>VISA011-B</td><td>Windows Server 2022</td><td>Complete, All Patches Applied</td>"));
-assert(perServerReportHtml.includes("<td>VISA029-1</td><td>Windows Server 2016</td><td>Validado com ressalvas</td>"));
+assert(perServerReportHtml.includes("<td>VISA029-1</td><td>Windows Server 2016</td><td>Falha identificada na evidencia</td>"));
 
 getElement("closureStatus").value = "Concluída com sucesso";
 getElement("closureObservations").value = "";
@@ -489,6 +489,19 @@ const ambiguousOcrText = sandbox.__enrichEvidenceTextWithFuzzyServerAliases(
 );
 assert(!ambiguousOcrText.includes("VWCSC016"), "OCR ambiguo nao deve validar VWCSC016 automaticamente");
 assert(!ambiguousOcrText.includes("VWCSC018"), "OCR ambiguo nao deve validar VWCSC018 automaticamente");
+const structuredOcrText = vm.runInContext(`buildStructuredOcrText({ data: { words: [
+  { text: "VISA012.VISABRASIL.local", bbox: { x0: 20, y0: 100, x1: 180, y1: 120 } },
+  { text: "Pending", bbox: { x0: 900, y0: 100, x1: 960, y1: 120 } },
+  { text: "Restart", bbox: { x0: 965, y0: 100, x1: 1030, y1: 120 } },
+  { text: "VISA035.VISABRASIL.local", bbox: { x0: 20, y0: 140, x1: 180, y1: 160 } },
+  { text: "Waiting", bbox: { x0: 900, y0: 140, x1: 960, y1: 160 } },
+  { text: "for", bbox: { x0: 965, y0: 140, x1: 990, y1: 160 } },
+  { text: "Deployment", bbox: { x0: 995, y0: 140, x1: 1080, y1: 160 } }
+] } })`, sandbox);
+assert(structuredOcrText.includes("VISA012.VISABRASIL.local Pending Restart"));
+assert(structuredOcrText.includes("VISA035.VISABRASIL.local Waiting for Deployment"));
+assert.strictEqual(vm.runInContext('inferClosureResultFromEvidenceContext("VISA012 Pending Restart, Restart Required to Complete")', sandbox), "Pending Restart - reinicio necessario");
+assert.strictEqual(vm.runInContext('inferClosureResultFromEvidenceContext("VISA035 Waiting for Deployment Start Time")', sandbox), "Waiting for Deployment Start Time");
 const visaEmailInfo = vm.runInContext('getCustomerEmailVmInfo({ name: "VISA011-B", info: "Cliente: VISA-HYPERATIVA | IP: 10.0.0.1 | OS: Windows Server 2022" })', sandbox);
 const regularEmailInfo = vm.runInContext('getCustomerEmailVmInfo({ name: "CLIENTE01", info: "Cliente: OUTRO | IP: 10.0.0.2 | OS: Windows Server 2022" })', sandbox);
 assert.strictEqual(visaEmailInfo, "Cliente: VISA-HYPERATIVA | OS: Windows Server 2022");

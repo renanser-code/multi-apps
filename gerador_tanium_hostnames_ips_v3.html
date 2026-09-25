@@ -1895,9 +1895,40 @@ function normalizeEvidenceText(text) {
     .toLowerCase();
 }
 
+function buildStructuredOcrText(result) {
+  const data = result && result.data ? result.data : {};
+  const words = Array.isArray(data.words) ? data.words.filter(word => word && word.text && word.bbox) : [];
+  if (words.length === 0) return String(data.text || "");
+
+  const positionedWords = words.map(word => ({
+    text: String(word.text || "").trim(),
+    x: Number(word.bbox.x0) || 0,
+    y: ((Number(word.bbox.y0) || 0) + (Number(word.bbox.y1) || 0)) / 2,
+    height: Math.max(1, (Number(word.bbox.y1) || 0) - (Number(word.bbox.y0) || 0))
+  })).filter(word => word.text);
+  const averageHeight = positionedWords.reduce((sum, word) => sum + word.height, 0) / Math.max(1, positionedWords.length);
+  const rowTolerance = Math.max(8, averageHeight * 0.7);
+  const rows = [];
+
+  positionedWords.sort((a, b) => a.y - b.y || a.x - b.x).forEach(word => {
+    let row = rows.find(candidate => Math.abs(candidate.y - word.y) <= rowTolerance);
+    if (!row) {
+      row = { y: word.y, words: [] };
+      rows.push(row);
+    }
+    row.words.push(word);
+    row.y = row.words.reduce((sum, item) => sum + item.y, 0) / row.words.length;
+  });
+
+  return rows
+    .sort((a, b) => a.y - b.y)
+    .map(row => row.words.sort((a, b) => a.x - b.x).map(word => word.text).join(" "))
+    .join("\n");
+}
+
 function inferClosureStatusFromEvidenceText(text) {
   const normalized = normalizeEvidenceText(text);
-  const hasIssue = /\b(failed|failure|error|erro|falha|pending|pendente|reboot required|restart required|not targeted|not applicable)\b/.test(normalized);
+  const hasIssue = /\b(failed|failure|error|erro|falha|pending|pendente|waiting|reboot required|restart required|pending restart|not targeted|not applicable)\b/.test(normalized);
   if (hasIssue) {
     return {
       status: "Concluída com ressalvas",
@@ -2167,9 +2198,12 @@ function inferClosureResultFromEvidenceContext(context) {
   if (!context) return "";
 
   const normalized = normalizeEvidenceText(context);
+  if (/\b(failed|failure|error|erro|falha)\b/.test(normalized)) return "Falha identificada na evidencia";
+  if (/pending restart|restart required|reinicio (?:necessario|pendente)/.test(normalized)) return "Pending Restart - reinicio necessario";
+  if (/waiting for deployment|waiting for .*start time|aguardando .*inicio/.test(normalized)) return "Waiting for Deployment Start Time";
   const hasComplete = normalized.includes("complete") || normalized.includes("concluido") || normalized.includes("concluida");
   const hasAllPatches = normalized.includes("all patches applied") || normalized.includes("sem pendencias") || normalized.includes("100% de sucesso");
-  const hasIssue = /\b(failed|failure|error|erro|falha|pending|pendente|reboot required|restart required|not targeted|not applicable)\b/.test(normalized);
+  const hasIssue = /\b(failed|failure|error|erro|falha|pending|pendente|waiting|reboot required|restart required|not targeted|not applicable)\b/.test(normalized);
 
   if (hasComplete && hasAllPatches) return "Complete, All Patches Applied";
   if (hasIssue) return "Validado com ressalvas";
@@ -2532,6 +2566,8 @@ async function runTesseractRecognize(source, progressCallback) {
 
   if (api.recognize) {
     return await api.recognize(source, "eng", {
+      tessedit_pageseg_mode: 6,
+      preserve_interword_spaces: "1",
       logger: message => {
         if (message && message.status && progressCallback) {
           const progress = message.progress ? ` (${Math.round(message.progress * 100)}%)` : "";
@@ -2544,6 +2580,9 @@ async function runTesseractRecognize(source, progressCallback) {
   if (api.createWorker) {
     const worker = await api.createWorker("eng");
     try {
+      if (worker.setParameters) {
+        await worker.setParameters({ tessedit_pageseg_mode: "6", preserve_interword_spaces: "1" });
+      }
       return await worker.recognize(source);
     } finally {
       await worker.terminate();
@@ -2593,7 +2632,7 @@ async function analyzeClosureEvidenceStatus(options = {}) {
       const result = await runTesseractRecognize(source, step => {
         feedback.textContent = `OCR: ${imageEvidence.name || `imagem ${index + 1}`} - ${step}`;
       });
-      const text = result && result.data && result.data.text ? result.data.text : "";
+      const text = buildStructuredOcrText(result);
       const inference = inferClosureStatusFromEvidenceText(text);
       imageEvidence.ocrText = text;
       imageEvidence.ocrInference = inference;
