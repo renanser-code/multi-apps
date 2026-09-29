@@ -206,3 +206,5 @@ assert.strictEqual(getElement("linuxMachineCount").innerText, 1);
 assert(html.includes("tanium_kb_catalog.json"), "deve consultar o catalogo automatico publicado no GitHub");
 assert(html.includes('cache: "no-store"'), "deve ignorar cache antigo do catalogo mensal");
 assert(html.includes("KB5122882"), "backup local deve conter o KB de setembro do Server 2022");
+assert(html.includes('id="cmdbCopyResult"'), "painel CMDB deve expor campo de resultado copiavel");
+assert(html.includes("copyText('cmdbCopyResult')"), "painel CMDB deve ter botao para copiar o resultado");

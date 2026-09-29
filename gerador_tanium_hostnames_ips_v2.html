@@ -169,8 +169,12 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
           Como a base possui cerca de 9.600 servidores, o gerador baixa a base localmente no navegador em memória de forma segura para fazer consultas instantâneas offline, sem travar seu fluxo.
         </div>
         <div id="vmStatusPanel" style="display:none; margin-top: 12px;">
-          <div style="font-size: 14px; font-weight: bold; color: #a5b4fc; margin-bottom: 5px;">Detalhamento de Status das VMs Identificadas:</div>
+          <div class="row" style="margin:0 0 6px 0;justify-content:space-between;align-items:center;">
+            <div style="font-size:14px;font-weight:bold;color:#a5b4fc;">Detalhamento de Status das VMs Identificadas:</div>
+            <button class="blue" type="button" onclick="copyText('cmdbCopyResult')">Copiar resultado CMDB</button>
+          </div>
           <div class="vms-list-container" id="vmsList"></div>
+          <textarea id="cmdbCopyResult" readonly style="margin-top:8px;min-height:100px;" aria-label="Resultado CMDB pronto para copiar"></textarea>
         </div>
       </div>
 
@@ -1002,10 +1006,12 @@ function processInput() {
   
   const vmListContainer = document.getElementById("vmsList");
   const vmStatusPanel = document.getElementById("vmStatusPanel");
+  const cmdbCopyResult = document.getElementById("cmdbCopyResult");
   
   if (isCmdbLoaded && (rawHostnames.length > 0 || rawIps.length > 0)) {
     vmStatusPanel.style.display = "block";
     let listHtml = "";
+    const copyLines = [];
     
      // Create lookup maps from CMDB database
     const cmdbHostMap = {};
@@ -1137,6 +1143,7 @@ function processInput() {
           <span><strong>${srv.displayName}</strong> (${details})</span>
           <span class="status-badge ${badgeClass}">${status}</span>
         </div>`;
+        copyLines.push(`${srv.displayName} | Cliente: ${info.Customer || "N/A"} | IP: ${info.IP || "N/A"} | OS: ${info.SO || "N/A"} | Status: ${status}`);
       } else {
         // Unregistered server
         const details = "Não encontrado no CMDB";
@@ -1158,10 +1165,12 @@ function processInput() {
           <span><strong>${srv.displayName}</strong> (${details})</span>
           <span class="status-badge status-desconhecido">Desconhecido</span>
         </div>`;
+        copyLines.push(`${srv.displayName} | CMDB: Nao encontrado | Status: Desconhecido`);
       }
     });
 
     vmListContainer.innerHTML = listHtml;
+    if (cmdbCopyResult) cmdbCopyResult.value = copyLines.join("\n");
     finalHostnames = filteredHostnames;
     finalIps = filteredIps;
     
@@ -1176,6 +1185,7 @@ function processInput() {
     return { lines, hostnames: finalHostnames, ips: finalIps, osGroups: osData.groups, osNames: osData.osNames, activeVMs, offlineVMs, unknownVMs, isCmdbApplied: true };
   } else {
     vmStatusPanel.style.display = "none";
+    if (cmdbCopyResult) cmdbCopyResult.value = "";
   }
 
   if (document.getElementById("sortList").checked) {
