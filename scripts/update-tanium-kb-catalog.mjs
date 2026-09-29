@@ -88,6 +88,10 @@ function extractCatalog(data, docId) {
   for (const required of ["2016", "2019", "2022", "2025"]) {
     if (!catalog[required]) throw new Error(`Documento ${docId} nao produziu KB para Windows Server ${required}.`);
   }
+  if (docId === "2026-Sep") {
+    catalog["2016"] = { kb: "KB5129239", name: "Windows Server 2016 Cumulative Update Out-of-Band (September 2026 - replaces KB5123099)" };
+    catalog["2019"] = { kb: "KB5129238", name: "Windows Server 2019 Cumulative Update Out-of-Band (September 2026 - replaces KB5122876)" };
+  }
   return { title, catalog };
 }
 

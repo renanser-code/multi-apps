@@ -524,8 +524,8 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
 <script>
 // Default backup catalog mapping for typical Windows Server versions (Backup for Offline / API failure)
 let KB_CATALOG = {
-  "2016": { kb: "KB5123099", name: "Windows Server 2016 Cumulative Update (September 2026 Security Updates)" },
-  "2019": { kb: "KB5122876", name: "Windows Server 2019 Cumulative Update (September 2026 Security Updates)" },
+  "2016": { kb: "KB5129239", name: "Windows Server 2016 Cumulative Update Out-of-Band (September 2026 - replaces KB5123099)" },
+  "2019": { kb: "KB5129238", name: "Windows Server 2019 Cumulative Update Out-of-Band (September 2026 - replaces KB5122876)" },
   "2022": { kb: "KB5122882", name: "Windows Server 2022 Cumulative Update (September 2026 Security Updates)" },
   "2025": { kb: "KB5122871", name: "Windows Server 2025 Cumulative Update (September 2026 Security Updates)" },
   "10": { kb: "KB5122878", name: "Windows 10 Cumulative Update (September 2026 Security Updates)" },
@@ -615,6 +615,15 @@ let isApiLoaded = false;
 let kbCatalogSource = "Backup Local";
 let kbCatalogDocumentId = "";
 const AUTOMATIC_KB_CATALOG_URL = "https://raw.githubusercontent.com/renanser-code/multi-apps/main/tanium_kb_catalog.json";
+const SEPTEMBER_2026_OOB_CORRECTIONS = {
+  "2016": { kb: "KB5129239", name: "Windows Server 2016 Cumulative Update Out-of-Band (September 2026 - replaces KB5123099)" },
+  "2019": { kb: "KB5129238", name: "Windows Server 2019 Cumulative Update Out-of-Band (September 2026 - replaces KB5122876)" }
+};
+
+function applyKnownKbCorrections(catalog, documentId) {
+  const isSeptember2026 = String(documentId || "").includes("2026-Sep") || /september 2026/i.test(String(documentId || ""));
+  return isSeptember2026 ? { ...catalog, ...SEPTEMBER_2026_OOB_CORRECTIONS } : catalog;
+}
 // CMDB Data Cache
 let cmdbDatabase = [];
 let isCmdbLoaded = false;
@@ -1162,7 +1171,7 @@ async function loadLatestKBsFromMicrosoft() {
 
   try {
     const snapshot = await fetchAutomaticKbCatalog();
-    KB_CATALOG = { ...KB_CATALOG, ...snapshot.catalog };
+    KB_CATALOG = applyKnownKbCorrections({ ...KB_CATALOG, ...snapshot.catalog }, snapshot.documentId);
     isApiLoaded = true;
     kbCatalogSource = "Catalogo automatico MSRC";
     kbCatalogDocumentId = snapshot.documentId;
@@ -1175,7 +1184,7 @@ async function loadLatestKBsFromMicrosoft() {
   for (const documentId of candidateDocIds) {
     try {
       const data = await fetchMsrcJson(documentId);
-      KB_CATALOG = buildKbCatalogFromMsrc(data, KB_CATALOG, documentId);
+      KB_CATALOG = applyKnownKbCorrections(buildKbCatalogFromMsrc(data, KB_CATALOG, documentId), documentId);
       isApiLoaded = true;
       kbCatalogSource = "Live MSRC API";
       kbCatalogDocumentId = getMsrcDocLabel(data, documentId);
