@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "documentId": "2026-Sep",
   "documentTitle": "September 2026 Security Updates",
-  "generatedAt": "2026-09-29T19:25:55.218Z",
+  "generatedAt": "2026-09-30T05:02:01.941Z",
   "sourceUrl": "https://api.msrc.microsoft.com/cvrf/v3.0/cvrf/2026-Sep",
   "catalog": {
     "10": {
@@ -22,12 +22,12 @@
       "name": "Windows Server 2019 Cumulative Update Out-of-Band (September 2026 - replaces KB5122876)"
     },
     "2022": {
-      "kb": "KB5122882",
-      "name": "Windows Server 2022 Cumulative Update (September 2026 Security Updates)"
+      "kb": "KB5129237",
+      "name": "Windows Server 2022 Cumulative Update Out-of-Band (September 2026 - replaces KB5122882)"
     },
     "2025": {
-      "kb": "KB5122871",
-      "name": "Windows Server 2025 Cumulative Update (September 2026 Security Updates)"
+      "kb": "KB5129235",
+      "name": "Windows Server 2025 Cumulative Update Out-of-Band (September 2026 - replaces KB5122871)"
     }
   }
 }

@@ -90,6 +90,8 @@ assert(kbSuggestionHtml.includes("class='kb-copy-btn'"), "sugestao de KB deve ex
 assert(kbSuggestionHtml.includes("copyKbName(this.dataset.kb)"), "botao deve chamar copyKbName com data-kb");
 assert(kbSuggestionHtml.includes('data-kb="'), "botao deve carregar o identificador do KB no data-kb");
 assert(kbSuggestionHtml.indexOf("Copiar KB") < kbSuggestionHtml.indexOf("Backup Local"), "botao Copiar KB deve ficar antes do selo Backup Local");
+assert(kbSuggestionHtml.includes("class='kb-download-btn'"), "sugestao de KB deve exibir botao para download");
+assert(kbSuggestionHtml.includes("catalog.update.microsoft.com/Search.aspx?q="), "download deve abrir o Microsoft Update Catalog");
 
 const shortServer2012Items = sandbox.__suggestKBs(["LEGADO02 Microsoft Server 2012 x64"]);
 assert.strictEqual(shortServer2012Items.length, 0, "Server 2012 escrito de forma curta nao deve receber sugestao automatica de KB");
@@ -208,10 +210,12 @@ assert.strictEqual(getElement("windowsMachineCount").innerText, 1);
 assert.strictEqual(getElement("linuxMachineCount").innerText, 1);
 assert(html.includes("tanium_kb_catalog.json"), "deve consultar o catalogo automatico publicado no GitHub");
 assert(html.includes('cache: "no-store"'), "deve ignorar cache antigo do catalogo mensal");
-assert(html.includes("KB5122882"), "backup local deve conter o KB de setembro do Server 2022");
+assert(html.includes("KB5129237"), "backup local deve conter o KB corretivo de setembro do Server 2022");
 const correctedSeptemberCatalog = vm.runInContext('applyKnownKbCorrections({ "2016": { kb: "KB5123099" }, "2019": { kb: "KB5122876" } }, "2026-Sep")', sandbox);
 assert.strictEqual(correctedSeptemberCatalog["2016"].kb, "KB5129239");
 assert.strictEqual(correctedSeptemberCatalog["2019"].kb, "KB5129238");
+assert.strictEqual(correctedSeptemberCatalog["2022"].kb, "KB5129237");
+assert.strictEqual(correctedSeptemberCatalog["2025"].kb, "KB5129235");
 const untouchedOctoberCatalog = vm.runInContext('applyKnownKbCorrections({ "2016": { kb: "KB-FUTURO" } }, "2026-Oct")', sandbox);
 assert.strictEqual(untouchedOctoberCatalog["2016"].kb, "KB-FUTURO");
 assert(html.includes('id="cmdbCopyResult"'), "painel CMDB deve expor campo de resultado copiavel");
