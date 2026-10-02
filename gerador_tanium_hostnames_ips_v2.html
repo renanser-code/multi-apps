@@ -950,21 +950,12 @@ function suggestKBs(lines) {
   const text = lines.join(" ").toLowerCase();
   const unsupportedNotices = getUnsupportedWindowsServerNotices(lines);
 
-  if (text.includes("2016") || text.includes("srv16") || text.includes("server16")) {
-    suggested.add("2016");
-  }
-  if (text.includes("2019") || text.includes("srv19") || text.includes("server19")) {
-    suggested.add("2019");
-  }
-  if (text.includes("2022") || text.includes("srv22") || text.includes("server22")) {
-    suggested.add("2022");
-  }
-  if (text.includes("win10") || text.includes("w10")) {
-    suggested.add("10");
-  }
-  if (text.includes("win11") || text.includes("w11")) {
-    suggested.add("11");
-  }
+  lines.map(getOsLabelFromText).forEach(osLabel => {
+    const serverMatch = osLabel.match(/^Windows Server (2016|2019|2022|2025)$/);
+    if (serverMatch) suggested.add(serverMatch[1]);
+    if (osLabel === "Windows 10") suggested.add("10");
+    if (osLabel === "Windows 11") suggested.add("11");
+  });
 
   if (unsupportedNotices.length === 0 && suggested.size === 0 && (text.includes("win") || text.includes("microsoft") || text.includes("ad") || text.includes("sql"))) {
     suggested.add("2019");

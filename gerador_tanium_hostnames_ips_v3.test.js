@@ -187,6 +187,18 @@ assert(kbSuggestionHtml.indexOf("Copiar KB") < kbSuggestionHtml.indexOf("Backup 
 assert(kbSuggestionHtml.includes("class='kb-download-btn'"), "sugestao de KB deve exibir botao para download");
 assert(kbSuggestionHtml.includes("catalog.update.microsoft.com/Search.aspx?q="), "download deve abrir o Microsoft Update Catalog");
 
+const dellaviaItems = sandbox.__suggestKBs([
+  "SV-DBM-DELLAV01 | IP: 10.200.186.30 | OS: Microsoft Windows Server 2012 (64-bit)",
+  "SV-DBS-DELLAV01 | IP: 10.200.186.27 | OS: Microsoft Windows Server 2016 (64-bit)",
+  "SV-FS-DCDV01 | IP: 10.200.186.26 | OS: Microsoft Windows Server 2019 (64-bit)",
+  "SV-ERPFR-DCDV1 | IP: 10.200.186.132 | OS: Microsoft Windows Server 2022 (64-bit)",
+  "SV-GLPI-DCDV1 | IP: 10.20.25.9 | OS: Debian GNU/Linux 12 (64-bit)"
+]);
+assert(dellaviaItems.some(item => /Windows Server 2016/i.test(item.name)), "DELLAVIA deve sugerir o KB do Server 2016");
+assert(dellaviaItems.some(item => /Windows Server 2019/i.test(item.name)), "DELLAVIA deve sugerir o KB do Server 2019");
+assert(dellaviaItems.some(item => /Windows Server 2022/i.test(item.name)), "DELLAVIA deve sugerir o KB do Server 2022");
+assert(!dellaviaItems.some(item => /Windows Server 2025/i.test(item.name)), "numero em IP ou hostname nao pode sugerir Server 2025");
+
 const catalogNameItems = sandbox.__suggestKBs(["Microsoft server operating system version 24H2 for x64-based Systems"]);
 assert(catalogNameItems.some(item => item.kb === "KB5120233"), "nome do Microsoft Update Catalog 24H2 deve mapear para Server 2025");
 
