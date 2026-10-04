@@ -752,8 +752,8 @@ function getOsDetectionLines(data) {
     ...((data.activeVMs || []).map(vm => `${vm.name || ""} ${vm.info || ""}`)),
     ...((data.offlineVMs || []).map(vm => `${vm.name || ""} ${vm.info || ""}`))
   ].filter(line => line.trim());
-  if (data.isCmdbApplied && cmdbLines.length > 0) return cmdbLines;
-  return data.lines || [];
+  const sourceLines = data.isCmdbApplied && cmdbLines.length > 0 ? cmdbLines : (data.lines || []);
+  return [...sourceLines, ...(data.osNames || [])];
 }
 
 function renderUnsupportedOsNotices(notices) {

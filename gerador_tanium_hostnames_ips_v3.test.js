@@ -202,6 +202,7 @@ assert(!dellaviaItems.some(item => /Windows Server 2025/i.test(item.name)), "num
 const cmdbDetectionLines = vm.runInContext(`getOsDetectionLines({
   isCmdbApplied: true,
   lines: ["SV-STF-DELLAV01", "SV-FS-DELLAV01"],
+  osNames: ["Windows Server 2012/2012 R2 (sem atualizacao padrao)", "Windows Server 2019", "Windows Server 2022"],
   activeVMs: [
     { name: "SV-STF-DELLAV01", info: "Cliente: DELLAVIA | OS: Microsoft Windows Server 2012 (64-bit)" },
     { name: "SV-FS-DELLAV01", info: "Cliente: DELLAVIA | OS: Microsoft Windows Server 2019 (64-bit)" },
@@ -214,6 +215,14 @@ assert(cmdbKbItems.some(item => /Windows Server 2019/i.test(item.name)), "CMDB d
 assert(cmdbKbItems.some(item => /Windows Server 2022/i.test(item.name)), "CMDB deve sugerir Server 2022");
 assert(!cmdbKbItems.some(item => /Windows Server 2025/i.test(item.name)), "CMDB sem Server 2025 nao deve sugerir seu KB");
 assert(getElement("kbSuggestions").innerHTML.includes("NAO SERAO ATUALIZADOS"), "CMDB com Server 2012 deve exibir o alerta");
+const osSummaryDetectionLines = vm.runInContext(`getOsDetectionLines({
+  isCmdbApplied: true,
+  lines: ["SV-STF-DELLAV01"],
+  osNames: ["Windows Server 2012/2012 R2 (sem atualizacao padrao)"],
+  activeVMs: [],
+  offlineVMs: []
+})`, sandbox);
+assert(vm.runInContext(`getUnsupportedWindowsServerNotices(${JSON.stringify(osSummaryDetectionLines)}).length`, sandbox) === 1, "resumo de SO com Server 2012 deve tornar o alerta obrigatorio");
 
 const catalogNameItems = sandbox.__suggestKBs(["Microsoft server operating system version 24H2 for x64-based Systems"]);
 assert(catalogNameItems.some(item => item.kb === "KB5120233"), "nome do Microsoft Update Catalog 24H2 deve mapear para Server 2025");
