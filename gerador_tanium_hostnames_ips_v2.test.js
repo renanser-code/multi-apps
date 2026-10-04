@@ -107,12 +107,14 @@ assert(!dellaviaItems.some(item => /Windows Server 2025/i.test(item.name)), "num
 
 const shortServer2012Items = sandbox.__suggestKBs(["LEGADO02 Microsoft Server 2012 x64"]);
 assert.strictEqual(shortServer2012Items.length, 0, "Server 2012 escrito de forma curta nao deve receber sugestao automatica de KB");
-assert(getElement("kbSuggestions").innerHTML.includes("Windows Server 2012/2012 R2 nao sao mais atualizados no ciclo padrao"));
+assert(getElement("kbSuggestions").innerHTML.includes("Windows Server 2012/2012 R2 - NAO SERAO ATUALIZADOS"));
 
 getElement("input").value = "LEGADO01 Microsoft Windows Server 2012 R2 (64-bit)";
 sandbox.__generate();
 const server2012EmailHtml = getElement("emailText").innerHTML;
 assert(server2012EmailHtml.includes("Windows Server 2012/2012 R2 (sem atualizacao padrao)"));
+assert(server2012EmailHtml.includes("ATENCAO: WINDOWS SERVER 2012/2012 R2 NAO SERAO ATUALIZADOS NESTA GMUD"));
+assert(server2012EmailHtml.includes("Estas VMs nao serao atualizadas nesta GMUD"));
 assert(!server2012EmailHtml.includes("Windows Server / Client (Padr"));
 assert(!server2012EmailHtml.includes("Cumulative Security Updates (Tanium Patch)"));
 

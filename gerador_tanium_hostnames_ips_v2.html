@@ -285,8 +285,8 @@ let KB_CATALOG = {
 };
 
 const WINDOWS_SERVER_2012_UNSUPPORTED_NOTICE = {
-  os: "Windows Server 2012/2012 R2 nao sao mais atualizados no ciclo padrao",
-  message: "O suporte estendido Microsoft encerrou em 10/10/2023. O gerador nao sugere KB automaticamente para este SO. Apenas ambientes/licencas elegiveis com ESU podem receber atualizacoes criticas/importantes ate 13/10/2026; recomenda-se upgrade para uma versao suportada."
+  os: "Windows Server 2012/2012 R2 - NAO SERAO ATUALIZADOS",
+  message: "Estas VMs nao serao atualizadas nesta GMUD. O suporte estendido Microsoft encerrou em 10/10/2023 e o gerador nao sugere KB para este SO. Apenas ambientes/licencas elegiveis com ESU podem receber atualizacoes criticas/importantes ate 13/10/2026; recomenda-se upgrade para uma versao suportada."
 };
 
 const PRIORITY_VM_ALERT_MESSAGE = "VM monitorada: validar tratamento especifico antes do deploy e registrar evidencia no encerramento da GMUD.";
@@ -395,6 +395,14 @@ function renderUnsupportedOsNotices(notices) {
   return `<div style="margin: 0 0 8px 0; padding: 8px; border-left: 4px solid #f97316; background: #2a1c10; color: #fed7aa; border-radius: 6px;">
     ${notices.map(notice => `<div><strong>${escapeHtml(notice.os)}</strong><br>${escapeHtml(notice.message)}</div>`).join("")}
   </div>`;
+}
+
+function renderUnsupportedOsEmailAlert(notices) {
+  if (!notices || notices.length === 0) return "";
+  return `<br><table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;font-family:Segoe UI,Arial,sans-serif;">
+    <tr><td style="background-color:#b91c1c;color:#ffffff;padding:10px 12px;border:1px solid #991b1b;font-size:16px;"><strong>ATENCAO: WINDOWS SERVER 2012/2012 R2 NAO SERAO ATUALIZADOS NESTA GMUD</strong></td></tr>
+    <tr><td style="background-color:#fff1f2;color:#7f1d1d;padding:12px;border:1px solid #f87171;">${notices.map(notice => `<strong>${escapeHtml(notice.os)}</strong><br>${escapeHtml(notice.message)}`).join("<br><br>")}</td></tr>
+  </table>`;
 }
 
 function compactIdentifier(value) {
@@ -1301,10 +1309,7 @@ function generate() {
   }
 
   if (unsupportedNotices.length > 0) {
-    emailHtml += "<br><strong>Sistemas operacionais sem suporte padrao:</strong><br>";
-    unsupportedNotices.forEach(notice => {
-      emailHtml += `- ${escapeHtml(notice.os)}: ${escapeHtml(notice.message)}<br>`;
-    });
+    emailHtml += renderUnsupportedOsEmailAlert(unsupportedNotices);
   }
 
   emailHtml += "<br><strong>Patches de segurança que serão aplicados:</strong><br>";
