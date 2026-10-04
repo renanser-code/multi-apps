@@ -333,7 +333,7 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
           </div>
           <div>
             <label for="schedCc">Cópia (Cc) — separados por ;</label>
-            <input type="text" id="schedCc" value="noc@br.clara.net" placeholder="copia@empresa.com">
+            <input type="text" id="schedCc" value="noc@br.clara.net; henrique.urbaninho@claranet.com; filipe.evangelista@claranet.com; ronald.magalhaes@claranet.com; aliffe.santos@claranet.com" placeholder="copia@empresa.com">
           </div>
         </div>
 
@@ -538,11 +538,19 @@ const WINDOWS_SERVER_2012_UNSUPPORTED_NOTICE = {
   os: "Windows Server 2012/2012 R2 - NAO SERAO ATUALIZADOS",
   message: "Estas VMs nao serao atualizadas nesta GMUD. O suporte estendido Microsoft encerrou em 10/10/2023 e o gerador nao sugere KB para este SO. Apenas ambientes/licencas elegiveis com ESU podem receber atualizacoes criticas/importantes ate 13/10/2026; recomenda-se upgrade para uma versao suportada."
 };
-const REQUIRED_CC_EMAIL = "noc@br.clara.net";
+const REQUIRED_CC_EMAILS = [
+  "noc@br.clara.net",
+  "henrique.urbaninho@claranet.com",
+  "filipe.evangelista@claranet.com",
+  "ronald.magalhaes@claranet.com",
+  "aliffe.santos@claranet.com"
+];
 
 function ensureRequiredCc(value) {
   const emails = String(value || "").split(/[;,]/).map(email => email.trim()).filter(Boolean);
-  if (!emails.some(email => email.toLowerCase() === REQUIRED_CC_EMAIL)) emails.push(REQUIRED_CC_EMAIL);
+  REQUIRED_CC_EMAILS.forEach(requiredEmail => {
+    if (!emails.some(email => email.toLowerCase() === requiredEmail)) emails.push(requiredEmail);
+  });
   return [...new Map(emails.map(email => [email.toLowerCase(), email])).values()].join("; ");
 }
 
@@ -3329,7 +3337,7 @@ function parseGmudEmail() {
 
   // Auto-apply email classification immediately — @claranet.com → Cc, others → To
   const autoTo = [];
-  const autoCc = [REQUIRED_CC_EMAIL];
+  const autoCc = [...REQUIRED_CC_EMAILS];
   allEmailsFound.forEach(email => {
     if (email.toLowerCase().includes('@claranet.com')) autoCc.push(email);
     else autoTo.push(email);
@@ -3360,7 +3368,7 @@ function onGmudEmailInput(el) {
 // Apply the email checkbox selection to the To and Cc fields
 function applyEmailSelection() {
   const toEmails = [];
-  const ccEmails = [REQUIRED_CC_EMAIL];
+  const ccEmails = [...REQUIRED_CC_EMAILS];
   document.querySelectorAll(".email-sel-row").forEach(row => {
     const email = row.dataset.email;
     const sel = row.querySelector("select").value;
