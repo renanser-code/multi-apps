@@ -105,6 +105,22 @@ assert(dellaviaItems.some(item => /Windows Server 2019/i.test(item.name)), "DELL
 assert(dellaviaItems.some(item => /Windows Server 2022/i.test(item.name)), "DELLAVIA deve sugerir o KB do Server 2022");
 assert(!dellaviaItems.some(item => /Windows Server 2025/i.test(item.name)), "numero em IP ou hostname nao pode sugerir Server 2025");
 
+const cmdbDetectionLines = vm.runInContext(`getOsDetectionLines({
+  isCmdbApplied: true,
+  lines: ["SV-STF-DELLAV01", "SV-FS-DELLAV01"],
+  activeVMs: [
+    { name: "SV-STF-DELLAV01", info: "Cliente: DELLAVIA | OS: Microsoft Windows Server 2012 (64-bit)" },
+    { name: "SV-FS-DELLAV01", info: "Cliente: DELLAVIA | OS: Microsoft Windows Server 2019 (64-bit)" },
+    { name: "SV-RDSVD-DCDV05", info: "Cliente: DELLAVIA | OS: Microsoft Windows Server 2022 (64-bit)" }
+  ],
+  offlineVMs: []
+})`, sandbox);
+const cmdbKbItems = sandbox.__suggestKBs(cmdbDetectionLines);
+assert(cmdbKbItems.some(item => /Windows Server 2019/i.test(item.name)), "CMDB deve sugerir Server 2019");
+assert(cmdbKbItems.some(item => /Windows Server 2022/i.test(item.name)), "CMDB deve sugerir Server 2022");
+assert(!cmdbKbItems.some(item => /Windows Server 2025/i.test(item.name)), "CMDB sem Server 2025 nao deve sugerir seu KB");
+assert(getElement("kbSuggestions").innerHTML.includes("NAO SERAO ATUALIZADOS"), "CMDB com Server 2012 deve exibir o alerta");
+
 const shortServer2012Items = sandbox.__suggestKBs(["LEGADO02 Microsoft Server 2012 x64"]);
 assert.strictEqual(shortServer2012Items.length, 0, "Server 2012 escrito de forma curta nao deve receber sugestao automatica de KB");
 assert(getElement("kbSuggestions").innerHTML.includes("Windows Server 2012/2012 R2 - NAO SERAO ATUALIZADOS"));

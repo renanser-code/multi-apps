@@ -747,6 +747,15 @@ function getUnsupportedWindowsServerNotices(lines) {
   return detectWindowsServer2012(text) ? [WINDOWS_SERVER_2012_UNSUPPORTED_NOTICE] : [];
 }
 
+function getOsDetectionLines(data) {
+  const cmdbLines = [
+    ...((data.activeVMs || []).map(vm => `${vm.name || ""} ${vm.info || ""}`)),
+    ...((data.offlineVMs || []).map(vm => `${vm.name || ""} ${vm.info || ""}`))
+  ].filter(line => line.trim());
+  if (data.isCmdbApplied && cmdbLines.length > 0) return cmdbLines;
+  return data.lines || [];
+}
+
 function renderUnsupportedOsNotices(notices) {
   if (!notices || notices.length === 0) return "";
   return `<div style="margin: 0 0 8px 0; padding: 8px; border-left: 4px solid #f97316; background: #2a1c10; color: #fed7aa; border-radius: 6px;">
@@ -1791,8 +1800,9 @@ function generate() {
   document.getElementById("linuxMachineCount").innerText = data.osGroups?.linux?.hostnames?.length || 0;
   document.getElementById("lineCount").innerText = data.lines.length;
 
-  const suggestedKbs = suggestKBs(data.lines).filter(isDeployableCumulativeKb);
-  const unsupportedNotices = getUnsupportedWindowsServerNotices(data.lines);
+  const osDetectionLines = getOsDetectionLines(data);
+  const suggestedKbs = suggestKBs(osDetectionLines).filter(isDeployableCumulativeKb);
+  const unsupportedNotices = getUnsupportedWindowsServerNotices(osDetectionLines);
   const monitoredAlerts = getMonitoredVmAlerts(data);
   updateMonitoredVmAlerts(monitoredAlerts);
   
@@ -2366,8 +2376,9 @@ function reconcileClosureInferenceWithScope(inference) {
 
 function getClosurePayload() {
   const data = processInput();
-  const suggestedKbs = suggestKBs(data.lines).filter(isDeployableCumulativeKb);
-  const unsupportedNotices = getUnsupportedWindowsServerNotices(data.lines);
+  const osDetectionLines = getOsDetectionLines(data);
+  const suggestedKbs = suggestKBs(osDetectionLines).filter(isDeployableCumulativeKb);
+  const unsupportedNotices = getUnsupportedWindowsServerNotices(osDetectionLines);
   const gmudNumber = document.getElementById("schedGmud").value.trim() || "XXX";
   const status = document.getElementById("closureStatus").value || "Concluída com sucesso";
   const client = getClosureClientName(data);
