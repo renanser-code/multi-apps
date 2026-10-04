@@ -97,6 +97,15 @@ assert(html.includes('class="regex-grid"'), "resultados finais devem usar grade 
 assert(html.includes("grid-template-columns:repeat(2,minmax(0,1fr))"), "resultados gerais separados devem ter duas colunas em telas largas");
 assert(html.includes("align-items:stretch"), "paineis paralelos devem preencher toda a altura disponivel");
 assert(html.includes("grid-template-rows:repeat(2,minmax(0,1fr))"), "resultados da coluna esquerda devem preencher o espaco vertical");
+assert(html.includes('id="schedCc" value="noc@br.clara.net"'), "campo Cc deve iniciar com o NOC obrigatorio");
+assert.strictEqual(vm.runInContext('ensureRequiredCc("")', sandbox), "noc@br.clara.net");
+assert.strictEqual(vm.runInContext('ensureRequiredCc("cliente@empresa.com; NOC@BR.CLARA.NET")', sandbox), "cliente@empresa.com; NOC@BR.CLARA.NET");
+getElement("schedDate").value = "2026-10-04";
+getElement("schedTime").value = "23:00";
+getElement("schedCc").value = "";
+const mandatoryCcScript = vm.runInContext("buildSchedulingScript()", sandbox);
+assert(mandatoryCcScript.includes("$Mail.CC                   = 'noc@br.clara.net'"), "script do Outlook deve sempre copiar o NOC");
+assert.strictEqual(getElement("schedCc").value, "noc@br.clara.net", "geracao deve restaurar o NOC no campo Cc");
 
 const baseCatalog = {
   "2016": { kb: "KB0000001", name: "old 2016" },

@@ -333,7 +333,7 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
           </div>
           <div>
             <label for="schedCc">Cópia (Cc) — separados por ;</label>
-            <input type="text" id="schedCc" placeholder="copia@empresa.com">
+            <input type="text" id="schedCc" value="noc@br.clara.net" placeholder="copia@empresa.com">
           </div>
         </div>
 
@@ -538,6 +538,13 @@ const WINDOWS_SERVER_2012_UNSUPPORTED_NOTICE = {
   os: "Windows Server 2012/2012 R2 - NAO SERAO ATUALIZADOS",
   message: "Estas VMs nao serao atualizadas nesta GMUD. O suporte estendido Microsoft encerrou em 10/10/2023 e o gerador nao sugere KB para este SO. Apenas ambientes/licencas elegiveis com ESU podem receber atualizacoes criticas/importantes ate 13/10/2026; recomenda-se upgrade para uma versao suportada."
 };
+const REQUIRED_CC_EMAIL = "noc@br.clara.net";
+
+function ensureRequiredCc(value) {
+  const emails = String(value || "").split(/[;,]/).map(email => email.trim()).filter(Boolean);
+  if (!emails.some(email => email.toLowerCase() === REQUIRED_CC_EMAIL)) emails.push(REQUIRED_CC_EMAIL);
+  return [...new Map(emails.map(email => [email.toLowerCase(), email])).values()].join("; ");
+}
 
 const PRIORITY_VM_ALERT_MESSAGE = "VM monitorada: validar tratamento especifico antes do deploy e registrar evidencia no encerramento da GMUD.";
 const VISA_THIRD_WAVE_ALERT_MESSAGE = "3a onda VISA: VM prioritaria; garantir acompanhamento durante o deploy e registrar evidencia no encerramento da GMUD.";
@@ -3081,7 +3088,9 @@ function buildSchedulingScript() {
   const schedDate  = document.getElementById("schedDate").value;   // YYYY-MM-DD
   const schedTime  = document.getElementById("schedTime").value;   // HH:MM
   const toAddr     = document.getElementById("schedTo").value.trim() || "";
-  const ccAddr     = document.getElementById("schedCc").value.trim() || "";
+  const ccField    = document.getElementById("schedCc");
+  const ccAddr     = ensureRequiredCc(ccField.value);
+  ccField.value    = ccAddr;
 
   if (!schedDate || !schedTime) return null;
 
@@ -3320,13 +3329,13 @@ function parseGmudEmail() {
 
   // Auto-apply email classification immediately — @claranet.com → Cc, others → To
   const autoTo = [];
-  const autoCc = [];
+  const autoCc = [REQUIRED_CC_EMAIL];
   allEmailsFound.forEach(email => {
     if (email.toLowerCase().includes('@claranet.com')) autoCc.push(email);
     else autoTo.push(email);
   });
   if (autoTo.length) document.getElementById("schedTo").value = autoTo.join("; ");
-  if (autoCc.length) document.getElementById("schedCc").value = autoCc.join("; ");
+  document.getElementById("schedCc").value = ensureRequiredCc(autoCc.join("; "));
 
   // Show parsed preview
   document.getElementById("previewGmud").textContent = gmudNum || "(não encontrado)";
@@ -3351,7 +3360,7 @@ function onGmudEmailInput(el) {
 // Apply the email checkbox selection to the To and Cc fields
 function applyEmailSelection() {
   const toEmails = [];
-  const ccEmails = [];
+  const ccEmails = [REQUIRED_CC_EMAIL];
   document.querySelectorAll(".email-sel-row").forEach(row => {
     const email = row.dataset.email;
     const sel = row.querySelector("select").value;
@@ -3359,7 +3368,7 @@ function applyEmailSelection() {
     else if (sel === "cc") ccEmails.push(email);
   });
   if (toEmails.length) document.getElementById("schedTo").value = toEmails.join("; ");
-  if (ccEmails.length) document.getElementById("schedCc").value = ccEmails.join("; ");
+  document.getElementById("schedCc").value = ensureRequiredCc(ccEmails.join("; "));
   updateScriptPreview();
   // Visual feedback
   const btn = event.target;
