@@ -2424,7 +2424,7 @@ function getClosurePayload() {
   const suggestedKbs = suggestKBs(osDetectionLines).filter(isDeployableCumulativeKb);
   const unsupportedNotices = getUnsupportedWindowsServerNotices(osDetectionLines);
   const gmudNumber = document.getElementById("schedGmud").value.trim() || "XXX";
-  const status = document.getElementById("closureStatus").value || "Concluída com sucesso";
+  const selectedStatus = document.getElementById("closureStatus").value || "Concluída com sucesso";
   const client = getClosureClientName(data);
   const executor = document.getElementById("closureExecutor").value.trim() || "Nao informado";
   const closureDate = document.getElementById("closureDate").value || "";
@@ -2436,6 +2436,19 @@ function getClosurePayload() {
   const missingEvidenceServers = servers.filter(server => server.evidenceState === "missing");
   const pendingOcrServers = servers.filter(server => server.evidenceState === "pending_ocr");
   const manualReviewServers = servers.filter(server => server.evidenceState === "ocr_unmatched" || server.evidenceState === "ocr_failed");
+  const evidencedSuccessServers = servers.filter(server => {
+    const result = normalizeEvidenceText(server.result || "");
+    return server.evidenceState === "evidenced"
+      && /complete|concluid/.test(result)
+      && !/falha|erro|pending|pendente|waiting|restart|reinicio|ressalva/.test(result);
+  });
+  const allServersEvidencedSuccessfully = servers.length > 0
+    && evidenceAnalysisState.hasImages
+    && evidencedSuccessServers.length === servers.length
+    && pendingOcrServers.length === 0
+    && manualReviewServers.length === 0
+    && missingEvidenceServers.length === 0;
+  const status = allServersEvidencedSuccessfully ? "Concluída com sucesso" : selectedStatus;
 
   return {
     gmudNumber,
@@ -2451,6 +2464,8 @@ function getClosurePayload() {
     missingEvidenceServers,
     pendingOcrServers,
     manualReviewServers,
+    evidencedSuccessServers,
+    allServersEvidencedSuccessfully,
     suggestedKbs,
     unsupportedNotices,
     osNames,
@@ -2994,6 +3009,10 @@ function buildClosureReportHtml() {
     <p>A leitura OCR foi executada, mas nao houve correlacao confiavel entre a evidencia e os hostnames/IPs abaixo. Valide a evidencia visualmente ou registre a situacao nas observacoes finais da GMUD.</p>
     <ul>${payload.manualReviewServers.map(server => `<li>${escapeHtml(server.name)} - ${escapeHtml(server.result)}</li>`).join("")}</ul>`
     : "";
+  const evidenceValidationHtml = payload.evidenceFiles.length > 0
+    ? `<h2>Validação das Evidências</h2>
+    <p><strong>${payload.evidencedSuccessServers.length} de ${payload.servers.length} servidor(es)</strong> foram identificados nas evidências com resultado de atualização concluída com sucesso.${payload.allServersEvidencedSuccessfully ? " Todo o escopo foi validado como Complete, All Patches Applied." : " Os demais itens permanecem detalhados abaixo para validação ou tratamento."}</p>`
+    : "";
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -3045,6 +3064,8 @@ function buildClosureReportHtml() {
       <thead><tr><th>Servidor</th><th>SO</th><th>Resultado</th></tr></thead>
       <tbody>${serversHtml}</tbody>
     </table>
+
+    ${evidenceValidationHtml}
 
     ${pendingOcrHtml}
 

@@ -533,6 +533,11 @@ const fuzzyOcrReportHtml = sandbox.__buildClosureReportHtml();
   assert(fuzzyOcrReportHtml.includes(`<td>${host}</td><td>Windows Server 2022</td><td>Complete, All Patches Applied</td>`), `${host} deve ser correlacionado mesmo com erro simples de OCR`);
 });
 assert(!fuzzyOcrReportHtml.includes("Nao evidenciado no encerramento"));
+assert(fuzzyOcrReportHtml.includes("Validação das Evidências"));
+assert(fuzzyOcrReportHtml.includes("6 de 6 servidor(es)"));
+assert(fuzzyOcrReportHtml.includes("Todo o escopo foi validado como Complete, All Patches Applied."));
+assert(fuzzyOcrReportHtml.includes('<td class="meta-label">Status</td><td>Concluída com sucesso</td>'), "PDF deve corrigir o status geral quando todo o escopo estiver evidenciado com sucesso");
+assert(fuzzyOcrReportHtml.includes("concluída com 100% de sucesso"), "conclusao tecnica do PDF deve refletir o sucesso comprovado");
 const completeScopeInference = sandbox.__reconcileClosureInferenceWithScope(successStatus);
 assert.strictEqual(completeScopeInference.status, "Concluída com sucesso", "todos os hosts evidenciados devem permitir sucesso");
 
