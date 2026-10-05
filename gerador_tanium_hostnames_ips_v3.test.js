@@ -480,6 +480,24 @@ assert(missingEvidenceReportHtml.includes("Servidores sem evidencia ou observaca
 
 const successStatus = sandbox.__inferClosureStatusFromEvidenceText("Parent Status Complete Status Complete, All Patches Applied Currently Targeted Yes");
 assert.strictEqual(successStatus.status, "Concluída com sucesso");
+const fullCoverageResults = vm.runInContext(`applyEvidenceResultsToServers(
+  [{ name: "HOST-A" }, { name: "HOST-B" }, { name: "HOST-C" }],
+  "nome ilegivel 1 Complete, All Patches Applied\\nnome ilegivel 2 Complete, All Patches Applied\\nnome ilegivel 3 Complete, All Patches Applied",
+  "",
+  { hasPending: false, hasFailures: false, hasImages: true }
+)`, sandbox);
+assert(fullCoverageResults.every(server => server.evidenceState === "evidenced"), "linhas de sucesso suficientes devem cobrir todo o escopo mesmo com hostnames ilegíveis");
+assert(fullCoverageResults.every(server => server.result === "Complete, All Patches Applied"));
+const insufficientCoverageResults = vm.runInContext(`applyEvidenceResultsToServers(
+  [{ name: "HOST-A" }, { name: "HOST-B" }],
+  "nome ilegivel Complete, All Patches Applied",
+  "",
+  { hasPending: false, hasFailures: false, hasImages: true }
+)`, sandbox);
+assert(insufficientCoverageResults.some(server => server.evidenceState !== "evidenced"), "uma unica linha de sucesso nao pode validar duas VMs");
+const pdfAnalysisState = vm.runInContext(`getClosureEvidenceAnalysisState([{ name: "evidencia.pdf", type: "application/pdf", ocrText: "", ocrAnalyzed: false, ocrError: "" }])`, sandbox);
+assert.strictEqual(pdfAnalysisState.hasImages, true, "PDF deve participar da analise OCR");
+assert.strictEqual(pdfAnalysisState.hasPending, true, "PDF ainda nao analisado deve ficar pendente");
 assert(successStatus.reason.includes("Complete"));
 
 const warningStatus = sandbox.__inferClosureStatusFromEvidenceText("Status Pending Error Failed Reboot Required");

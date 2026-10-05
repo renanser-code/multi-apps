@@ -501,9 +501,9 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
           <div style="grid-column: 1 / -1;">
             <label for="closureEvidenceInput">Evidencias do encerramento (imagens ou PDF)</label>
             <input type="file" id="closureEvidenceInput" multiple accept="image/*,.pdf,application/pdf" onchange="handleClosureEvidenceFiles(this.files)">
-            <div class="hint">Imagens entram visualmente no relatorio. PDFs entram como referencia de evidencia para anexar junto ao encerramento.</div>
+            <div class="hint">Imagens entram visualmente no relatorio. Imagens e PDFs sao analisados por OCR; mantenha tambem os arquivos originais anexados ao encerramento.</div>
             <div id="closureEvidenceList" class="closure-file-list">Nenhuma evidencia selecionada.</div>
-            <div id="closureOcrFeedback" class="hint">OCR: selecione uma imagem e clique em analisar para sugerir o status.</div>
+            <div id="closureOcrFeedback" class="hint">OCR: selecione imagens ou PDFs e clique em analisar para sugerir o status.</div>
           </div>
         </div>
 
@@ -659,7 +659,10 @@ document.getElementById("closureTime").value = `${currentHours}:${currentMinutes
 
 const MSRC_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const TESSERACT_SCRIPT_URL = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
+const PDFJS_SCRIPT_URL = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+const PDFJS_WORKER_URL = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 let tesseractLoadPromise = null;
+let pdfJsLoadPromise = null;
 const SECURITY_UPDATE_RANK = {
   "security update": 1,
   "monthly rollup": 1,
@@ -2034,20 +2037,29 @@ function isClosureImageEvidence(file) {
   return String(file && file.type ? file.type : "").toLowerCase().startsWith("image/");
 }
 
+function isClosurePdfEvidence(file) {
+  const type = String(file && file.type ? file.type : "").toLowerCase();
+  return type.includes("pdf") || /\.pdf$/i.test(String(file && file.name ? file.name : ""));
+}
+
+function isClosureOcrEvidence(file) {
+  return isClosureImageEvidence(file) || isClosurePdfEvidence(file);
+}
+
 function closureImageHasOcrText(file) {
   return !!(file && (file.ocrText || file.recognizedText || file.text));
 }
 
 function getClosureEvidenceAnalysisState(files = closureEvidenceFiles) {
-  const imageFiles = (files || []).filter(isClosureImageEvidence);
-  const pendingImages = imageFiles.filter(file => !closureImageHasOcrText(file) && !file.ocrAnalyzed && !file.ocrError);
-  const failedImages = imageFiles.filter(file => !closureImageHasOcrText(file) && file.ocrError);
+  const ocrFiles = (files || []).filter(isClosureOcrEvidence);
+  const pendingImages = ocrFiles.filter(file => !closureImageHasOcrText(file) && !file.ocrAnalyzed && !file.ocrError);
+  const failedImages = ocrFiles.filter(file => !closureImageHasOcrText(file) && file.ocrError);
 
   return {
-    imageCount: imageFiles.length,
+    imageCount: ocrFiles.length,
     pendingImages,
     failedImages,
-    hasImages: imageFiles.length > 0,
+    hasImages: ocrFiles.length > 0,
     hasPending: pendingImages.length > 0,
     hasFailures: failedImages.length > 0
   };
@@ -2273,13 +2285,30 @@ function inferClosureResultFromEvidence(server, evidenceText, allServers) {
   return inferClosureResultFromEvidenceContext(getServerEvidenceContext(evidenceText, server, allServers));
 }
 
+function evidenceShowsSuccessForEntireScope(evidenceText, serverCount) {
+  if (!serverCount) return false;
+  const normalized = normalizeEvidenceText(evidenceText);
+  if (/\b(failed|failure|error|erro|falha|pending|pendente|waiting|reboot required|restart required|not targeted|not applicable)\b/.test(normalized)) return false;
+  const successfulRows = String(evidenceText || "").split(/\r?\n/).filter(line => {
+    const row = normalizeEvidenceText(line);
+    const complete = /\bcomplete\b|\bconcluid[oa]\b/.test(row);
+    const applied = row.includes("all patches applied") || row.includes("sem pendencias") || row.includes("100% de sucesso");
+    return complete && applied;
+  }).length;
+  return successfulRows >= serverCount;
+}
+
 function applyEvidenceResultsToServers(servers, evidenceText, observationText, evidenceState) {
   const correlatedEvidenceText = enrichEvidenceTextWithFuzzyServerAliases(evidenceText, servers);
   const hasEvidenceText = !!String(correlatedEvidenceText || "").trim();
+  const hasFullSuccessCoverage = evidenceShowsSuccessForEntireScope(correlatedEvidenceText, servers.length);
   const hasAnyServerEvidenceContext = hasEvidenceText
     && servers.some(server => !!getServerEvidenceContext(correlatedEvidenceText, server, servers));
 
   return servers.map(server => {
+    if (hasFullSuccessCoverage) {
+      return { ...server, result: "Complete, All Patches Applied", evidenceState: "evidenced" };
+    }
     const evidenceContext = getServerEvidenceContext(correlatedEvidenceText, server, servers);
     const evidenceResult = inferClosureResultFromEvidenceContext(evidenceContext);
 
@@ -2620,6 +2649,56 @@ function loadTesseractOcr() {
   return tesseractLoadPromise;
 }
 
+function loadPdfJs() {
+  const existingApi = window.pdfjsLib || (typeof pdfjsLib !== "undefined" ? pdfjsLib : null);
+  if (existingApi) return Promise.resolve(existingApi);
+  if (pdfJsLoadPromise) return pdfJsLoadPromise;
+
+  pdfJsLoadPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = PDFJS_SCRIPT_URL;
+    script.async = true;
+    script.onload = () => {
+      const api = window.pdfjsLib || (typeof pdfjsLib !== "undefined" ? pdfjsLib : null);
+      if (!api) {
+        reject(new Error("PDF.js carregado, mas API global nao encontrada."));
+        return;
+      }
+      if (api.GlobalWorkerOptions) api.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL;
+      resolve(api);
+    };
+    script.onerror = () => reject(new Error("Nao foi possivel carregar PDF.js pela internet."));
+    document.head.appendChild(script);
+  });
+  return pdfJsLoadPromise;
+}
+
+async function extractPdfEvidenceText(evidence, progressCallback) {
+  if (!evidence.file || typeof evidence.file.arrayBuffer !== "function") {
+    throw new Error("Arquivo PDF indisponivel para leitura.");
+  }
+  const api = await loadPdfJs();
+  const bytes = await evidence.file.arrayBuffer();
+  const pdf = await api.getDocument({ data: bytes }).promise;
+  const pageTexts = [];
+
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+    if (progressCallback) progressCallback(`pagina ${pageNumber}/${pdf.numPages}`);
+    const page = await pdf.getPage(pageNumber);
+    const viewport = page.getViewport({ scale: 2.2 });
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
+    const context = canvas.getContext("2d");
+    await page.render({ canvasContext: context, viewport }).promise;
+    const result = await runTesseractRecognize(canvas.toDataURL("image/png"), step => {
+      if (progressCallback) progressCallback(`pagina ${pageNumber}/${pdf.numPages} - ${step}`);
+    });
+    pageTexts.push(buildStructuredOcrText(result));
+  }
+  return pageTexts.filter(Boolean).join("\n");
+}
+
 async function runTesseractRecognize(source, progressCallback) {
   const api = await loadTesseractOcr();
 
@@ -2660,14 +2739,14 @@ async function runTesseractRecognize(source, progressCallback) {
 
 async function analyzeClosureEvidenceStatus(options = {}) {
   const feedback = document.getElementById("closureOcrFeedback");
-  const imageEvidences = closureEvidenceFiles.filter(isClosureImageEvidence);
+  const imageEvidences = closureEvidenceFiles.filter(isClosureOcrEvidence);
   const force = options.force !== false;
   const targets = force
     ? imageEvidences
     : imageEvidences.filter(file => !closureImageHasOcrText(file) && !file.ocrAnalyzed && !file.ocrError);
 
   if (imageEvidences.length === 0) {
-    feedback.textContent = "OCR: selecione ao menos uma imagem de evidencia para analisar.";
+    feedback.textContent = "OCR: selecione ao menos uma imagem ou PDF de evidencia para analisar.";
     feedback.style.color = "#fbbf24";
     return null;
   }
@@ -2686,19 +2765,26 @@ async function analyzeClosureEvidenceStatus(options = {}) {
   }
 
   try {
-    feedback.textContent = `OCR: carregando motor de leitura para ${targets.length} imagem(ns)...`;
+    feedback.textContent = `OCR: carregando motor de leitura para ${targets.length} arquivo(s)...`;
     feedback.style.color = "#93c5fd";
 
     for (let index = 0; index < targets.length; index++) {
       const imageEvidence = targets[index];
       feedback.textContent = `OCR: preparando ${imageEvidence.name || `imagem ${index + 1}`} (${index + 1}/${targets.length})...`;
 
-      const rawSource = await getEvidenceImageSource(imageEvidence);
-      const source = await preprocessImageForOcr(rawSource);
-      const result = await runTesseractRecognize(source, step => {
-        feedback.textContent = `OCR: ${imageEvidence.name || `imagem ${index + 1}`} - ${step}`;
-      });
-      const text = buildStructuredOcrText(result);
+      let text = "";
+      if (isClosurePdfEvidence(imageEvidence)) {
+        text = await extractPdfEvidenceText(imageEvidence, step => {
+          feedback.textContent = `OCR: ${imageEvidence.name || `PDF ${index + 1}`} - ${step}`;
+        });
+      } else {
+        const rawSource = await getEvidenceImageSource(imageEvidence);
+        const source = await preprocessImageForOcr(rawSource);
+        const result = await runTesseractRecognize(source, step => {
+          feedback.textContent = `OCR: ${imageEvidence.name || `imagem ${index + 1}`} - ${step}`;
+        });
+        text = buildStructuredOcrText(result);
+      }
       const inference = inferClosureStatusFromEvidenceText(text);
       imageEvidence.ocrText = text;
       imageEvidence.ocrInference = inference;
@@ -2710,7 +2796,7 @@ async function analyzeClosureEvidenceStatus(options = {}) {
     const inference = reconcileClosureInferenceWithScope(inferClosureStatusFromEvidenceText(combinedText));
 
     document.getElementById("closureStatus").value = inference.status;
-    feedback.textContent = `OCR: ${targets.length} imagem(ns) analisada(s). ${inference.status} sugerido. ${inference.reason}`;
+    feedback.textContent = `OCR: ${targets.length} arquivo(s) analisado(s). ${inference.status} sugerido. ${inference.reason}`;
     feedback.style.color = inference.status.includes("sucesso") ? "#86efac" : "#fde68a";
     if (!options.skipGenerate) generateClosure();
     return inference;
@@ -2761,7 +2847,7 @@ function buildClosureEmailHtml() {
 
   if (payload.pendingOcrServers.length > 0) {
     html += "<br><strong>Analise OCR pendente:</strong><br>";
-    html += "Ha imagem(ns) de evidencia anexada(s), mas a leitura OCR ainda nao foi concluida. Clique em Analisar evidencia e sugerir status antes de enviar o encerramento ou gerar o PDF final.<br>";
+    html += "Ha arquivo(s) de evidencia anexado(s), mas a leitura OCR ainda nao foi concluida. Clique em Analisar evidencia e sugerir status antes de enviar o encerramento ou gerar o PDF final.<br>";
   }
 
   if (payload.manualReviewServers.length > 0) {
@@ -2901,7 +2987,7 @@ function buildClosureReportHtml() {
     : "";
   const pendingOcrHtml = payload.pendingOcrServers.length > 0
     ? `<h2>Analise OCR pendente</h2>
-    <p>Ha imagem(ns) de evidencia anexada(s), mas a leitura OCR ainda nao foi concluida. Clique em Analisar evidencia e sugerir status ou abra novamente o relatorio para que o gerador processe as imagens antes da emissao final.</p>`
+    <p>Ha arquivo(s) de evidencia anexado(s), mas a leitura OCR ainda nao foi concluida. Clique em Analisar evidencia e sugerir status ou abra novamente o relatorio para que o gerador processe as evidencias antes da emissao final.</p>`
     : "";
   const manualReviewHtml = payload.manualReviewServers.length > 0
     ? `<h2>Servidores com validacao manual necessaria</h2>
