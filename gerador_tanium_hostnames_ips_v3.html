@@ -72,6 +72,22 @@
     .review-item.ok { border-color:#22c55e; }
     .review-item.warning { border-color:#f59e0b; }
     .review-item.critical { border-color:#ef4444; color:#fecaca; }
+    .scope-table-panel { margin:10px 0 14px; border-top:1px solid #334155; border-bottom:1px solid #334155; background:#151e2d; }
+    .scope-table-panel summary { cursor:pointer; padding:10px 12px; color:#e2e8f0; font-size:14px; font-weight:700; list-style-position:inside; }
+    .scope-table-tools { display:flex; gap:7px; flex-wrap:wrap; align-items:center; padding:0 12px 9px; }
+    .scope-table-tools input { flex:1; min-width:210px; max-width:360px; min-height:34px; border:1px solid #475569; border-radius:6px; background:#0f172a; color:#fff; padding:6px 9px; }
+    .scope-filter { padding:7px 9px; border-radius:5px; border:1px solid #475569; background:#1e293b; font-size:11px; }
+    .scope-filter.active { background:#0369a1; border-color:#38bdf8; }
+    .scope-table-wrap { max-height:280px; overflow:auto; border-top:1px solid #334155; }
+    .scope-table { width:100%; border-collapse:collapse; font-size:12px; }
+    .scope-table th { position:sticky; top:0; z-index:2; padding:8px; background:#0f172a; color:#bae6fd; text-align:left; border-bottom:1px solid #475569; }
+    .scope-table td { padding:7px 8px; border-bottom:1px solid #293548; color:#dbeafe; vertical-align:top; }
+    .scope-table tr.has-problem td { background:#2a1719; }
+    .scope-table-empty { padding:16px; text-align:center; color:#94a3b8; }
+    .scope-tag { display:inline-block; margin:1px 3px 1px 0; padding:2px 5px; border-radius:4px; background:#334155; color:#e2e8f0; font-size:10px; font-weight:700; }
+    .scope-tag.priority { background:#92400e; color:#fde68a; }
+    .scope-tag.database { background:#991b1b; color:#fecaca; }
+    .scope-tag.problem { background:#7f1d1d; color:#fecaca; }
     .example { background:#0b1220; border:1px solid #334155; border-radius:10px; padding:10px; color:#cbd5e1; font-family:Consolas, monospace; font-size:13px; line-height:1.45; margin-top:10px; }
     
     /* CMDB Section CSS */
@@ -279,6 +295,25 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
           <div class="review-item">Insira os servidores para iniciar a validação.</div>
         </div>
       </div>
+
+      <details class="scope-table-panel" id="scopeTablePanel" open>
+        <summary>Escopo estruturado <span id="scopeTableVisibleCount" class="badge">0 servidores</span></summary>
+        <div class="scope-table-tools">
+          <input id="scopeTableSearch" type="search" placeholder="Pesquisar hostname, IP, cliente ou SO" oninput="renderScopeTable()" aria-label="Pesquisar no escopo estruturado">
+          <button class="scope-filter active" type="button" data-filter="all" onclick="setScopeTableFilter('all')">Todos</button>
+          <button class="scope-filter" type="button" data-filter="windows" onclick="setScopeTableFilter('windows')">Windows</button>
+          <button class="scope-filter" type="button" data-filter="linux" onclick="setScopeTableFilter('linux')">Linux</button>
+          <button class="scope-filter" type="button" data-filter="priority" onclick="setScopeTableFilter('priority')">Prioritárias / BD</button>
+          <button class="scope-filter" type="button" data-filter="problem" onclick="setScopeTableFilter('problem')">Com problemas</button>
+          <button class="secondary mini-copy-btn" type="button" onclick="copyFilteredScopeTable()">Copiar lista filtrada</button>
+        </div>
+        <div class="scope-table-wrap">
+          <table class="scope-table">
+            <thead><tr><th>Hostname</th><th>IP</th><th>Cliente</th><th>Sistema operacional</th><th>Status</th><th>Classificação</th></tr></thead>
+            <tbody id="scopeTableBody"><tr><td colspan="6" class="scope-table-empty">Insira os servidores para montar a tabela.</td></tr></tbody>
+          </table>
+        </div>
+      </details>
 
       <!-- CMDB ClaraHub Panel -->
       <div class="cmdb-section" id="section-cmdb">
@@ -728,6 +763,9 @@ function applyKnownKbCorrections(catalog, documentId) {
 let cmdbDatabase = [];
 let isCmdbLoaded = false;
 let closureEvidenceFiles = [];
+let scopeTableRows = [];
+let scopeTableFilter = "all";
+let filteredScopeTableRows = [];
 
 // Initialize form default dates (today)
 const today = new Date();
@@ -1931,6 +1969,132 @@ function getDuplicateValues(values) {
   return [...counts.values()].filter(item => item.count > 1).map(item => item.value);
 }
 
+function getScopeInfoValue(info, label) {
+  const match = String(info || "").match(new RegExp(`${label}:\\s*([^|]+)`, "i"));
+  return match ? match[1].trim() : "";
+}
+
+function getScopePlatform(os) {
+  const value = String(os || "");
+  if (/linux|ubuntu|debian|centos|rocky|alma|suse|rhel|red hat/i.test(value)) return "linux";
+  if (/windows|microsoft server/i.test(value)) return "windows";
+  return "unknown";
+}
+
+function buildScopeTableRows(data, monitoredAlerts) {
+  const alertMap = new Map((monitoredAlerts || []).map(alert => [normalizeMonitoredVmName(alert.name), alert]));
+  const rows = [];
+  const seen = new Set();
+  const addRow = row => {
+    const name = String(row.name || "").trim();
+    const ip = String(row.ip || "").trim();
+    const key = `${normalizeMonitoredVmName(name)}|${ip}`;
+    if ((!name && !ip) || seen.has(key)) return;
+    seen.add(key);
+    const alert = alertMap.get(normalizeMonitoredVmName(name));
+    const classifications = [];
+    if (alert?.type && /VM prioritaria|3a onda VISA/i.test(alert.type)) classifications.push("Prioritária");
+    if (alert?.type && /Banco de Dados/i.test(alert.type)) classifications.push("Banco de dados");
+    const problems = [...(row.problems || [])];
+    if (/Windows Server 2012/i.test(row.os || "")) problems.push("Sem atualização");
+    if (!row.os || /N\/A|Nao informado/i.test(row.os)) problems.push("SO ausente");
+    rows.push({
+      ...row,
+      name: name || "Não informado",
+      ip: ip || "Não informado",
+      client: row.client || "Não informado",
+      os: row.os || "Não informado",
+      status: row.status || "Não validado",
+      platform: getScopePlatform(row.os),
+      classifications,
+      problems: unique(problems)
+    });
+  };
+
+  if (data.isCmdbApplied) {
+    const fromVm = (vm, status, problems = []) => addRow({
+      name: vm.name,
+      ip: getScopeInfoValue(vm.info, "IP"),
+      client: getScopeInfoValue(vm.info, "Cliente"),
+      os: getScopeInfoValue(vm.info, "OS"),
+      status,
+      problems
+    });
+    data.activeVMs.forEach(vm => fromVm(vm, "Ligada"));
+    data.offlineVMs.forEach(vm => fromVm(vm, "Desligada", ["Fora do escopo"]));
+    data.unknownVMs.forEach(vm => fromVm(vm, "Não localizado", [vm.reason || "Validar CMDB"]));
+  } else {
+    data.lines.forEach(line => {
+      const name = findHostname(line);
+      const ips = findIps(line);
+      if (!name && ips.length === 0) return;
+      const os = getOsLabelFromText(line);
+      const clientMatch = String(line).match(/Cliente:\s*([^|]+)/i);
+      addRow({
+        name,
+        ip: ips[0] || "",
+        client: clientMatch ? clientMatch[1].trim() : "",
+        os,
+        status: "Não validado",
+        problems: ["CMDB não aplicada"]
+      });
+    });
+  }
+  return rows;
+}
+
+function getFilteredScopeTableRows() {
+  const search = normalizeEvidenceText(document.getElementById("scopeTableSearch")?.value || "");
+  return scopeTableRows.filter(row => {
+    const matchesFilter = scopeTableFilter === "all"
+      || scopeTableFilter === row.platform
+      || (scopeTableFilter === "priority" && row.classifications.length > 0)
+      || (scopeTableFilter === "problem" && row.problems.length > 0);
+    if (!matchesFilter) return false;
+    if (!search) return true;
+    return normalizeEvidenceText([row.name, row.ip, row.client, row.os, row.status, ...row.classifications, ...row.problems].join(" ")).includes(search);
+  });
+}
+
+function renderScopeTable() {
+  const body = document.getElementById("scopeTableBody");
+  const count = document.getElementById("scopeTableVisibleCount");
+  if (!body) return [];
+  filteredScopeTableRows = getFilteredScopeTableRows();
+  if (count) count.textContent = `${filteredScopeTableRows.length} de ${scopeTableRows.length} servidores`;
+  if (filteredScopeTableRows.length === 0) {
+    body.innerHTML = '<tr><td colspan="6" class="scope-table-empty">Nenhum servidor corresponde ao filtro atual.</td></tr>';
+    return [];
+  }
+  body.innerHTML = filteredScopeTableRows.map(row => {
+    const tags = [
+      ...row.classifications.map(value => `<span class="scope-tag ${/Banco/i.test(value) ? "database" : "priority"}">${escapeHtml(value)}</span>`),
+      ...row.problems.map(value => `<span class="scope-tag problem">${escapeHtml(value)}</span>`)
+    ].join("") || '<span class="scope-tag">Padrão</span>';
+    return `<tr class="${row.problems.length ? "has-problem" : ""}"><td><strong>${escapeHtml(row.name)}</strong></td><td>${escapeHtml(row.ip)}</td><td>${escapeHtml(row.client)}</td><td>${escapeHtml(row.os)}</td><td>${escapeHtml(row.status)}</td><td>${tags}</td></tr>`;
+  }).join("");
+  return filteredScopeTableRows;
+}
+
+function setScopeTableFilter(filter) {
+  scopeTableFilter = ["all", "windows", "linux", "priority", "problem"].includes(filter) ? filter : "all";
+  document.querySelectorAll(".scope-filter").forEach(button => button.classList.toggle("active", button.dataset.filter === scopeTableFilter));
+  return renderScopeTable();
+}
+
+function updateScopeTable(data, monitoredAlerts) {
+  scopeTableRows = buildScopeTableRows(data, monitoredAlerts);
+  return renderScopeTable();
+}
+
+function copyFilteredScopeTable() {
+  const rows = renderScopeTable();
+  const text = rows.map(row => `${row.name} | IP: ${row.ip} | Cliente: ${row.client} | OS: ${row.os} | Status: ${row.status}${row.classifications.length ? ` | ${row.classifications.join(" / ")}` : ""}${row.problems.length ? ` | Alertas: ${row.problems.join(" / ")}` : ""}`).join("\n");
+  if (!text) return;
+  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).catch(err => console.warn("Falha ao copiar escopo:", err));
+  showCopyFeedback(`${rows.length} servidor(es) copiado(s)!`);
+}
+
 function buildGmudReview(data, suggestedKbs, unsupportedNotices, monitoredAlerts) {
   const items = [];
   const add = (level, message) => items.push({ level, message });
@@ -2140,6 +2304,7 @@ function generate() {
 
   emailHtml += "<br>Qualquer dúvida, estamos à disposição.<br>Atenciosamente,";
   document.getElementById("emailText").innerHTML = emailHtml;
+  updateScopeTable(data, monitoredAlerts);
   updateOperationalOverview(data, suggestedKbs, unsupportedNotices, monitoredAlerts);
 }
 
