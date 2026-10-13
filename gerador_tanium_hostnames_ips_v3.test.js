@@ -63,7 +63,7 @@ const sandbox = {
 };
 
 let script = scriptMatch[1];
-script = script.replace(/generate\(\);\s*(?:generateClosure\(\);\s*)?updateScriptPreview\(\);\s*loadLatestKBsFromMicrosoft\(\);/, "");
+script = script.replace(/generate\(\);\s*(?:generateClosure\(\);\s*)?updateScriptPreview\(\);\s*initializeKbSynchronization\(\);/, "");
 
 vm.createContext(sandbox);
 vm.runInContext(`${script}\nthis.__buildKbCatalogFromMsrc = buildKbCatalogFromMsrc;\nthis.__suggestKBs = suggestKBs;\nthis.__generate = generate;\nthis.__processInput = processInput;\nthis.__findHostname = findHostname;\nthis.__copyKbName = typeof copyKbName === "function" ? copyKbName : undefined;\nthis.__setKbCatalog = (catalog) => { KB_CATALOG = catalog; };\nthis.__generateClosure = typeof generateClosure === "function" ? generateClosure : undefined;\nthis.__buildClosureReportHtml = typeof buildClosureReportHtml === "function" ? buildClosureReportHtml : undefined;\nthis.__inferClosureStatusFromEvidenceText = typeof inferClosureStatusFromEvidenceText === "function" ? inferClosureStatusFromEvidenceText : undefined;\nthis.__analyzeClosureEvidenceStatus = typeof analyzeClosureEvidenceStatus === "function" ? analyzeClosureEvidenceStatus : undefined;\nthis.__enrichEvidenceTextWithFuzzyServerAliases = typeof enrichEvidenceTextWithFuzzyServerAliases === "function" ? enrichEvidenceTextWithFuzzyServerAliases : undefined;\nthis.__reconcileClosureInferenceWithScope = typeof reconcileClosureInferenceWithScope === "function" ? reconcileClosureInferenceWithScope : undefined;\nthis.__setClosureEvidenceFiles = (files) => { closureEvidenceFiles = files; };`, sandbox);
@@ -219,7 +219,7 @@ const kbSuggestionHtml = getElement("kbSuggestions").innerHTML;
 assert(kbSuggestionHtml.includes("class='kb-copy-btn'"), "sugestao de KB deve exibir botao para copiar KB");
 assert(kbSuggestionHtml.includes("copyKbName(this.dataset.kb)"), "botao deve chamar copyKbName com data-kb");
 assert(kbSuggestionHtml.includes('data-kb="KB5120233"'), "botao deve carregar o identificador do KB no data-kb");
-assert(kbSuggestionHtml.indexOf("Copiar KB") < kbSuggestionHtml.indexOf("Backup Local"), "botao Copiar KB deve ficar antes do selo Backup Local");
+assert(kbSuggestionHtml.indexOf("Copiar KB") < kbSuggestionHtml.indexOf("Backup local"), "botao Copiar KB deve ficar antes do selo do catalogo local");
 assert(kbSuggestionHtml.includes("class='kb-download-btn'"), "sugestao de KB deve exibir botao para download");
 assert(kbSuggestionHtml.includes("catalog.update.microsoft.com/Search.aspx?q="), "download deve abrir o Microsoft Update Catalog");
 
@@ -659,12 +659,6 @@ vm.runInContext("isCmdbLoaded = false; cmdbDatabase = [];", sandbox);
 assert(html.includes("tanium_kb_catalog.json"), "deve consultar o catalogo automatico publicado no GitHub");
 assert(html.includes('cache: "no-store"'), "deve ignorar cache antigo do catalogo mensal");
 assert(html.includes("KB5129237"), "backup local deve conter o KB corretivo de setembro do Server 2022");
-const correctedSeptemberCatalog = vm.runInContext('applyKnownKbCorrections({ "2016": { kb: "KB5123099" }, "2019": { kb: "KB5122876" } }, "2026-Sep")', sandbox);
-assert.strictEqual(correctedSeptemberCatalog["2016"].kb, "KB5129239");
-assert.strictEqual(correctedSeptemberCatalog["2019"].kb, "KB5129238");
-assert.strictEqual(correctedSeptemberCatalog["2022"].kb, "KB5129237");
-assert.strictEqual(correctedSeptemberCatalog["2025"].kb, "KB5129235");
-const untouchedOctoberCatalog = vm.runInContext('applyKnownKbCorrections({ "2016": { kb: "KB-FUTURO" } }, "2026-Oct")', sandbox);
-assert.strictEqual(untouchedOctoberCatalog["2016"].kb, "KB-FUTURO");
+assert(!html.includes("SEPTEMBER_2026_OOB_CORRECTIONS"), "atualizacoes emergenciais nao podem ser fixadas por mes");
 assert(html.includes('onclick="copyEmailAddress(this)"'), "cada e-mail encontrado deve ter botao individual para copiar");
 assert(html.includes('data-email="${email}"'), "o botao deve usar o endereco da propria linha");

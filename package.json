@@ -1,0 +1,11 @@
+{
+  "name": "multi-apps-maintenance",
+  "private": true,
+  "scripts": {
+    "test:tanium": "node --test scripts/tanium-kb-sync.test.cjs scripts/tanium-kb-browser.test.cjs && node gerador_tanium_hostnames_ips_v3.test.js && node scripts/embed-tanium-kb-sync.mjs --check",
+    "sync:tanium": "node scripts/update-tanium-kb-catalog.mjs"
+  },
+  "dependencies": {
+    "linkedom": "0.18.12"
+  }
+}
