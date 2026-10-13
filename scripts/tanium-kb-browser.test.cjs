@@ -14,7 +14,7 @@ function snapshot(fresh = true, newer = false) {
     sync: { status: "success", lastSuccessfulAt: fresh ? now.toISOString() : "2026-11-12T10:00:00Z", lastCompleteSuccessAt: now.toISOString(), errors: [] } };
 }
 
-function browser() {
+function browser(realGenerators = false) {
   const elements = new Map();
   const timers = new Map();
   const stored = new Map();
@@ -41,7 +41,7 @@ function browser() {
   assert(startup.test(script), "must suppress startup only, leaving real browser loader intact");
   script = script.replace(startup, "");
   vm.runInContext(script, context);
-  vm.runInContext("generate = generateClosure = updateScriptPreview = renderServerKbLookup = () => {};", context);
+  if (!realGenerators) vm.runInContext("generate = generateClosure = updateScriptPreview = renderServerKbLookup = () => {};", context);
   const load = vm.runInContext("loadLatestKBsFromMicrosoft", context);
   const initialize = vm.runInContext("initializeKbSynchronization", context);
   const read = expression => vm.runInContext(expression, context);
@@ -145,4 +145,43 @@ test("corrupt local cache is ignored; online and visible events restart synchron
   await b.load();
   assert.equal(calls, 3);
   assert.equal(b.read('KB_CATALOG["2025"].kb'), "KB6000004");
+});
+
+test("local file uses remote automatic catalog without a server or same-origin JSON", async () => {
+  const b = browser();
+  b.context.location = { protocol: "file:", href: "file:///C:/Manuais/gerador_tanium_hostnames_ips_v3.html" };
+  const urls = [];
+  b.context.TaniumKbSync.request = async url => { urls.push(url); return snapshot(true, true); };
+  await b.load();
+  assert.equal(urls.length, 1);
+  assert(urls[0].startsWith("https://raw.githubusercontent.com/"));
+  assert.equal(b.read('KB_CATALOG["2016"].kb'), "KB6000001");
+});
+
+test("new month regenerates opening email, closure email and PDF report using only affected Servers", async () => {
+  const b = browser(true);
+  b.element("input").value = [
+    "SV-KB-2016 Microsoft Windows Server 2016 (64-bit)",
+    "SV-KB-2019 Microsoft Windows Server 2019 (64-bit)",
+    "SV-KB-2022 Microsoft Windows Server 2022 (64-bit)",
+    "SV-KB-2025 Microsoft Windows Server 2025 (64-bit)",
+    "SV-KB-2012 Microsoft Windows Server 2012 (64-bit)",
+    "SV-KB-LINUX Debian GNU/Linux 12 (64-bit)"
+  ].join("\n");
+  b.element("closureStatus").value = "Concluida com sucesso";
+  b.element("schedGmud").value = "TEST-SYNC";
+  b.element("closureClient").value = "TEST";
+  b.context.TaniumKbSync.request = async () => snapshot(false);
+  b.context.TaniumKbSync.synchronize = async () => snapshot(true, true);
+  await b.load();
+  const report = b.read("buildClosureReportHtml()");
+  for (const markup of [b.element("emailText").innerHTML, b.element("closureEmailText").innerHTML, report]) {
+    for (const kb of ["KB6000001", "KB6000002", "KB6000003", "KB6000004"]) assert(markup.includes(kb), `missing ${kb}`);
+    assert(!markup.includes("KB5000001"));
+    assert(markup.includes("2012"));
+  }
+  b.element("input").value = "SV-KB-2016 Microsoft Windows Server 2016 (64-bit)";
+  b.read("generate()");
+  assert(b.element("emailText").innerHTML.includes("KB6000001"));
+  assert(!b.element("emailText").innerHTML.includes("KB6000004"));
 });

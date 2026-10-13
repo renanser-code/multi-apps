@@ -39,7 +39,7 @@ O JSON e escrito por substituicao atomica. O painel mostra ultimo sucesso,
 proxima consulta, falhas e alerta para uma consulta com mais de 90 minutos.
 
 O funcionamento depende de internet, disponibilidade das fontes oficiais e
-GitHub Actions habilitado. O agendamento do GitHub pode atrasar. Repositorios
+GitHub Actions habilitado. O [agendamento do GitHub](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule) pode atrasar. Repositorios
 publicos sem atividade por 60 dias podem ter agendamentos desabilitados pelo
 GitHub; as publicacoes periodicas do catalogo mantem atividade quando o job roda.
 Se o job parar, o indicador de frescor sinaliza a parada. Nao sao inventados KBs
@@ -56,6 +56,8 @@ npm run sync:tanium
 Os testes usam respostas controladas para um novo mes, um cumulativo emergencial,
 fontes atrasadas, produtos incorretos, duplicidades, falhas parciais/totais,
 timeout, 429, cache antigo, concorrencia, tentativas e recuperacao no navegador.
+Tambem validam o HTML via `file:` e a regeneracao dos e-mails de inicio,
+encerramento e relatorio para PDF apos receber o catalogo de um novo mes.
 A consulta real em 13/10/2026 encontrou os quatro KBs de outubro no Catalog,
 mesmo com o CVRF de outubro ainda antecipado e o Learn ainda em setembro.
 
@@ -75,8 +77,11 @@ Backup local original:
 `C:\Users\RenanSerafimPires\OneDrive - Claranet\Documentos\Manuais\backups-gerador-tanium\pre-sync-kbs-20261013-153505`.
 
 Para desfazer no GitHub, pausar primeiro o workflow de sincronizacao e criar um
-commit de reversao do commit de implementacao (`git revert <commit>`), revisando
-possiveis conflitos do JSON com as sincronizacoes posteriores. Nao usar reset
+commit de reversao, desfazendo os commits desta entrega em ordem inversa:
+testes/documentacao posteriores, normalizacao auxiliar (`da805c7`) e
+implementacao (`0267a5f`). Revisar possiveis conflitos do JSON com as
+sincronizacoes posteriores e dos testes modificados apos a implementacao.
+O tag preserva o conteudo anterior completo para essa revisao. Nao usar reset
 destrutivo nem reverter outras alteracoes do usuario. Publicar a reversao e
 validar a pagina. A reversao retorna ao mecanismo anterior, com suas limitacoes.
 
