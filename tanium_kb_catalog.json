@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "documentId": "2026-Oct",
   "documentTitle": "Windows Server Security / Out-of-Band Cumulative Updates",
-  "generatedAt": "2026-10-13T18:52:18.243Z",
+  "generatedAt": "2026-10-13T18:54:21.703Z",
   "sourceUrl": "https://learn.microsoft.com/en-us/windows/release-health/windows-server-release-info",
   "catalog": {
     "10": {
@@ -29,8 +29,8 @@
       "architecture": "x64",
       "kind": "security",
       "releaseDate": "2026-10-13",
-      "build": "",
-      "sourceUrl": "https://www.catalog.update.microsoft.com/Search.aspx?q=KB5126651",
+      "build": "17763.9376",
+      "sourceUrl": "https://support.microsoft.com/help/5126651",
       "name": "Windows Server 2019 Cumulative Update (2026-10-13)"
     },
     "2022": {
@@ -39,8 +39,8 @@
       "architecture": "x64",
       "kind": "security",
       "releaseDate": "2026-10-13",
-      "build": "",
-      "sourceUrl": "https://www.catalog.update.microsoft.com/Search.aspx?q=KB5126655",
+      "build": "20348.5761",
+      "sourceUrl": "https://support.microsoft.com/help/5126655",
       "name": "Windows Server 2022 Cumulative Update (2026-10-13)"
     },
     "2025": {
@@ -50,15 +50,15 @@
       "kind": "security",
       "releaseDate": "2026-10-13",
       "build": "26100.33650",
-      "sourceUrl": "https://www.catalog.update.microsoft.com/Search.aspx?q=KB5126646",
+      "sourceUrl": "https://support.microsoft.com/help/5126646",
       "name": "Windows Server 2025 Cumulative Update (2026-10-13)"
     }
   },
   "sync": {
     "status": "success",
-    "lastAttemptAt": "2026-10-13T18:52:18.243Z",
-    "lastSuccessfulAt": "2026-10-13T18:52:18.243Z",
-    "lastCompleteSuccessAt": "2026-10-13T18:52:18.243Z",
+    "lastAttemptAt": "2026-10-13T18:54:21.703Z",
+    "lastSuccessfulAt": "2026-10-13T18:54:21.703Z",
+    "lastCompleteSuccessAt": "2026-10-13T18:54:21.703Z",
     "checks": [
       {
         "source": "Microsoft release history",
@@ -117,24 +117,14 @@
   },
   "history": [
     {
-      "kb": "KB5126868",
-      "osVersion": "2016",
+      "kb": "KB5126646",
+      "osVersion": "2025",
       "architecture": "x64",
       "kind": "security",
       "releaseDate": "2026-10-13",
-      "build": "",
-      "sourceUrl": "https://www.catalog.update.microsoft.com/Search.aspx?q=KB5126868",
-      "name": "Windows Server 2016 Cumulative Update (2026-10-13)"
-    },
-    {
-      "kb": "KB5126651",
-      "osVersion": "2019",
-      "architecture": "x64",
-      "kind": "security",
-      "releaseDate": "2026-10-13",
-      "build": "",
-      "sourceUrl": "https://www.catalog.update.microsoft.com/Search.aspx?q=KB5126651",
-      "name": "Windows Server 2019 Cumulative Update (2026-10-13)"
+      "build": "26100.33650",
+      "sourceUrl": "https://www.catalog.update.microsoft.com/Search.aspx?q=KB5126646",
+      "name": "Windows Server 2025 Cumulative Update (2026-10-13)"
     },
     {
       "kb": "KB5126655",
@@ -147,14 +137,24 @@
       "name": "Windows Server 2022 Cumulative Update (2026-10-13)"
     },
     {
-      "kb": "KB5126646",
-      "osVersion": "2025",
+      "kb": "KB5126651",
+      "osVersion": "2019",
       "architecture": "x64",
       "kind": "security",
       "releaseDate": "2026-10-13",
-      "build": "26100.33650",
-      "sourceUrl": "https://www.catalog.update.microsoft.com/Search.aspx?q=KB5126646",
-      "name": "Windows Server 2025 Cumulative Update (2026-10-13)"
+      "build": "",
+      "sourceUrl": "https://www.catalog.update.microsoft.com/Search.aspx?q=KB5126651",
+      "name": "Windows Server 2019 Cumulative Update (2026-10-13)"
+    },
+    {
+      "kb": "KB5126868",
+      "osVersion": "2016",
+      "architecture": "x64",
+      "kind": "security",
+      "releaseDate": "2026-10-13",
+      "build": "",
+      "sourceUrl": "https://www.catalog.update.microsoft.com/Search.aspx?q=KB5126868",
+      "name": "Windows Server 2016 Cumulative Update (2026-10-13)"
     },
     {
       "kb": "KB5129235",
