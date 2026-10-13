@@ -2,6 +2,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { DOMParser } = require("linkedom");
 const sync = require("./tanium-kb-sync.cjs");
+const readV1 = require("./fixtures/tanium-kb-v1-client.cjs");
 const now = new Date("2026-11-12T19:00:00Z");
 const versions = Object.keys(sync.SERVERS);
 const build = version => `${sync.SERVERS[version]}.9000`;
@@ -141,4 +142,18 @@ test("Catalog metadata revision does not replace a newer emergency already in of
   const emergency = { ...item("2022", "KB6000002", "2026-11-11", "oob"), build: "20348.9005" };
   const revisedMetadata = { ...monthly, releaseDate: "2026-11-12", build: "" };
   assert.equal(sync.selectLatest([monthly, revisedMetadata, emergency], {}, now)["2022"].kb, emergency.kb);
+});
+
+test("old cached HTML rejects V2 but accepts the companion V1 catalog with identical new KBs", async () => {
+  const latest = await sync.synchronize({ previous: baseline(), now, Parser: DOMParser, fetchImpl: fakeSources(), sleep: async () => {} });
+  const url = "https://raw.githubusercontent.com/renanser-code/multi-apps/main/tanium_kb_catalog.json";
+  await assert.rejects(readV1(async () => response(latest), url), /Catalogo automatico invalido/);
+  const legacy = sync.legacySnapshot(latest, now);
+  const accepted = await readV1(async () => response(legacy), url);
+  assert.equal(accepted.schemaVersion, 1);
+  versions.forEach((v, i) => assert.equal(accepted.catalog[v].kb, `KB600000${i + 1}`));
+  assert.equal(accepted.generatedAt, latest.generatedAt);
+  assert.equal(accepted.sync.lastSuccessfulAt, latest.sync.lastSuccessfulAt);
+  assert.equal(latest.schemaVersion, 2);
+  sync.validateSnapshot(latest, now);
 });

@@ -199,6 +199,11 @@
     return snapshot;
   }
 
+  function legacySnapshot(snapshot, now = new Date()) {
+    validateSnapshot(snapshot, now);
+    return { ...snapshot, schemaVersion: 1, catalog: Object.fromEntries(Object.entries(snapshot.catalog).map(([version, item]) => [version, { kb: item.kb, name: item.name }])) };
+  }
+
   function freshness(snapshot, now = new Date()) {
     const reasons = [];
     if (!snapshot?.sync?.lastSuccessfulAt || now - new Date(snapshot.sync.lastSuccessfulAt) > 90 * 60 * 1000) reasons.push("Ultima consulta oficial ha mais de 90 minutos");
@@ -295,5 +300,5 @@
       history: [...new Map(candidates.filter(item => validRecord(item, now)).map(item => [`${item.osVersion}:${item.kb}`, item])).values()].filter(item => item.releaseDate >= `${monthLabel(now, -2)}-01`).sort((a, b) => b.releaseDate.localeCompare(a.releaseDate)) };
   }
 
-  return { SERVERS, MSRC, HISTORY, isoDate, monthId, patchTuesday, osVersion, validRecord, record, parseMsrc, parseHistory, parseCatalog, selectLatest, validateSnapshot, freshness, request, synchronize };
+  return { SERVERS, MSRC, HISTORY, isoDate, monthId, patchTuesday, osVersion, validRecord, record, parseMsrc, parseHistory, parseCatalog, selectLatest, validateSnapshot, legacySnapshot, freshness, request, synchronize };
 });

@@ -847,6 +847,11 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
     return snapshot;
   }
 
+  function legacySnapshot(snapshot, now = new Date()) {
+    validateSnapshot(snapshot, now);
+    return { ...snapshot, schemaVersion: 1, catalog: Object.fromEntries(Object.entries(snapshot.catalog).map(([version, item]) => [version, { kb: item.kb, name: item.name }])) };
+  }
+
   function freshness(snapshot, now = new Date()) {
     const reasons = [];
     if (!snapshot?.sync?.lastSuccessfulAt || now - new Date(snapshot.sync.lastSuccessfulAt) > 90 * 60 * 1000) reasons.push("Ultima consulta oficial ha mais de 90 minutos");
@@ -943,7 +948,7 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
       history: [...new Map(candidates.filter(item => validRecord(item, now)).map(item => [`${item.osVersion}:${item.kb}`, item])).values()].filter(item => item.releaseDate >= `${monthLabel(now, -2)}-01`).sort((a, b) => b.releaseDate.localeCompare(a.releaseDate)) };
   }
 
-  return { SERVERS, MSRC, HISTORY, isoDate, monthId, patchTuesday, osVersion, validRecord, record, parseMsrc, parseHistory, parseCatalog, selectLatest, validateSnapshot, freshness, request, synchronize };
+  return { SERVERS, MSRC, HISTORY, isoDate, monthId, patchTuesday, osVersion, validRecord, record, parseMsrc, parseHistory, parseCatalog, selectLatest, validateSnapshot, legacySnapshot, freshness, request, synchronize };
 });
 // END SHARED TANIUM KB SYNC
 // Default backup catalog mapping for typical Windows Server versions (Backup for Offline / API failure)
@@ -1053,7 +1058,7 @@ const MONITORED_VM_ALERTS = [
 let isApiLoaded = false;
 let kbCatalogSource = "Backup local - não sincronizado";
 let kbCatalogDocumentId = "";
-const AUTOMATIC_KB_CATALOG_URL = "https://raw.githubusercontent.com/renanser-code/multi-apps/main/tanium_kb_catalog.json";
+const AUTOMATIC_KB_CATALOG_URL = "https://raw.githubusercontent.com/renanser-code/multi-apps/main/tanium_kb_catalog.v2.json";
 // CMDB Data Cache
 let cmdbDatabase = [];
 let isCmdbLoaded = false;
@@ -1492,7 +1497,7 @@ function applyKbSnapshot(snapshot, source) {
 async function fetchAutomaticKbCatalog() {
   const urls = [AUTOMATIC_KB_CATALOG_URL];
   if (typeof location !== "undefined" && /^https?:$/.test(location.protocol)) {
-    urls.push(new URL("tanium_kb_catalog.json", location.href).href);
+    urls.push(new URL("tanium_kb_catalog.v2.json", location.href).href);
   }
   let error;
   for (const url of urls) {

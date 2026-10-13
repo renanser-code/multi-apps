@@ -55,7 +55,7 @@ test("HTML uses shared engine, raw catalog first, and shows current heartbeat wi
   b.context.TaniumKbSync.request = async url => { urls.push(url); return current; };
   b.context.TaniumKbSync.synchronize = async () => { throw new Error("fresh catalog must not trigger direct Microsoft queries"); };
   await b.load();
-  assert(urls[0].startsWith("https://raw.githubusercontent.com/renanser-code/multi-apps/main/tanium_kb_catalog.json?t="));
+  assert(urls[0].startsWith("https://raw.githubusercontent.com/renanser-code/multi-apps/main/tanium_kb_catalog.v2.json?t="));
   assert.equal(b.read('KB_CATALOG["2016"].kb'), "KB6000001");
   assert.equal(b.element("kbSyncStatus").className, "kb-sync-status ok");
   assert(b.element("kbSyncStatus").textContent.includes("12/11/2026"));

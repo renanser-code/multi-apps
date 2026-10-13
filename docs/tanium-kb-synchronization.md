@@ -31,6 +31,13 @@ depender de um novo deploy do GitHub Pages. Se estiver antigo ou em falha,
 tenta tambem as fontes oficiais diretamente, sujeito ao CORS do navegador.
 As consultas diretas utilizam o mesmo motor do job agendado.
 
+O endereco `tanium_kb_catalog.json` preserva o contrato V1 exigido pelos
+geradores antigos ainda abertos. O HTML atual utiliza `tanium_kb_catalog.v2.json`,
+com validacoes adicionais e metadados de sincronizacao. Ambos sao produzidos
+pela mesma consulta e recebem os mesmos KBs. Nunca alterar o formato de um
+endereco publicado sem manter a compatibilidade com os consumidores anteriores.
+Existe um teste com o leitor V1 anteriormente publicado para evitar regressao.
+
 Falhas transitorias possuem timeout e ate tres tentativas por requisicao.
 O navegador agenda novas tentativas em 1, 2, 4, 8 e ate 15 minutos. Falhas
 parciais nao bloqueiam KBs novos de outras versoes. Uma falha total conserva os
@@ -89,3 +96,11 @@ Para restaurar o HTML local, preservar uma copia do arquivo atual e substituir
 somente o HTML e seu teste pelas copias desse backup. Nenhum dado da CMDB,
 evidencia ou arquivo enviado e apagado pelo rollback. O cache de sincronizacao
 possui chave nova (`tanium-kb-catalog-v2`), ignorada pela versao anterior.
+
+Checkpoint anterior a correcao de compatibilidade dos catalogos V1/V2:
+`rollback/pre-kb-catalog-compat-20261013-160721`.
+Backup local correspondente:
+`C:\Users\RenanSerafimPires\OneDrive - Claranet\Documentos\Manuais\backups-gerador-tanium\pre-kb-catalog-compat-20261013-160721`.
+Esse checkpoint permite desfazer apenas a correcao de compatibilidade sem
+desfazer o sincronizador automatico. Pausar o workflow e revisar as alteracoes
+de ambos os JSONs, que continuam sendo atualizados pelos jobs posteriores.

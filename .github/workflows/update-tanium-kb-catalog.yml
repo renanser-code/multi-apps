@@ -38,13 +38,14 @@ jobs:
         if: ${{ always() && (steps.sync.outcome == 'success' || steps.sync.outcome == 'failure') }}
         run: |
           test -s tanium_kb_catalog.json
-          if git diff --quiet -- tanium_kb_catalog.json; then
+          test -s tanium_kb_catalog.v2.json
+          if git diff --quiet -- tanium_kb_catalog.json tanium_kb_catalog.v2.json; then
             echo "Catalogo ja esta atualizado."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add tanium_kb_catalog.json
+          git add tanium_kb_catalog.json tanium_kb_catalog.v2.json
           git commit -m "Sincronizar KBs de seguranca e status das fontes Microsoft"
           git pull --rebase origin main
           git push
