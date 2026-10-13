@@ -80,6 +80,9 @@ assert.strictEqual(typeof sandbox.__inferClosureStatusFromEvidenceText, "functio
 assert.strictEqual(typeof sandbox.__analyzeClosureEvidenceStatus, "function");
 assert.strictEqual(typeof sandbox.__enrichEvidenceTextWithFuzzyServerAliases, "function");
 assert.strictEqual(typeof sandbox.__reconcileClosureInferenceWithScope, "function");
+assert.strictEqual(typeof vm.runInContext("renderServerKbLookup", sandbox), "function");
+assert(html.includes('id="serverKbLookupInput"'), "consulta rapida deve ter campo para a versao do Windows Server");
+assert(html.includes('id="serverKbLookupResult"'), "consulta rapida deve ter area para os KBs encontrados");
 assert(html.includes("copyText('windowsHostnameRegex')"), "acao principal deve copiar hostnames Windows");
 assert(html.includes("copyText('windowsIpRegex')"), "acao principal deve copiar IPs Windows");
 assert(html.includes("copyText('linuxHostnameRegex')"), "acao principal deve copiar hostnames Linux");
@@ -185,6 +188,15 @@ assert.strictEqual(catalog["11"].kb, "KB5120240");
 assert.match(catalog2022[0].name, /August 2026|2026-Aug/);
 
 sandbox.__setKbCatalog(catalog);
+getElement("serverKbLookupInput").value = "2016";
+const quickLookup2016 = vm.runInContext("renderServerKbLookup()", sandbox);
+assert(quickLookup2016.some(item => item.kb === "KB5120418"), "consulta 2016 deve retornar apenas os KBs do Windows Server 2016");
+assert(getElement("serverKbLookupResult").innerHTML.includes("Copiar KB"), "consulta rapida deve permitir copiar o KB");
+assert(getElement("serverKbLookupResult").innerHTML.includes("Baixar KB"), "consulta rapida deve permitir abrir o download do KB");
+assert(!getElement("serverKbLookupResult").innerHTML.includes("KB5120238"), "consulta 2016 nao pode misturar o KB do Server 2019");
+getElement("serverKbLookupInput").value = "2012";
+assert.strictEqual(vm.runInContext("renderServerKbLookup()", sandbox).length, 0, "consulta rapida deve aceitar somente versoes suportadas");
+assert(getElement("serverKbLookupResult").innerHTML.includes("Versão não suportada"));
 const genericServerItems = sandbox.__suggestKBs(["Aplicar patch em servidores Windows Server x64"]);
 assert(genericServerItems.some(item => item.kb === "KB5120233"), "fallback Windows Server deve incluir Server 2025");
 assert(!genericServerItems.some(item => item.kb === "KB5123303"), "fallback Windows Server nao deve incluir security update avulso");

@@ -79,6 +79,14 @@
       font-size: 13px;
       color: #93c5fd;
     }
+    .cmdb-toolbar { display:grid; grid-template-columns:minmax(360px,.8fr) minmax(520px,1.2fr); gap:18px; align-items:start; }
+    .kb-quick-search { border:1px solid #6366f1; background:#15133a; border-radius:8px; padding:10px 12px; }
+    .kb-quick-search-title { color:#c7d2fe; font-size:14px; font-weight:700; margin-bottom:7px; }
+    .kb-quick-search-row { display:grid; grid-template-columns:minmax(140px,210px) auto; gap:8px; align-items:center; }
+    .kb-quick-search input { width:100%; min-height:40px; border:1px solid #475569; border-radius:7px; background:#0f172a; color:#fff; padding:8px 10px; font-size:14px; }
+    .kb-quick-result { margin-top:8px; color:#cbd5e1; font-size:13px; line-height:1.55; }
+    .kb-quick-result ul { margin:0; padding-left:18px; }
+    @media (max-width:1050px){ .cmdb-toolbar{grid-template-columns:1fr;} }
     .vms-list-container {
       max-height: 180px;
       overflow-y: auto;
@@ -228,12 +236,27 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
           </div>
           <div class="cmdb-status" id="cmdbApiStatus">Pronto para carregar base de dados.</div>
         </div>
-        <div class="row" style="margin: 0 0 10px 0;">
-          <button class="orange" id="btnLoadCmdb" onclick="loadCmdbData()">1. Carregar Base de Dados (GetDataLake)</button>
-          <button class="purple" id="btnFilterStatus" onclick="generate()" disabled>2. Atualizar Status das VMs</button>
-        </div>
-        <div class="hint" style="color: #cbd5e1;">
-          Como a base possui cerca de 9.600 servidores, o gerador baixa a base localmente no navegador em memória de forma segura para fazer consultas instantâneas offline, sem travar seu fluxo.
+        <div class="cmdb-toolbar">
+          <div>
+            <div class="row" style="margin: 0 0 10px 0;">
+              <button class="orange" id="btnLoadCmdb" onclick="loadCmdbData()">1. Carregar Base de Dados (GetDataLake)</button>
+              <button class="purple" id="btnFilterStatus" onclick="generate()" disabled>2. Atualizar Status das VMs</button>
+            </div>
+            <div class="hint" style="color: #cbd5e1;">
+              Como a base possui cerca de 9.600 servidores, o gerador baixa a base localmente no navegador em memória de forma segura para fazer consultas instantâneas offline, sem travar seu fluxo.
+            </div>
+          </div>
+          <div class="kb-quick-search">
+            <div class="kb-quick-search-title">Pesquisar KB por versão do Windows Server</div>
+            <div class="kb-quick-search-row">
+              <input id="serverKbLookupInput" type="text" inputmode="numeric" maxlength="4" list="serverKbVersions" placeholder="Ex.: 2016" aria-label="Versão do Windows Server" oninput="renderServerKbLookup()" onkeydown="if(event.key === 'Enter'){ event.preventDefault(); renderServerKbLookup(); }">
+              <button class="blue" type="button" onclick="renderServerKbLookup()">Pesquisar KB</button>
+              <datalist id="serverKbVersions">
+                <option value="2016"></option><option value="2019"></option><option value="2022"></option><option value="2025"></option>
+              </datalist>
+            </div>
+            <div id="serverKbLookupResult" class="kb-quick-result">Digite 2016, 2019, 2022 ou 2025.</div>
+          </div>
         </div>
         <div id="vmStatusPanel" style="display:none; margin-top: 12px;">
           <div class="row" style="margin:0 0 6px 0;justify-content:space-between;align-items:center;">
@@ -1215,6 +1238,7 @@ async function loadLatestKBsFromMicrosoft() {
     kbCatalogSource = "Catalogo automatico MSRC";
     kbCatalogDocumentId = snapshot.documentId;
     generate();
+    renderServerKbLookup();
     return;
   } catch (err) {
     lastError = err;
@@ -1229,6 +1253,7 @@ async function loadLatestKBsFromMicrosoft() {
       kbCatalogDocumentId = getMsrcDocLabel(data, documentId);
       console.log("Catalogo MSRC atualizado com sucesso:", KB_CATALOG);
       generate();
+      renderServerKbLookup();
       return;
     } catch (err) {
       lastError = err;
@@ -1240,6 +1265,7 @@ async function loadLatestKBsFromMicrosoft() {
   kbCatalogDocumentId = "2026-Sep";
   console.warn("Nao foi possivel carregar KBs da API MSRC, usando catalogo local estavel:", lastError);
   generate();
+  renderServerKbLookup();
 }
 
 // CMDB API ClaraHub Loader
@@ -1532,6 +1558,33 @@ function renderKbDownloadButton(kb) {
 
 function renderKbSuggestionItem(item, badgeText, badgeColor) {
   return `<li><strong>${escapeHtml(item.kb)}</strong> - ${escapeHtml(item.name)} ${renderKbCopyButton(item.kb)} ${renderKbDownloadButton(item.kb)} <span class='badge' style='background:${badgeColor}; color:#fff;'>${escapeHtml(badgeText)}</span></li>`;
+}
+
+function renderServerKbLookup() {
+  const input = document.getElementById("serverKbLookupInput");
+  const result = document.getElementById("serverKbLookupResult");
+  if (!input || !result) return [];
+
+  const version = String(input.value || "").trim();
+  if (!version) {
+    result.innerHTML = "Digite 2016, 2019, 2022 ou 2025.";
+    return [];
+  }
+  if (!/^(2016|2019|2022|2025)$/.test(version)) {
+    result.innerHTML = "<strong>Versão não suportada.</strong> Use 2016, 2019, 2022 ou 2025.";
+    return [];
+  }
+
+  const items = normalizeKbItems(KB_CATALOG[version]).filter(isDeployableCumulativeKb);
+  if (items.length === 0) {
+    result.innerHTML = `<strong>Windows Server ${escapeHtml(version)}:</strong> nenhum KB cumulativo disponível no catálogo atual.`;
+    return [];
+  }
+
+  const badgeText = isApiLoaded && kbCatalogDocumentId ? `${kbCatalogSource}: ${kbCatalogDocumentId}` : kbCatalogSource;
+  const badgeColor = isApiLoaded ? "#8b5cf6" : "#10b981";
+  result.innerHTML = `<ul>${items.map(item => renderKbSuggestionItem(item, badgeText, badgeColor)).join("")}</ul>`;
+  return items;
 }
 
 function suggestKBs(lines) {
