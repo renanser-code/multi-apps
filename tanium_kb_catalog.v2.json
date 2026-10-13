@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "documentId": "2026-Oct",
   "documentTitle": "Windows Server Security / Out-of-Band Cumulative Updates",
-  "generatedAt": "2026-10-13T19:12:32.641Z",
+  "generatedAt": "2026-10-13T23:14:38.231Z",
   "sourceUrl": "https://learn.microsoft.com/en-us/windows/release-health/windows-server-release-info",
   "catalog": {
     "10": {
@@ -20,7 +20,7 @@
       "kind": "security",
       "releaseDate": "2026-10-13",
       "build": "14393.9612",
-      "sourceUrl": "https://api.msrc.microsoft.com/cvrf/v3.0/cvrf/2026-Oct",
+      "sourceUrl": "https://support.microsoft.com/help/5126868",
       "name": "Windows Server 2016 Cumulative Update (2026-10-13)"
     },
     "2019": {
@@ -56,9 +56,9 @@
   },
   "sync": {
     "status": "success",
-    "lastAttemptAt": "2026-10-13T19:12:32.641Z",
-    "lastSuccessfulAt": "2026-10-13T19:12:32.641Z",
-    "lastCompleteSuccessAt": "2026-10-13T19:12:32.641Z",
+    "lastAttemptAt": "2026-10-13T23:14:38.231Z",
+    "lastSuccessfulAt": "2026-10-13T23:14:38.231Z",
+    "lastCompleteSuccessAt": "2026-10-13T23:14:38.231Z",
     "checks": [
       {
         "source": "Microsoft release history",
@@ -177,16 +177,6 @@
       "name": "Windows Server 2019 Cumulative Update (2026-10-13)"
     },
     {
-      "kb": "KB5099535",
-      "osVersion": "2016",
-      "architecture": "x64",
-      "kind": "security",
-      "releaseDate": "2026-10-13",
-      "build": "14393.9339",
-      "sourceUrl": "https://api.msrc.microsoft.com/cvrf/v3.0/cvrf/2026-Oct",
-      "name": "Windows Server 2016 Cumulative Update (2026-10-13)"
-    },
-    {
       "kb": "KB5126868",
       "osVersion": "2016",
       "architecture": "x64",
@@ -194,6 +184,16 @@
       "releaseDate": "2026-10-13",
       "build": "",
       "sourceUrl": "https://www.catalog.update.microsoft.com/Search.aspx?q=KB5126868",
+      "name": "Windows Server 2016 Cumulative Update (2026-10-13)"
+    },
+    {
+      "kb": "KB5099535",
+      "osVersion": "2016",
+      "architecture": "x64",
+      "kind": "security",
+      "releaseDate": "2026-10-13",
+      "build": "14393.9339",
+      "sourceUrl": "https://api.msrc.microsoft.com/cvrf/v3.0/cvrf/2026-Oct",
       "name": "Windows Server 2016 Cumulative Update (2026-10-13)"
     },
     {
