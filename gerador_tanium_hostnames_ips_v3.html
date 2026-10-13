@@ -51,6 +51,27 @@
     .kb-download-btn { display:inline-block; margin-left:6px; padding:5px 9px; border-radius:6px; background:#059669; color:#fff; font-size:12px; line-height:1; vertical-align:middle; text-decoration:none; }
     .kb-download-btn:hover { background:#047857; }
     .copy-feedback { color:#86efac; font-size:13px; margin-left:4px; display:none; }
+    .operations-bar { position:sticky; top:0; z-index:30; background:#0b1220; border-bottom:1px solid #334155; padding:9px 18px; box-shadow:0 8px 18px rgba(0,0,0,.22); }
+    .operations-summary { display:grid; grid-template-columns:repeat(8,minmax(90px,1fr)); gap:7px; }
+    .operations-stat { min-width:0; padding:7px 9px; border:1px solid #334155; border-radius:6px; background:#111827; }
+    .operations-stat strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; color:#f8fafc; }
+    .operations-stat span { display:block; margin-top:2px; color:#94a3b8; font-size:10px; text-transform:uppercase; }
+    .quick-nav { display:flex; gap:5px; flex-wrap:wrap; margin-top:7px; }
+    .quick-nav a { color:#cbd5e1; background:#1e293b; border:1px solid #334155; border-radius:5px; padding:5px 9px; font-size:11px; font-weight:700; text-decoration:none; }
+    .quick-nav a:hover { background:#334155; color:#fff; }
+    [id^="section-"] { scroll-margin-top:126px; }
+    .review-panel { margin:10px 0; border:1px solid #475569; border-left:4px solid #38bdf8; border-radius:8px; background:#101827; overflow:hidden; }
+    .review-header { display:flex; justify-content:space-between; gap:12px; align-items:center; padding:10px 12px; }
+    .review-header strong { font-size:14px; }
+    .review-status { padding:4px 8px; border-radius:5px; font-size:11px; font-weight:700; white-space:nowrap; }
+    .review-status.ok { background:#064e3b; color:#6ee7b7; }
+    .review-status.warning { background:#78350f; color:#fde68a; }
+    .review-status.critical { background:#7f1d1d; color:#fecaca; }
+    .review-items { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:6px; padding:0 12px 11px; }
+    .review-item { padding:7px 9px; border-radius:5px; background:#172033; border-left:3px solid #64748b; color:#cbd5e1; font-size:12px; line-height:1.35; }
+    .review-item.ok { border-color:#22c55e; }
+    .review-item.warning { border-color:#f59e0b; }
+    .review-item.critical { border-color:#ef4444; color:#fecaca; }
     .example { background:#0b1220; border:1px solid #334155; border-radius:10px; padding:10px; color:#cbd5e1; font-family:Consolas, monospace; font-size:13px; line-height:1.45; margin-top:10px; }
     
     /* CMDB Section CSS */
@@ -188,7 +209,9 @@
       .workflow-grid,.communication-grid,.regex-grid{grid-template-columns:1fr;}
       .communication-left .regex-grid{grid-template-rows:none;}
       .workflow-grid > .cmdb-section,.communication-grid > .result-box{height:auto;}
+      .operations-summary{grid-template-columns:repeat(4,minmax(90px,1fr));}
     }
+    @media (max-width:650px){ .operations-summary{grid-template-columns:repeat(2,minmax(90px,1fr));} .operations-bar{position:static;} }
   </style>
 </head>
 <body>
@@ -200,8 +223,24 @@
       </div>
     </div>
 
+    <div class="operations-bar" aria-label="Resumo operacional e navegação">
+      <div class="operations-summary">
+        <div class="operations-stat"><strong id="summaryGmud">GMUD 100</strong><span>GMUD</span></div>
+        <div class="operations-stat"><strong id="summaryClient">Não informado</strong><span>Cliente</span></div>
+        <div class="operations-stat"><strong id="summaryWindows">0</strong><span>Windows</span></div>
+        <div class="operations-stat"><strong id="summaryLinux">0</strong><span>Linux</span></div>
+        <div class="operations-stat"><strong id="summaryPoweredOn">0</strong><span>Ligadas</span></div>
+        <div class="operations-stat"><strong id="summaryOffline">0</strong><span>Fora do escopo</span></div>
+        <div class="operations-stat"><strong id="summaryPriority">0</strong><span>Prioritárias / BD</span></div>
+        <div class="operations-stat"><strong id="summaryIssues">0</strong><span>Alertas</span></div>
+      </div>
+      <nav class="quick-nav" aria-label="Navegação rápida do gerador">
+        <a href="#section-input">Entrada</a><a href="#section-cmdb">CMDB e KBs</a><a href="#section-email-source">E-mail recebido</a><a href="#section-schedule">Agendamento</a><a href="#section-tanium">Tanium</a><a href="#section-communication">Comunicação</a><a href="#section-closure">Encerramento</a>
+      </nav>
+    </div>
+
     <div class="content">
-      <div class="grid">
+      <div class="grid" id="section-input">
         <div>
           <label for="input">Entrada bruta</label>
           <textarea id="input" placeholder="SV-WEB-BARUEL04 10.255.68.10&#10;SV-WEB-BARUEL03 10.255.68.11&#10;SRV-CL02.baruel.com.br 10.255.68.23"></textarea>
@@ -231,8 +270,18 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
         <label class="check"><input type="checkbox" id="onlyPoweredOn" checked> 🟢 Filtrar apenas VMs com Status "Ligada"</label>
       </div>
 
+      <div class="review-panel" id="gmudReviewPanel">
+        <div class="review-header">
+          <strong>Revisão automática da GMUD</strong>
+          <span class="review-status ok" id="gmudReviewStatus">Aguardando dados</span>
+        </div>
+        <div class="review-items" id="gmudReviewItems">
+          <div class="review-item">Insira os servidores para iniciar a validação.</div>
+        </div>
+      </div>
+
       <!-- CMDB ClaraHub Panel -->
-      <div class="cmdb-section">
+      <div class="cmdb-section" id="section-cmdb">
         <div class="cmdb-header">
           <div class="cmdb-title">
             🌐 Integração CMDB ClaraHub (API DataLake)
@@ -279,7 +328,7 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
 
       <div class="workflow-grid">
       <!-- GMUD EMAIL PARSER PANEL -->
-      <div class="cmdb-section" style="background: #162032; border-color: #0ea5e9;">
+      <div class="cmdb-section" id="section-email-source" style="background: #162032; border-color: #0ea5e9;">
         <div class="cmdb-title" style="color: #7dd3fc;">
           📨 Colar E-mail da GMUD (Extração Automática)
         </div>
@@ -329,7 +378,7 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
       </div>
 
       <!-- OUTLOOK AUTOMATIC MAIL SCHEDULER PANEL -->
-      <div class="cmdb-section" style="background: #1e293b; border-color: #475569;">
+      <div class="cmdb-section" id="section-schedule" style="background: #1e293b; border-color: #475569;">
         <div class="cmdb-title" style="color: #cbd5e1;">
           📅 Agendador de Comunicado de GMUD (Outlook Local)
         </div>
@@ -399,7 +448,7 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
       </div>
       </div>
 
-      <div class="row">
+      <div class="row" id="section-tanium">
         <button class="primary" onclick="generate()">Gerar padrão Tanium</button>
         <button class="blue" onclick="copyText('windowsHostnameRegex')">Copiar hostnames Windows</button>
         <button class="blue" onclick="copyText('windowsIpRegex')">Copiar IPs Windows</button>
@@ -471,7 +520,7 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
         </div>
       </div>
 
-      <div class="communication-grid">
+      <div class="communication-grid" id="section-communication">
       <div class="communication-left">
       <!-- Generated Email text area box -->
       <div class="result-box" style="border-left: 4px solid #8b5cf6; background: #1a1525;">
@@ -493,7 +542,7 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
       </div>
       </div>
 
-      <div class="result-box" style="border-left: 4px solid #22c55e; background: #102016;">
+      <div class="result-box" id="section-closure" style="border-left: 4px solid #22c55e; background: #102016;">
         <label style="color: #86efac; font-size: 16px;">Encerramento da GMUD</label>
         <div class="hint">
           Preencha o status final, observacoes e evidencias do encerramento. O gerador cria o texto do e-mail final e abre um relatorio pronto para imprimir ou salvar como PDF.
@@ -1873,6 +1922,113 @@ function processInput() {
   return { lines, hostnames: finalHostnames, ips: finalIps, osGroups: osData.groups, osNames: osData.osNames, isCmdbApplied: false };
 }
 
+function getDuplicateValues(values) {
+  const counts = new Map();
+  values.filter(Boolean).forEach(value => {
+    const key = String(value).toLowerCase();
+    counts.set(key, { value, count: (counts.get(key)?.count || 0) + 1 });
+  });
+  return [...counts.values()].filter(item => item.count > 1).map(item => item.value);
+}
+
+function buildGmudReview(data, suggestedKbs, unsupportedNotices, monitoredAlerts) {
+  const items = [];
+  const add = (level, message) => items.push({ level, message });
+  const inputLines = data.lines || [];
+
+  if (inputLines.length === 0) {
+    return { items: [{ level: "neutral", message: "Insira os servidores para iniciar a validação." }], issueCount: 0, overall: "empty" };
+  }
+
+  const rawHosts = inputLines.map(findHostname).filter(Boolean);
+  const rawIps = inputLines.flatMap(findIps);
+  const duplicateHosts = getDuplicateValues(rawHosts);
+  const duplicateIps = getDuplicateValues(rawIps);
+  if (duplicateHosts.length > 0) add("warning", `${duplicateHosts.length} hostname(s) duplicado(s): ${duplicateHosts.join(", ")}.`);
+  if (duplicateIps.length > 0) add("warning", `${duplicateIps.length} IP(s) duplicado(s): ${duplicateIps.join(", ")}.`);
+
+  if (data.hostnames.length === 0) add("critical", "Nenhum hostname válido foi identificado na entrada.");
+  if (data.isCmdbApplied) {
+    if (data.unknownVMs.length > 0) add("critical", `${data.unknownVMs.length} VM(s) não encontrada(s) ou sem status válido na CMDB.`);
+    if (data.offlineVMs.length > 0) add("warning", `${data.offlineVMs.length} VM(s) desligada(s) e fora do escopo de atualização.`);
+    const missingIp = data.activeVMs.filter(vm => !/\|\s*IP:\s*(?!N\/A)[^|]+/i.test(vm.info || "")).length;
+    const missingOs = data.activeVMs.filter(vm => /\|\s*OS:\s*(?:N\/A|Nao informado)?\s*$/i.test(vm.info || "")).length;
+    if (missingIp > 0) add("warning", `${missingIp} VM(s) ligada(s) sem IP válido informado pela CMDB.`);
+    if (missingOs > 0) add("critical", `${missingOs} VM(s) ligada(s) sem sistema operacional informado pela CMDB.`);
+  } else {
+    add("warning", "A base CMDB ainda não foi aplicada; status e cadastro das VMs não foram validados.");
+  }
+
+  if (unsupportedNotices.length > 0) add("critical", "Windows Server 2012/2012 R2 detectado: essas máquinas não serão atualizadas.");
+
+  const expectedVersions = new Set();
+  getOsDetectionLines(data).map(getOsLabelFromText).forEach(label => {
+    const match = String(label || "").match(/^Windows Server (2016|2019|2022|2025)$/);
+    if (match) expectedVersions.add(match[1]);
+  });
+  expectedVersions.forEach(version => {
+    const found = suggestedKbs.some(item => new RegExp(`Windows Server ${version}`, "i").test(item.name || ""));
+    if (!found) add("critical", `Nenhum KB cumulativo foi encontrado para Windows Server ${version}.`);
+  });
+
+  const ccValue = String(document.getElementById("schedCc")?.value || "").toLowerCase();
+  const missingRequiredCc = REQUIRED_CC_EMAILS.filter(email => !ccValue.includes(email));
+  if (missingRequiredCc.length > 0) add("critical", `Destinatário(s) obrigatório(s) ausente(s) em Cc: ${missingRequiredCc.join(", ")}.`);
+  if (!String(document.getElementById("schedTo")?.value || "").trim()) add("warning", "O campo Para do e-mail ainda não foi preenchido.");
+
+  if (monitoredAlerts.length > 0) {
+    const databaseCount = monitoredAlerts.filter(alert => /Banco de Dados/i.test(alert.type || "")).length;
+    add("warning", `${monitoredAlerts.length} VM(s) prioritária(s) detectada(s)${databaseCount ? `, incluindo ${databaseCount} banco(s) de dados` : ""}.`);
+  }
+
+  if (closureEvidenceFiles.length > 0) {
+    const evidenceState = getClosureEvidenceAnalysisState();
+    if (evidenceState.hasPending) add("warning", "Existem evidências aguardando análise OCR.");
+    if (evidenceState.hasFailures) add("critical", "Uma ou mais evidências falharam na leitura OCR.");
+    const observations = String(document.getElementById("closureObservations")?.value || "");
+    const closureServers = getClosureServerItems(data, observations);
+    const missingEvidence = closureServers.filter(server => server.evidenceState === "missing").length;
+    const manualReview = closureServers.filter(server => /ocr_unmatched|ocr_failed/.test(server.evidenceState || "")).length;
+    if (missingEvidence > 0) add("critical", `${missingEvidence} servidor(es) do encerramento sem evidência ou observação.`);
+    if (manualReview > 0) add("warning", `${manualReview} servidor(es) exigem validação manual da evidência.`);
+  }
+
+  if (items.length === 0) add("ok", "Nenhuma inconsistência encontrada nos dados atuais.");
+  const issueCount = items.filter(item => item.level === "critical" || item.level === "warning").length;
+  const overall = items.some(item => item.level === "critical") ? "critical" : items.some(item => item.level === "warning") ? "warning" : "ok";
+  return { items, issueCount, overall };
+}
+
+function updateOperationalOverview(data, suggestedKbs, unsupportedNotices, monitoredAlerts) {
+  const review = buildGmudReview(data, suggestedKbs, unsupportedNotices, monitoredAlerts);
+  const client = getClosureClientName(data) || "Não informado";
+  const gmud = String(document.getElementById("schedGmud")?.value || "XXX").trim();
+  const setText = (id, value) => {
+    const element = document.getElementById(id);
+    if (element) element.textContent = String(value);
+  };
+
+  setText("summaryGmud", `GMUD ${gmud || "XXX"}`);
+  setText("summaryClient", client);
+  setText("summaryWindows", data.osGroups?.windows?.hostnames?.length || 0);
+  setText("summaryLinux", data.osGroups?.linux?.hostnames?.length || 0);
+  setText("summaryPoweredOn", data.isCmdbApplied ? data.activeVMs.length : data.hostnames.length);
+  setText("summaryOffline", data.isCmdbApplied ? data.offlineVMs.length + data.unknownVMs.length : 0);
+  setText("summaryPriority", monitoredAlerts.length);
+  setText("summaryIssues", review.issueCount);
+
+  const status = document.getElementById("gmudReviewStatus");
+  const container = document.getElementById("gmudReviewItems");
+  if (status) {
+    status.className = `review-status ${review.overall === "empty" ? "ok" : review.overall}`;
+    status.textContent = review.overall === "empty" ? "Aguardando dados" : review.overall === "ok" ? "Revisão aprovada" : review.overall === "critical" ? `${review.issueCount} alerta(s) crítico(s)` : `${review.issueCount} ponto(s) de atenção`;
+  }
+  if (container) {
+    container.innerHTML = review.items.map(item => `<div class="review-item ${item.level}">${escapeHtml(item.message)}</div>`).join("");
+  }
+  return review;
+}
+
 function generate() {
   const gmudNumber = document.getElementById("schedGmud").value || "XXX";
   const data = processInput();
@@ -1984,6 +2140,7 @@ function generate() {
 
   emailHtml += "<br>Qualquer dúvida, estamos à disposição.<br>Atenciosamente,";
   document.getElementById("emailText").innerHTML = emailHtml;
+  updateOperationalOverview(data, suggestedKbs, unsupportedNotices, monitoredAlerts);
 }
 
 function escapeHtml(value) {
@@ -2576,6 +2733,7 @@ function handleClosureEvidenceFiles(fileList) {
     file
   }));
   updateClosureEvidenceList();
+  generate();
 
   files.forEach((file, index) => {
     if (!file.type || !file.type.toLowerCase().startsWith("image/") || typeof FileReader === "undefined") return;
@@ -2596,6 +2754,7 @@ function clearClosureEvidence() {
   const input = document.getElementById("closureEvidenceInput");
   if (input) input.value = "";
   updateClosureEvidenceList();
+  generate();
 }
 
 function getEvidenceImageSource(file) {
@@ -2846,6 +3005,7 @@ async function analyzeClosureEvidenceStatus(options = {}) {
       feedback.textContent = `OCR: evidencias ja analisadas. ${existingInference.status} sugerido.`;
       feedback.style.color = existingInference.status.includes("sucesso") ? "#86efac" : "#fde68a";
       if (!options.skipGenerate) generateClosure();
+      generate();
       return existingInference;
     }
     return null;
@@ -2886,6 +3046,7 @@ async function analyzeClosureEvidenceStatus(options = {}) {
     feedback.textContent = `OCR: ${targets.length} arquivo(s) analisado(s). ${inference.status} sugerido. ${inference.reason}`;
     feedback.style.color = inference.status.includes("sucesso") ? "#86efac" : "#fde68a";
     if (!options.skipGenerate) generateClosure();
+    generate();
     return inference;
   } catch (err) {
     targets.forEach(file => {
@@ -2895,6 +3056,7 @@ async function analyzeClosureEvidenceStatus(options = {}) {
     });
     feedback.textContent = `OCR: falha ao analisar evidencia (${err.message}). Ajuste o status manualmente.`;
     feedback.style.color = "#fca5a5";
+    generate();
     return null;
   }
 }
@@ -3656,12 +3818,12 @@ document.getElementById("input").addEventListener("input", () => { generate(); g
 document.querySelectorAll("input[type=checkbox]").forEach(el => el.addEventListener("change", () => { generate(); generateClosure(); }));
 document.getElementById("schedGmud").addEventListener("input", () => { generate(); generateClosure(); updateScriptPreview(); });
 ["schedDate","schedTime","schedTo","schedCc"].forEach(id => {
-  document.getElementById(id).addEventListener("input", updateScriptPreview);
-  document.getElementById(id).addEventListener("change", updateScriptPreview);
+  document.getElementById(id).addEventListener("input", () => { updateScriptPreview(); generate(); });
+  document.getElementById(id).addEventListener("change", () => { updateScriptPreview(); generate(); });
 });
 ["closureStatus","closureClient","closureExecutor","closureDate","closureTime","closureObservations"].forEach(id => {
-  document.getElementById(id).addEventListener("input", generateClosure);
-  document.getElementById(id).addEventListener("change", generateClosure);
+  document.getElementById(id).addEventListener("input", () => { generateClosure(); generate(); });
+  document.getElementById(id).addEventListener("change", () => { generateClosure(); generate(); });
 });
 // Also update preview when email body is re-generated
 const origGenerate = generate;

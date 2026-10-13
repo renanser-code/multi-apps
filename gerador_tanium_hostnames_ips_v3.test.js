@@ -85,6 +85,11 @@ assert.strictEqual(typeof vm.runInContext("selectServerKbVersion", sandbox), "fu
 assert(html.includes('id="serverKbLookupInput"'), "consulta rapida deve ter campo para a versao do Windows Server");
 assert(html.includes('id="serverKbLookupResult"'), "consulta rapida deve ter area para os KBs encontrados");
 assert(html.includes('onclick="selectServerKbVersion(\'2016\')"'), "consulta rapida deve oferecer atalhos por versao");
+assert(html.includes('class="operations-bar"'), "gerador deve exibir barra de resumo operacional");
+assert(html.includes('id="gmudReviewPanel"'), "gerador deve exibir painel de revisao automatica");
+assert(html.includes('href="#section-closure"'), "barra deve permitir navegar diretamente ao encerramento");
+assert.strictEqual(typeof vm.runInContext("buildGmudReview", sandbox), "function");
+assert.strictEqual(typeof vm.runInContext("updateOperationalOverview", sandbox), "function");
 assert(html.includes("copyText('windowsHostnameRegex')"), "acao principal deve copiar hostnames Windows");
 assert(html.includes("copyText('windowsIpRegex')"), "acao principal deve copiar IPs Windows");
 assert(html.includes("copyText('linuxHostnameRegex')"), "acao principal deve copiar hostnames Linux");
@@ -272,6 +277,8 @@ assert(server2012EmailHtml.includes("Estas VMs nao serao atualizadas nesta GMUD"
 assert(server2012EmailHtml.includes("Windows Server 2012/2012 R2 (sem atualizacao padrao)"));
 assert(!server2012EmailHtml.includes("Windows Server / Client (Padr"));
 assert(!server2012EmailHtml.includes("Cumulative Security Updates (Tanium Patch)"));
+assert(getElement("gmudReviewItems").innerHTML.includes("Windows Server 2012/2012 R2 detectado"), "revisao deve sinalizar Server 2012 como alerta critico");
+assert(Number(getElement("summaryIssues").textContent) > 0, "barra operacional deve contabilizar alertas da revisao");
 
 getElement("input").value = [
   "Senhores, boa noite.",
@@ -296,6 +303,8 @@ getElement("input").value = [
 ].join("\n");
 sandbox.__generate();
 const monitoredAlertsHtml = getElement("monitoredVmAlerts").innerHTML;
+assert.strictEqual(getElement("summaryPriority").textContent, "3", "barra operacional deve contar VMs prioritarias e bancos de dados");
+assert(getElement("gmudReviewItems").innerHTML.includes("VM(s) prioritária(s) detectada(s)"), "revisao deve destacar VMs prioritarias");
 const monitoredAlertEmailHtml = getElement("emailText").innerHTML;
 assert(monitoredAlertsHtml.includes("Alertas de VMs monitoradas"));
 assert(monitoredAlertsHtml.includes("PPCFXPRDDB2"));
