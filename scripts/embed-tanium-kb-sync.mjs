@@ -1,7 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
-const engine = await readFile(new URL("./tanium-kb-sync.cjs", import.meta.url), "utf8");
+const engine = (await readFile(new URL("./tanium-kb-sync.cjs", import.meta.url), "utf8")).replace(/\r\n/g, "\n");
 const target = new URL("../gerador_tanium_hostnames_ips_v3.html", import.meta.url);
-const html = await readFile(target, "utf8");
+const html = (await readFile(target, "utf8")).replace(/\r\n/g, "\n");
 const start = "// BEGIN SHARED TANIUM KB SYNC";
 const end = "// END SHARED TANIUM KB SYNC";
 const block = `${start}\n${engine.trim()}\n${end}`;
