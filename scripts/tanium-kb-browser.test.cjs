@@ -185,3 +185,77 @@ test("new month regenerates opening email, closure email and PDF report using on
   assert(b.element("emailText").innerHTML.includes("KB6000001"));
   assert(!b.element("emailText").innerHTML.includes("KB6000004"));
 });
+
+test("GMUD 1010 WIN/2022 is deduplicated and never creates Server 2012 notices or unrelated KBs", () => {
+  const b = browser(true);
+  const row = "SRV-SQL 192.0.2.66 WIN/2022 DBA | GERENCIA CLIENTE | GARANTIR INTEGRIDADE";
+  b.element("removeDuplicates").checked = true;
+  b.element("gmudEmailRaw").value = ["GMUD 1010 - CLIENTE | ATUALIZACOES DE SEGURANCA",
+    "Time Command: Executor", "Stop dos servicos de banco de dados", row,
+    "Garantir snapshot via Virtualizador", row, "Reboot do servidor", row,
+    "START dos servicos de banco de dados", row, "LISTAGEM COMPLETA DE SERVIDORES", row].join("\n");
+  b.read("parseGmudEmail(); generateClosure()");
+  assert.equal(b.element("schedGmud").value, "1010");
+  assert.equal(b.element("input").value, row);
+  assert.equal(b.read("processInput().hostnames.length"), 1);
+  for (const markup of [b.element("emailText").innerHTML, b.element("closureEmailText").innerHTML, b.read("buildClosureReportHtml()")]) {
+    assert(markup.includes("Windows Server 2022"));
+    assert(!markup.includes("Windows Server 2012"));
+    assert(!markup.includes("Windows Server 2025"));
+  }
+  assert.equal(b.read('getUnsupportedWindowsServerNotices(processInput().lines).length'), 0);
+});
+
+test("same hostname in another customer cannot replace the server identified by IP", () => {
+  for (const reverse of [false, true]) {
+    const b = browser(true);
+    b.element("input").value = "SRV-SQL 192.0.2.66 WIN/2022 DBA";
+    const records = [
+      { ServerID: "target", HostName: "SRV-SQL", IP: "192.0.2.66", Customer: "TARGET", SO: "Windows Server 2022", Status: "Ligada" },
+      { ServerID: "unrelated", HostName: "SRV-SQL", IP: "192.0.2.99", Customer: "OTHER", SO: "Windows Server 2012", Status: "Ligada" }
+    ];
+    b.read(`isCmdbLoaded = true; cmdbDatabase = ${JSON.stringify(reverse ? records.reverse() : records)}; generate(); generateClosure();`);
+    const info = b.read("processInput().activeVMs[0].info");
+    assert(info.includes("TARGET"));
+    assert(info.includes("192.0.2.66"));
+    assert(!b.element("emailText").innerHTML.includes("Windows Server 2012"));
+    assert(!b.read("buildClosureReportHtml()").includes("Windows Server 2012"));
+  }
+});
+
+test("explicit Server 2022 from GMUD wins over stale CMDB OS and records a review warning", () => {
+  const b = browser(true);
+  b.element("input").value = "SRV-SQL 192.0.2.66 WIN/2022 DBA";
+  b.read('isCmdbLoaded = true; cmdbDatabase = [{ServerID:"stale",HostName:"SRV-SQL",IP:"192.0.2.66",SO:"Microsoft Windows Server 2012",Status:"Ligada"}]; generate(); generateClosure();');
+  assert(b.read("processInput().activeVMs[0].osConflict").includes("Validar cadastro"));
+  assert(b.element("gmudReviewItems").innerHTML.includes("SO informado na GMUD"));
+  assert(b.element("emailText").innerHTML.includes("Windows Server 2022"));
+  assert(!b.element("emailText").innerHTML.includes("Windows Server 2012"));
+  assert(!b.read("buildClosureReportHtml()").includes("Windows Server 2012"));
+});
+
+test("ambiguous hostname or mismatched IP never silently selects a different CMDB machine", () => {
+  const b = browser(true);
+  b.read('isCmdbLoaded = true; cmdbDatabase = [{HostName:"SRV-SQL",IP:"192.0.2.1",SO:"Windows Server 2012",Status:"Ligada"},{HostName:"SRV-SQL",IP:"192.0.2.2",SO:"Windows Server 2012",Status:"Ligada"}];');
+  for (const line of ["SRV-SQL WIN/2022", "SRV-SQL 192.0.2.66 WIN/2022"]) {
+    b.element("input").value = line;
+    assert.equal(b.read("processInput().activeVMs.length"), 0);
+    assert.equal(b.read("processInput().unknownVMs.length"), 1);
+    b.read("generate()");
+    assert(!b.element("emailText").innerHTML.includes("Windows Server 2012"));
+  }
+});
+
+test("OS formats accept WIN slash years, preserve actual 2012 notices, and do not infer 2012 from a hostname", () => {
+  const b = browser();
+  for (const year of ["2016", "2019", "2022", "2025"]) {
+    for (const format of [`WIN/${year}`, `WIN ${year}`, `WIN${year}`, `Windows Server ${year}`]) {
+      assert.equal(b.read(`getOsLabelFromText(${JSON.stringify(format)})`), `Windows Server ${year}`);
+    }
+  }
+  assert.equal(b.read('detectWindowsServer2012("SRV1201 192.0.2.66 WIN/2022")'), false);
+  assert.equal(b.read('detectWindowsServer2012("SRV12 192.0.2.66 WIN/2022")'), false);
+  assert.equal(b.read('detectWindowsServer2012("SERVER12022")'), false);
+  assert.equal(b.read('detectWindowsServer2012("WIN/2012 R2")'), true);
+  assert.equal(b.read('getUnsupportedWindowsServerNotices(["WIN/2022", "WIN/2012 R2"]).length'), 1);
+});

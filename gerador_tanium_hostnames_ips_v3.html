@@ -1166,22 +1166,24 @@ function getKbOsLabel(item) {
   return name.split(" Cumulative")[0].split(" Monthly")[0].split(" Security")[0];
 }
 
+function getExplicitWindowsServerVersion(text) {
+  const value = String(text || "");
+  const osField = value.match(/\b(?:OS|SO):\s*([^|]+)/i);
+  const source = osField ? osField[1] : value;
+  const full = source.match(/\b(?:windows\s+server|microsoft\s+server|server)\s+(2012|2016|2019|2022|2025)(?:\s*r2)?\b/i);
+  const short = source.match(/(?:^|[\s|:(])(?:windows|win|ws)\s*[\/-]?\s*(2012|2016|2019|2022|2025)(?:\s*r2)?\b/i);
+  return (full || short)?.[1] || "";
+}
+
 function detectWindowsServer2012(text) {
-  const value = String(text || "").toLowerCase();
-  return value.includes("windows server 2012")
-    || value.includes("microsoft server 2012")
-    || value.includes("server 2012")
-    || value.includes("windows 2012")
-    || value.includes("win2012")
-    || value.includes("ws2012")
-    || value.includes("2012 r2")
-    || value.includes("srv12")
-    || value.includes("server12");
+  const version = getExplicitWindowsServerVersion(text);
+  if (version) return version === "2012";
+  return /(?:^|[\s|:(])(?:srv12|server12|2012\s+r2)(?=$|[\s|;)])/i.test(String(text || ""));
 }
 
 function getUnsupportedWindowsServerNotices(lines) {
-  const text = Array.isArray(lines) ? lines.join(" ") : String(lines || "");
-  return detectWindowsServer2012(text) ? [WINDOWS_SERVER_2012_UNSUPPORTED_NOTICE] : [];
+  const rows = Array.isArray(lines) ? lines : String(lines || "").split(/\r?\n/);
+  return rows.some(detectWindowsServer2012) ? [WINDOWS_SERVER_2012_UNSUPPORTED_NOTICE] : [];
 }
 
 function getOsDetectionLines(data) {
@@ -1741,6 +1743,8 @@ function getOsLabelFromText(text) {
   const value = String(text || "");
   const normalized = normalizeOsDetectionText(value);
 
+  const explicitVersion = getExplicitWindowsServerVersion(value);
+  if (explicitVersion && explicitVersion !== "2012") return `Windows Server ${explicitVersion}`;
   if (detectWindowsServer2012(value)) return "Windows Server 2012/2012 R2 (sem atualizacao padrao)";
 
   const serverMatch = value.match(/Windows\s+Server\s+(2016|2019|2022|2025)/i);
@@ -2003,10 +2007,10 @@ function processInput() {
     cmdbDatabase.forEach(server => {
       if (server.HostName) {
         const key = server.HostName.toLowerCase().split(".")[0];
-        cmdbHostMap[key] = server;
+        (cmdbHostMap[key] ||= []).push(server);
       }
       if (server.IP) {
-        cmdbIpMap[server.IP] = server;
+        (cmdbIpMap[server.IP] ||= []).push(server);
       }
     });
 
@@ -2021,21 +2025,19 @@ function processInput() {
       let hostKey = lineHost ? lineHost.toLowerCase().split(".")[0] : "";
       let matchedServer = null;
 
-      if (hostKey && cmdbHostMap[hostKey]) {
-        matchedServer = cmdbHostMap[hostKey];
-      }
-      
-      if (!matchedServer && lineIps.length > 0) {
-        for (let ip of lineIps) {
-          if (cmdbIpMap[ip]) {
-            matchedServer = cmdbIpMap[ip];
-            break;
-          }
-        }
+      // Hostnames can repeat across customers; an explicit IP must agree.
+      const hostMatches = cmdbHostMap[hostKey] || [];
+      if (lineIps.length > 0) {
+        const ipMatches = [...new Set(lineIps.flatMap(ip => cmdbIpMap[ip] || []))];
+        const exactMatches = ipMatches.filter(server => hostMatches.includes(server));
+        if (exactMatches.length === 1) matchedServer = exactMatches[0];
+        else if (ipMatches.length === 1) matchedServer = ipMatches[0];
+      } else if (hostMatches.length === 1) {
+        matchedServer = hostMatches[0];
       }
 
       if (matchedServer) {
-        const srvId = matchedServer.ServerID || matchedServer.ServerUUID || (matchedServer.HostName ? matchedServer.HostName.toLowerCase().split(".")[0] : "") || matchedServer.IP;
+        const srvId = matchedServer.ServerID || matchedServer.ServerUUID || `${(matchedServer.HostName || "").toLowerCase()}|${matchedServer.IP || ""}|${matchedServer.Customer || ""}`;
         if (!processedServerIds.has(srvId)) {
           processedServerIds.add(srvId);
           detectedServers.push({
@@ -2077,8 +2079,13 @@ function processInput() {
       if (srv.isRegistered) {
         const info = srv.serverInfo;
         const status = info.Status || "Desconhecido";
+        const cmdbOs = getOsLabelFromText(info.SO);
+        const inputOs = getExplicitWindowsServerVersion(srv.sourceLine) && !/or\s+later|ou\s+posterior|ou\s+superior/i.test(srv.sourceLine) ? srv.lineOs : "";
+        const effectiveOs = inputOs && inputOs !== cmdbOs ? inputOs : (info.SO || srv.lineOs || srv.sourceLine);
+        const osConflict = inputOs && cmdbOs && inputOs !== cmdbOs
+          ? `SO informado na GMUD: ${inputOs}; CMDB: ${cmdbOs}. Validar cadastro.` : "";
         const ipInfo = info.IP ? ` | IP: ${info.IP}` : "";
-        const details = `Cliente: ${info.Customer || "N/A"}${ipInfo} | OS: ${info.SO || "N/A"}`;
+        const details = `Cliente: ${info.Customer || "N/A"}${ipInfo} | OS: ${effectiveOs || "N/A"}`;
         
         let badgeClass = "status-desconhecido";
         
@@ -2089,30 +2096,30 @@ function processInput() {
           scopedEntries.push(createOsEntry(
             info.HostName ? info.HostName.split(".")[0] : srv.displayName,
             info.IP ? [info.IP] : [],
-            info.SO || srv.lineOs || srv.sourceLine
+            effectiveOs
           ));
-          activeVMs.push({ name: srv.displayName, info: details });
+          activeVMs.push({ name: srv.displayName, info: details, osConflict });
         } else if (status.toLowerCase() === "desligada") {
           badgeClass = "status-desligada";
-          offlineVMs.push({ name: srv.displayName, info: details, reason: "Desligada no CMDB" });
+          offlineVMs.push({ name: srv.displayName, info: details, osConflict, reason: "Desligada no CMDB" });
           if (!onlyPoweredOn) {
             if (info.HostName) filteredHostnames.push(info.HostName.split(".")[0]);
             if (info.IP) filteredIps.push(info.IP);
             scopedEntries.push(createOsEntry(
               info.HostName ? info.HostName.split(".")[0] : srv.displayName,
               info.IP ? [info.IP] : [],
-              info.SO || srv.lineOs || srv.sourceLine
+              effectiveOs
             ));
           }
         } else {
-          unknownVMs.push({ name: srv.displayName, info: details, reason: `Status do CMDB: ${status}` });
+          unknownVMs.push({ name: srv.displayName, info: details, osConflict, reason: `Status do CMDB: ${status}` });
           if (!onlyPoweredOn) {
             if (info.HostName) filteredHostnames.push(info.HostName.split(".")[0]);
             if (info.IP) filteredIps.push(info.IP);
             scopedEntries.push(createOsEntry(
               info.HostName ? info.HostName.split(".")[0] : srv.displayName,
               info.IP ? [info.IP] : [],
-              info.SO || srv.lineOs || srv.sourceLine
+              effectiveOs
             ));
           }
         }
@@ -2121,7 +2128,8 @@ function processInput() {
           <span><strong>${srv.displayName}</strong> (${details})</span>
           <span class="status-badge ${badgeClass}">${status}</span>
         </div>`;
-        copyLines.push(`${srv.displayName} | Cliente: ${info.Customer || "N/A"} | IP: ${info.IP || "N/A"} | OS: ${info.SO || "N/A"} | Status: ${status}`);
+        if (osConflict) listHtml += `<div class="small">${escapeHtml(srv.displayName)}: ${escapeHtml(osConflict)}</div>`;
+        copyLines.push(`${srv.displayName} | Cliente: ${info.Customer || "N/A"} | IP: ${info.IP || "N/A"} | OS: ${effectiveOs || "N/A"} | Status: ${status}`);
       } else {
         const details = "Não encontrado no CMDB";
         unknownVMs.push({ name: srv.displayName, info: details, reason: "Não cadastrado no CMDB" });
@@ -2231,7 +2239,7 @@ function buildScopeTableRows(data, monitoredAlerts) {
       client: getScopeInfoValue(vm.info, "Cliente"),
       os: getScopeInfoValue(vm.info, "OS"),
       status,
-      problems
+      problems: [...problems, ...(vm.osConflict ? [vm.osConflict] : [])]
     });
     data.activeVMs.forEach(vm => fromVm(vm, "Ligada"));
     data.offlineVMs.forEach(vm => fromVm(vm, "Desligada", ["Fora do escopo"]));
@@ -2332,6 +2340,7 @@ function buildGmudReview(data, suggestedKbs, unsupportedNotices, monitoredAlerts
     const missingOs = data.activeVMs.filter(vm => /\|\s*OS:\s*(?:N\/A|Nao informado)?\s*$/i.test(vm.info || "")).length;
     if (missingIp > 0) add("warning", `${missingIp} VM(s) ligada(s) sem IP válido informado pela CMDB.`);
     if (missingOs > 0) add("critical", `${missingOs} VM(s) ligada(s) sem sistema operacional informado pela CMDB.`);
+    [...data.activeVMs, ...data.offlineVMs, ...data.unknownVMs].filter(vm => vm.osConflict).forEach(vm => add("warning", `${vm.name}: ${vm.osConflict}`));
   } else {
     add("warning", "A base CMDB ainda não foi aplicada; status e cadastro das VMs não foram validados.");
   }
