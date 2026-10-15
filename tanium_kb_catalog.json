@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "documentId": "2026-Oct",
   "documentTitle": "Windows Server Security / Out-of-Band Cumulative Updates",
-  "generatedAt": "2026-10-14T21:32:23.463Z",
+  "generatedAt": "2026-10-15T00:02:48.780Z",
   "sourceUrl": "https://learn.microsoft.com/en-us/windows/release-health/windows-server-release-info",
   "catalog": {
     "10": {
@@ -32,9 +32,9 @@
   },
   "sync": {
     "status": "success",
-    "lastAttemptAt": "2026-10-14T21:32:23.463Z",
-    "lastSuccessfulAt": "2026-10-14T21:32:23.463Z",
-    "lastCompleteSuccessAt": "2026-10-14T21:32:23.463Z",
+    "lastAttemptAt": "2026-10-15T00:02:48.780Z",
+    "lastSuccessfulAt": "2026-10-15T00:02:48.780Z",
+    "lastCompleteSuccessAt": "2026-10-15T00:02:48.780Z",
     "checks": [
       {
         "source": "Microsoft release history",
@@ -138,8 +138,8 @@
       "architecture": "x64",
       "kind": "security",
       "releaseDate": "2026-10-13",
-      "build": "",
-      "sourceUrl": "https://www.catalog.update.microsoft.com/Search.aspx?q=KB5126651",
+      "build": "17763.9376",
+      "sourceUrl": "https://api.msrc.microsoft.com/cvrf/v3.0/cvrf/2026-Oct",
       "name": "Windows Server 2019 Cumulative Update (2026-10-13)"
     },
     {
@@ -248,8 +248,8 @@
       "architecture": "x64",
       "kind": "security",
       "releaseDate": "2026-09-08",
-      "build": "",
-      "sourceUrl": "https://www.catalog.update.microsoft.com/Search.aspx?q=KB5122876",
+      "build": "17763.9245",
+      "sourceUrl": "https://api.msrc.microsoft.com/cvrf/v3.0/cvrf/2026-Sep",
       "name": "Windows Server 2019 Cumulative Update (2026-09-08)"
     },
     {
