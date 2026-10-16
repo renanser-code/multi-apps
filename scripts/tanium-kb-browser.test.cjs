@@ -377,3 +377,61 @@ test("only powered-off duplicates remain powered off, without inventing an activ
   assert.equal(b.read("processInput().offlineVMs.length"), 1);
   assert.equal(b.read("processInput().hostnames.length"), 0);
 });
+
+test("ON and poweredOn override discontinued/off duplicates in the opening email", () => {
+  for (const state of ["ON", " on ", "PoweredOn", "Powered On", "Ligado"]) {
+    const b = browser(true);
+    b.element("onlyPoweredOn").checked = true;
+    b.element("input").value = "VM-DUP01 192.0.2.114 WIN/2022";
+    const record = {HostName:"VM-DUP01",IP:"192.0.2.114",Customer:"TEST",SO:"Windows Server 2022"};
+    b.read(`isCmdbLoaded = true; cmdbDatabase = ${JSON.stringify([{...record,ServerID:"old",Status:"Descontinuada"},{...record,ServerID:"on",Status:state}])}; generate();`);
+    assert.equal(b.read("processInput().activeVMs.length"), 1);
+    assert.equal(b.read("processInput().unknownVMs.length"), 0);
+    const html = b.element("emailText").innerHTML;
+    assert(html.includes("Servidores LIGADOS (Patches"));
+    assert(!html.includes("Servidores DESLIGADOS"));
+    assert(!html.includes("Descontinuada"));
+    assert(!html.includes("status não confirmado"));
+    assert(b.element("cmdbCopyResult").value.includes("Status: Ligada"));
+  }
+});
+
+test("missing and discontinued VMs are pending validation, never labelled powered off", () => {
+  const b = browser(true);
+  b.element("onlyPoweredOn").checked = true;
+  b.element("input").value = "VM-MISSING01 192.0.2.1 WIN/2022\nVM-RETIRED01 192.0.2.2 WIN/2022";
+  b.read('isCmdbLoaded = true; cmdbDatabase = [{HostName:"VM-RETIRED01",IP:"192.0.2.2",Status:"Descontinuada"}]; generate();');
+  const html = b.element("emailText").innerHTML;
+  assert(!html.includes("Servidores DESLIGADOS"));
+  assert(!html.includes("Não serão atualizados"));
+  const pending = html.split("Servidores com status não confirmado")[1];
+  assert(pending.includes("VM-MISSING01"));
+  assert(pending.includes("VM-RETIRED01"));
+});
+
+test("opening email separates confirmed powered-off VMs from unconfirmed records", () => {
+  const b = browser(true);
+  b.element("input").value = "VM-ON01 192.0.2.1 WIN/2022\nVM-OFF01 192.0.2.2 WIN/2022\nVM-MISSING01 192.0.2.3 WIN/2022";
+  b.read('isCmdbLoaded = true; cmdbDatabase = [{HostName:"VM-ON01",IP:"192.0.2.1",Status:"ON"},{HostName:"VM-OFF01",IP:"192.0.2.2",Status:"OFF"}]; generate();');
+  const html = b.element("emailText").innerHTML;
+  const active = html.split("Servidores DESLIGADOS")[0];
+  const off = html.split("Servidores DESLIGADOS")[1].split("Servidores com status não confirmado")[0];
+  const pending = html.split("Servidores com status não confirmado")[1];
+  assert(active.includes("VM-ON01"));
+  assert(off.includes("VM-OFF01"));
+  assert(!off.includes("VM-ON01"));
+  assert(!off.includes("VM-MISSING01"));
+  assert(pending.includes("VM-MISSING01"));
+});
+
+test("a resolved ON VM does not remain duplicated as unknown from an earlier hostname-only line", () => {
+  const b = browser(true);
+  const record = {HostName:"VM-DUP01",IP:"192.0.2.114",Customer:"TEST",Status:"ON",SO:"Windows Server 2022"};
+  b.element("input").value = "VM-DUP01\nVM-DUP01 192.0.2.114 WIN/2022";
+  b.read(`isCmdbLoaded = true; cmdbDatabase = ${JSON.stringify([record,{...record,IP:"192.0.2.115",Customer:"OTHER"}])}; generate();`);
+  assert.equal(b.read("processInput().activeVMs.length"), 1);
+  assert.equal(b.read("processInput().unknownVMs.length"), 0);
+  assert(!b.element("emailText").innerHTML.includes("status não confirmado"));
+  b.element("input").value += "\nVM-DUP01 192.0.2.199 WIN/2022";
+  assert.equal(b.read("processInput().unknownVMs.length"), 1);
+});

@@ -1987,13 +1987,20 @@ function suggestKBs(lines) {
   return items;
 }
 
+function normalizeCmdbPowerStatus(value) {
+  const status = String(value || "").trim();
+  if (/^(?:on|powered[\s_-]*on|ligad[ao])$/i.test(status)) return "Ligada";
+  if (/^(?:off|powered[\s_-]*off|desligad[ao])$/i.test(status)) return "Desligada";
+  return status || "Desconhecido";
+}
+
 function selectPreferredCmdbRecord(candidates) {
   if (candidates.length < 2) return candidates[0] || null;
   const customer = record => normalizeOsDetectionText(record.Customer).trim();
   const customers = new Set(candidates.map(customer).filter(value => value && value !== "n/a"));
   if (customers.size > 1) return null;
 
-  const status = record => String(record.Status || "Desconhecido").trim().toLowerCase();
+  const status = record => normalizeCmdbPowerStatus(record.Status).toLowerCase();
   const poweredOn = candidates.filter(record => status(record) === "ligada");
   const pool = poweredOn.length ? poweredOn : candidates;
   const names = new Set(pool.map(record => getVmHostname(record.HostName).toLowerCase()).filter(Boolean));
@@ -2091,7 +2098,7 @@ function processInput() {
       } else {
         const nameOrIp = lineHost || (lineIps.length > 0 ? lineIps[0] : "");
         if (nameOrIp) {
-          const lookupKey = nameOrIp.toLowerCase().split(".")[0];
+          const lookupKey = `${nameOrIp.toLowerCase().split(".")[0]}|${lineIps[0] || ""}`;
           if (!processedUnregisteredNames.has(lookupKey)) {
             processedUnregisteredNames.add(lookupKey);
             detectedServers.push({
@@ -2114,10 +2121,22 @@ function processInput() {
     const filteredIps = [];
     const scopedEntries = [];
 
-    detectedServers.forEach(srv => {
+    // A later IP-qualified line can resolve an earlier ambiguous hostname.
+    const registeredServers = detectedServers.filter(srv => srv.isRegistered);
+    const resolvedServers = detectedServers.filter(srv => {
+      if (srv.isRegistered) return true;
+      const matches = registeredServers.filter(registered => {
+        const sameHost = getVmHostname(srv.displayName).toLowerCase() === getVmHostname(registered.displayName).toLowerCase();
+        const sameIp = Boolean(srv.ip) && srv.ip === registered.ip;
+        return (sameHost || (isValidIp(srv.displayName) && sameIp)) && (!srv.ip || sameIp);
+      });
+      return matches.length !== 1;
+    });
+
+    resolvedServers.forEach(srv => {
       if (srv.isRegistered) {
         const info = srv.serverInfo;
-        const status = String(info.Status || "Desconhecido").trim();
+        const status = normalizeCmdbPowerStatus(info.Status);
         const cmdbOs = getOsLabelFromText(info.SO);
         const inputOs = getExplicitWindowsServerVersion(srv.sourceLine) && !/or\s+later|ou\s+posterior|ou\s+superior/i.test(srv.sourceLine) ? srv.lineOs : "";
         const effectiveOs = inputOs && inputOs !== cmdbOs ? inputOs : (info.SO || srv.lineOs || srv.sourceLine);
@@ -2489,11 +2508,14 @@ function generate() {
       emailHtml += "<strong>Servidores LIGADOS:</strong><br>- n/a<br>";
     }
     
-    if (data.offlineVMs.length > 0 || data.unknownVMs.length > 0) {
+    if (data.offlineVMs.length > 0) {
       emailHtml += "<br><strong>Servidores DESLIGADOS / Fora do escopo (Não serão atualizados):</strong><br>";
       data.offlineVMs.forEach(vm => {
         emailHtml += `- <strong>${vm.name}</strong>${getVmEmailClassification(vm.name)} (Evidência: ${vm.reason} | ${getCustomerEmailVmInfo(vm)})<br>`;
       });
+    }
+    if (data.unknownVMs.length > 0) {
+      emailHtml += "<br><strong>Servidores com status não confirmado (validar antes da atualização):</strong><br>";
       data.unknownVMs.forEach(vm => {
         emailHtml += `- <strong>${vm.name}</strong>${getVmEmailClassification(vm.name)} (Evidência: ${vm.reason})<br>`;
       });

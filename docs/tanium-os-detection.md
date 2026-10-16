@@ -36,6 +36,20 @@ explicitamente informado por outro. Se varios registros ligados ainda apontam
 para maquinas diferentes, a correspondencia permanece ambigua para validacao.
 Se nao houver registro ligado, o gerador nao inventa esse status.
 
+Os valores `ON`, `PoweredOn`, `Powered On`, `Ligado` e `Ligada` representam
+o estado ligado; `OFF`, `PoweredOff`, `Desligado` e `Desligada` representam
+o estado desligado. A normalizacao e compartilhada pela selecao e exibicao.
+No e-mail inicial, somente desligamento confirmado vai para DESLIGADOS.
+Maquinas nao localizadas, descontinuadas ou sem confirmacao de energia ficam
+em um bloco separado de status nao confirmado, para validacao.
+Uma linha anterior apenas com hostname deixa de gerar pendencia duplicada
+quando outra linha identifica inequivocamente a mesma VM pelo IP.
+
+Checkpoint anterior a este ajuste do e-mail:
+`rollback/pre-email-power-status-20261016-200937`.
+Backup local:
+`C:\Users\RenanSerafimPires\OneDrive - Claranet\Documentos\Manuais\backups-gerador-tanium\pre-email-power-status-20261016-200937`.
+
 Checkpoint anterior a esta correcao:
 `rollback/pre-prefer-powered-on-20261016-194929`.
 Backup local:
