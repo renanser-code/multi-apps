@@ -23,7 +23,22 @@ cronograma da GMUD 1010, com endereco IP reservado para documentacao, sem
 publicar contatos ou a base real do cliente. Incluem colisao de hostname,
 cadastro divergente, correspondencia ausente e maquinas realmente 2012.
 
-## Rollback
+## Classificacao automatica de banco de dados
+
+Qualquer hostname contendo `SQL`, sem diferenciar maiusculas de minusculas,
+e classificado como Banco de Dados, sem precisar de cadastro na lista manual.
+Somente o nome da VM e considerado; observacoes e sufixos de dominio nao
+ativam essa regra. As classificacoes manuais e prioridades existentes permanecem.
+Os alertas nao sao duplicados quando a VM ja consta na lista de bancos de dados.
+O destaque aparece no painel, no escopo, nos e-mails e na tabela do PDF, sem
+alterar as colunas do modelo do relatorio.
+
+Checkpoint anterior a esta regra:
+`rollback/pre-sql-database-rule-20261015-221222`.
+Backup local:
+`C:\Users\RenanSerafimPires\OneDrive - Claranet\Documentos\Manuais\backups-gerador-tanium\pre-sql-database-rule-20261015-221222`.
+
+## Rollback da correcao de SO
 
 Tag anterior a esta correcao:
 `rollback/pre-os-detection-20261015-191015`.

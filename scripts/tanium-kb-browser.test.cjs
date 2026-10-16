@@ -259,3 +259,51 @@ test("OS formats accept WIN slash years, preserve actual 2012 notices, and do no
   assert.equal(b.read('detectWindowsServer2012("WIN/2012 R2")'), true);
   assert.equal(b.read('getUnsupportedWindowsServerNotices(["WIN/2022", "WIN/2012 R2"]).length'), 1);
 });
+
+test("any SQL hostname is automatically a database across alerts, scope, emails and PDF", () => {
+  for (const name of ["SRV-SQL", "APPSQL01", "MSSQL-02", "postgresql01", "srv-sql.example.test"]) {
+    const b = browser(true);
+    b.element("input").value = `${name} 192.0.2.66 WIN/2022`;
+    b.read("generate(); generateClosure()");
+    assert.equal(b.read("getMonitoredVmAlerts(processInput()).length"), 1);
+    assert(b.element("monitoredVmAlerts").innerHTML.includes("Banco de Dados"));
+    assert(b.element("scopeTableBody").innerHTML.includes("Banco de dados"));
+    for (const markup of [b.element("emailText").innerHTML, b.element("closureEmailText").innerHTML, b.read("buildClosureReportHtml()")]) {
+      assert(markup.includes("[BANCO DE DADOS]"), `${name} must be highlighted`);
+    }
+    b.element("input").value = "";
+    b.read("generate()");
+    assert.equal(b.read("getMonitoredVmAlerts(processInput()).length"), 0);
+  }
+});
+
+test("SQL rule is restricted to VM hostname, not observations or domain suffix", () => {
+  const b = browser(true);
+  for (const line of ["SV-WEB-01 192.0.2.66 WIN/2022 OBS: validar servico SQL", "SV-WEB-01.sql.example 192.0.2.66 WIN/2022"]) {
+    b.element("input").value = line;
+    b.read("generate(); generateClosure()");
+    assert.equal(b.read("getMonitoredVmAlerts(processInput()).length"), 0);
+    assert(!b.element("emailText").innerHTML.includes("[BANCO DE DADOS]"));
+  }
+  assert.equal(b.read('getMonitoredVmAlertByName("rdgw.other.example")'), null);
+});
+
+test("SQL classification preserves configured priority and never duplicates a registered database", () => {
+  const b = browser(true);
+  b.read('MONITORED_VM_ALERTS.push({name:"PRIORITY-SQL01",type:"VM prioritaria",message:"Acompanhamento prioritario"})');
+  b.element("input").value = "PRIORITY-SQL01 192.0.2.66 WIN/2022";
+  b.read("generate()");
+  assert(b.element("emailText").innerHTML.includes("[VM PRIORITARIA / BANCO DE DADOS]"));
+  assert(b.read('getMonitoredVmAlertByName("PRIORITY-SQL01").message').includes("Acompanhamento prioritario"));
+  b.element("input").value = "SV-SQL3 192.0.2.67 WIN/2022\nsv-sql3.example.test 192.0.2.67 WIN/2022";
+  assert.equal(b.read("getMonitoredVmAlerts(processInput()).length"), 1);
+});
+
+test("SQL VM from CMDB is highlighted even when powered off and outside update scope", () => {
+  const b = browser(true);
+  b.element("onlyPoweredOn").checked = true;
+  b.element("input").value = "SRV-SQL 192.0.2.66 WIN/2022";
+  b.read('isCmdbLoaded = true; cmdbDatabase = [{HostName:"SRV-SQL.example.test",IP:"192.0.2.66",SO:"Windows Server 2022",Status:"Desligada"}]; generate()');
+  assert(b.element("emailText").innerHTML.includes("[BANCO DE DADOS]"));
+  assert(b.element("scopeTableBody").innerHTML.includes("Banco de dados"));
+});

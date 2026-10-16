@@ -1230,16 +1230,34 @@ function normalizeMonitoredVmName(value) {
   return String(value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
+function getVmHostname(name) {
+  return String(name || "").trim().split(".")[0];
+}
+
 function getMonitoredVmAlertByName(name) {
   const normalizedName = normalizeMonitoredVmName(name);
   if (!normalizedName) return null;
-  return MONITORED_VM_ALERTS.find(alert => normalizeMonitoredVmName(alert.name) === normalizedName) || null;
+  const hostname = getVmHostname(name);
+  const configured = MONITORED_VM_ALERTS.find(alert => normalizeMonitoredVmName(alert.name) === normalizedName)
+    || MONITORED_VM_ALERTS.find(alert => !String(alert.name).includes(".") && normalizeMonitoredVmName(alert.name) === normalizeMonitoredVmName(hostname));
+  if (!/sql/i.test(hostname)) return configured || null;
+  if (configured?.type?.includes("Banco de Dados")) return configured;
+  return {
+    name: configured?.name || hostname,
+    type: configured?.type ? `${configured.type} / Banco de Dados` : "Banco de Dados",
+    message: configured?.message ? `${configured.message} ${DATABASE_VM_ALERT_MESSAGE}` : DATABASE_VM_ALERT_MESSAGE
+  };
+}
+
+function getVmDatabaseClassification(name) {
+  return getMonitoredVmAlertByName(name)?.type?.includes("Banco de Dados")
+    ? ' <strong style="color:#b91c1c;">[BANCO DE DADOS]</strong>' : "";
 }
 
 function getVmEmailClassification(name) {
   const alert = getMonitoredVmAlertByName(name);
   if (!alert) return "";
-  if (alert.type && alert.type.includes("Banco de Dados")) return ' <strong style="color:#b91c1c;">[BANCO DE DADOS]</strong>';
+  if (alert.type && alert.type.includes("Banco de Dados")) return getVmDatabaseClassification(name);
   if (alert.type && alert.type.includes("3a onda VISA")) return ' <strong style="color:#b45309;">[VM PRIORITARIA - 3a ONDA VISA]</strong>';
   if (alert.type && alert.type.includes("VM prioritaria")) return ' <strong style="color:#b45309;">[VM PRIORITARIA]</strong>';
   return "";
@@ -1255,20 +1273,23 @@ function getMonitoredVmAlerts(data) {
     ...((data.unknownVMs || []).map(vm => `${vm.name} ${vm.info || ""}`))
   ];
   const searchText = parts.join("\n");
-  const detectedNames = new Set([
+  const detectedVmNames = [
     ...(data.hostnames || []),
     ...((data.activeVMs || []).map(vm => vm.name)),
     ...((data.offlineVMs || []).map(vm => vm.name)),
     ...((data.unknownVMs || []).map(vm => vm.name)),
     ...((data.lines || []).map(findHostname).filter(Boolean))
-  ].map(normalizeMonitoredVmName));
+  ];
+  const detectedNames = new Set(detectedVmNames.map(normalizeMonitoredVmName));
 
-  return MONITORED_VM_ALERTS.filter(alert => {
+  const configuredAlerts = MONITORED_VM_ALERTS.filter(alert => {
     const alertName = normalizeMonitoredVmName(alert.name);
     if (detectedNames.has(alertName)) return true;
     const isPrefixOfAnotherVm = [...detectedNames].some(name => name !== alertName && name.startsWith(alertName));
     return !isPrefixOfAnotherVm && textContainsMonitoredVm(searchText, alert.name);
-  });
+  }).map(alert => getMonitoredVmAlertByName(alert.name));
+  const automaticAlerts = detectedVmNames.filter(name => /sql/i.test(getVmHostname(name))).map(getMonitoredVmAlertByName);
+  return [...new Map([...configuredAlerts, ...automaticAlerts].map(alert => [normalizeMonitoredVmName(getVmHostname(alert.name)), alert])).values()];
 }
 
 function renderMonitoredVmAlerts(alerts) {
@@ -2212,7 +2233,7 @@ function buildScopeTableRows(data, monitoredAlerts) {
     const key = `${normalizeMonitoredVmName(name)}|${ip}`;
     if ((!name && !ip) || seen.has(key)) return;
     seen.add(key);
-    const alert = alertMap.get(normalizeMonitoredVmName(name));
+    const alert = alertMap.get(normalizeMonitoredVmName(name)) || alertMap.get(normalizeMonitoredVmName(getVmHostname(name)));
     const classifications = [];
     if (alert?.type && /VM prioritaria|3a onda VISA/i.test(alert.type)) classifications.push("Prioritária");
     if (alert?.type && /Banco de Dados/i.test(alert.type)) classifications.push("Banco de dados");
@@ -3467,7 +3488,7 @@ function buildClosureEmailHtml() {
     payload.servers.forEach(server => {
       const filteredInfo = getCustomerEmailVmInfo(server);
       const info = filteredInfo ? ` (${escapeHtml(filteredInfo)})` : "";
-      html += `- <strong>${escapeHtml(server.name)}</strong>${info} - ${escapeHtml(server.result || "Validacao nao informada")}<br>`;
+      html += `- <strong>${escapeHtml(server.name)}</strong>${getVmDatabaseClassification(server.name)}${info} - ${escapeHtml(server.result || "Validacao nao informada")}<br>`;
     });
   } else {
     html += "- Nao informado<br>";
@@ -3593,7 +3614,7 @@ function buildClosureReportHtml() {
   const payload = getClosurePayload();
   const titleLine = `GMUD ${payload.gmudNumber} - ${payload.client} | Atualizações de Segurança`;
   const serversHtml = payload.servers.length > 0
-    ? payload.servers.map(server => `<tr><td>${escapeHtml(server.name)}</td><td>${escapeHtml(server.os || "Nao informado")}</td><td>${escapeHtml(server.result || getClosureResultLabel(payload.status))}</td></tr>`).join("")
+    ? payload.servers.map(server => `<tr><td>${escapeHtml(server.name)}${getVmDatabaseClassification(server.name)}</td><td>${escapeHtml(server.os || "Nao informado")}</td><td>${escapeHtml(server.result || getClosureResultLabel(payload.status))}</td></tr>`).join("")
     : "<tr><td colspan='3'>Nao informado</td></tr>";
   const kbHtml = payload.suggestedKbs.length > 0
     ? payload.suggestedKbs.map(item => `<li>${escapeHtml(item.kb)} - ${escapeHtml(item.name)}</li>`).join("")
