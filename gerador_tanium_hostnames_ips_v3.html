@@ -2013,6 +2013,23 @@ function selectPreferredCmdbRecord(candidates) {
   return [...pool].sort((a, b) => score(b) - score(a) || key(a).localeCompare(key(b)))[0];
 }
 
+function includePoweredOnCmdbAliases(matches, ipMap) {
+  // Restored VMs may retain a dated suffix while the original record is retired.
+  const aliases = matches.flatMap(original => {
+    const ip = String(original.IP || "").trim();
+    const name = getVmHostname(original.HostName).toLowerCase();
+    const customer = normalizeOsDetectionText(original.Customer).trim();
+    if (!isValidIp(ip) || !name || !customer || customer === "n/a") return [];
+    return (ipMap[ip] || []).filter(record => {
+      const alias = getVmHostname(record.HostName).toLowerCase();
+      return normalizeCmdbPowerStatus(record.Status) === "Ligada"
+        && normalizeOsDetectionText(record.Customer).trim() === customer
+        && (alias === name || alias.startsWith(name + "_") || alias.startsWith(name + "-"));
+    });
+  });
+  return [...new Set([...matches, ...aliases])];
+}
+
 function processInput() {
   const input = document.getElementById("input").value;
   const lines = input.split(/\r?\n/).filter(line => line.trim());
@@ -2077,9 +2094,9 @@ function processInput() {
       if (lineIps.length > 0) {
         const ipMatches = [...new Set(lineIps.flatMap(ip => cmdbIpMap[ip] || []))];
         const exactMatches = ipMatches.filter(server => hostMatches.includes(server));
-        matchedServer = selectPreferredCmdbRecord(exactMatches.length ? exactMatches : ipMatches);
+        matchedServer = selectPreferredCmdbRecord(includePoweredOnCmdbAliases(exactMatches.length ? exactMatches : ipMatches, cmdbIpMap));
       } else {
-        matchedServer = selectPreferredCmdbRecord(hostMatches);
+        matchedServer = selectPreferredCmdbRecord(includePoweredOnCmdbAliases(hostMatches, cmdbIpMap));
       }
 
       if (matchedServer) {

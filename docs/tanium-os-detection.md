@@ -72,6 +72,22 @@ Backup local:
 
 ## Rollback da correcao de SO
 
+### Registros restaurados com sufixo
+
+Um cadastro com nome exato pode estar descontinuado enquanto uma VM restaurada
+com sufixo esta ligada. A consulta agora inclui aliases ligados cujo nome
+inicia com o hostname original seguido por `_` ou `-`, exclusivamente quando
+IP valido e cliente coincidem com o registro original. Funciona tambem quando
+a entrada contem apenas o hostname, usando o IP do cadastro encontrado.
+O nome real do registro ligado aparece nas saidas. Conflitos entre registros
+ligados permanecem sujeitos a validacao, sem inferir que qualquer prefixo e ON.
+
+Teste de regressao reproduz cadastro descontinuado, copia desligada e restaurada
+ligada, em ambas as ordens, com hostname, hostname/IP e IP isolado. Verifica
+e-mail, encerramento, PDF e copia CMDB, alem de rejeitar outro cliente/IP/nome.
+Rollback: `rollback/pre-cmdb-renamed-on-20261016-202255`; backup local em
+`backups-gerador-tanium/pre-cmdb-renamed-on-20261016-202255`.
+
 Tag anterior a esta correcao:
 `rollback/pre-os-detection-20261015-191015`.
 

@@ -340,6 +340,32 @@ test("duplicate CMDB records always select the powered-on VM regardless of order
   }
 });
 
+test("restored ON alias overrides retired original with same IP and customer in every output", () => {
+  const original = {ServerID:"old",HostName:"VM-DUP01",IP:"192.0.2.114",Customer:"TEST",Status:"Descontinuada",SO:"Windows Server 2019"};
+  const on = {...original,ServerID:"restored",HostName:"VM-DUP01_R_24SET",Status:"Ligada"};
+  const records = [original, {...original,ServerID:"off",HostName:"VM-DUP01-OLD",IP:null,Status:"Desligada"}, on];
+  for (const ordered of [records, [...records].reverse()]) {
+    for (const line of ["VM-DUP01", "VM-DUP01 192.0.2.114 WIN/2019", "192.0.2.114"]) {
+      const b = browser(true);
+      b.element("input").value = line;
+      b.read(`isCmdbLoaded=true;cmdbDatabase=${JSON.stringify(ordered)};generate();generateClosure();`);
+      assert.equal(b.read("processInput().activeVMs.length"), 1);
+      assert.equal(b.read("processInput().unknownVMs.length"), 0);
+      assert(b.element("emailText").innerHTML.includes(on.HostName));
+      assert(!b.element("emailText").innerHTML.includes("Descontinuada"));
+      assert(b.element("cmdbCopyResult").value.includes("Status: Ligada"));
+      assert(b.element("closureEmailText").innerHTML.includes(on.HostName));
+      assert(b.read("buildClosureReportHtml()").includes(on.HostName));
+    }
+  }
+  for (const unsafe of [{...on,Customer:"OTHER"}, {...on,IP:"192.0.2.115"}, {...on,HostName:"VM-OTHER01"}]) {
+    const b = browser();
+    b.element("input").value = "VM-DUP01 192.0.2.114";
+    b.read(`isCmdbLoaded=true;cmdbDatabase=${JSON.stringify([original,unsafe])};`);
+    assert.equal(b.read("processInput().activeVMs.length"), 0);
+  }
+});
+
 test("multiple powered-on snapshots with the same identity collapse to one deterministic VM", () => {
   const b = browser();
   const records = [
