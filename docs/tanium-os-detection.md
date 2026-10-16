@@ -23,6 +23,24 @@ cronograma da GMUD 1010, com endereco IP reservado para documentacao, sem
 publicar contatos ou a base real do cliente. Incluem colisao de hostname,
 cadastro divergente, correspondencia ausente e maquinas realmente 2012.
 
+## Registros duplicados e prioridade de status
+
+Quando a mesma VM possui varios registros na CMDB, o registro com status
+`Ligada` tem prioridade sobre registros desligados ou sem status. O resultado
+independe da ordem da base e e exibido uma unica vez no escopo, nos contadores,
+nos resultados Tanium e nas comunicacoes. O registro ligado fornece IP e SO;
+nao sao misturados campos de registros antigos desligados.
+
+A preferencia nao atravessa clientes diferentes e nao substitui um IP
+explicitamente informado por outro. Se varios registros ligados ainda apontam
+para maquinas diferentes, a correspondencia permanece ambigua para validacao.
+Se nao houver registro ligado, o gerador nao inventa esse status.
+
+Checkpoint anterior a esta correcao:
+`rollback/pre-prefer-powered-on-20261016-194929`.
+Backup local:
+`C:\Users\RenanSerafimPires\OneDrive - Claranet\Documentos\Manuais\backups-gerador-tanium\pre-prefer-powered-on-20261016-194929`.
+
 ## Classificacao automatica de banco de dados
 
 Qualquer hostname contendo `SQL`, sem diferenciar maiusculas de minusculas,

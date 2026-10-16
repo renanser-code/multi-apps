@@ -307,3 +307,73 @@ test("SQL VM from CMDB is highlighted even when powered off and outside update s
   assert(b.element("emailText").innerHTML.includes("[BANCO DE DADOS]"));
   assert(b.element("scopeTableBody").innerHTML.includes("Banco de dados"));
 });
+
+test("duplicate CMDB records always select the powered-on VM regardless of order or input style", () => {
+  const on = {ServerID:"on",HostName:"VM-DUP01.example.test",IP:"192.0.2.114",Customer:"TEST",SO:"Windows Server 2022",Status:"Ligada"};
+  const duplicates = [
+    {...on,ServerID:"unknown",Status:"Desconhecido"},
+    {...on,ServerID:"old1",IP:"-",Status:"Desligada"},
+    {...on,ServerID:"old2",IP:"-",Status:"Desligada"},
+    on
+  ];
+  for (const records of [duplicates, [...duplicates].reverse()]) {
+    for (const line of ["VM-DUP01 192.0.2.114 WIN/2022", "VM-DUP01 WIN/2022", "192.0.2.114"]) {
+      const b = browser(true);
+      b.element("onlyPoweredOn").checked = true;
+      b.element("input").value = `${line}\n${line}`;
+      b.read(`isCmdbLoaded = true; cmdbDatabase = ${JSON.stringify(records)}; generate(); generateClosure();`);
+      assert.equal(b.read("processInput().activeVMs.length"), 1);
+      assert.equal(b.read("processInput().offlineVMs.length"), 0);
+      assert.equal(b.read("processInput().unknownVMs.length"), 0);
+      assert.equal(b.read("processInput().hostnames.length"), 1);
+      assert.equal(b.read("processInput().ips[0]"), "192.0.2.114");
+      assert.equal(b.read('getScopeInfoValue(processInput().activeVMs[0].info, "IP")'), "192.0.2.114");
+      assert(b.element("cmdbCopyResult").value.includes("Status: Ligada"));
+      assert(!b.element("cmdbCopyResult").value.includes("Status: Desligada"));
+      assert(b.element("windowsHostnameRegex").value.includes("VM-DUP01"));
+      assert(b.element("scopeTableBody").innerHTML.includes("Ligada"));
+      assert(!b.element("scopeTableBody").innerHTML.includes("Desligada"));
+      assert(b.element("emailText").innerHTML.includes("VM-DUP01"));
+      assert(b.element("closureEmailText").innerHTML.includes("VM-DUP01"));
+      assert(b.read("buildClosureReportHtml()").includes("VM-DUP01"));
+    }
+  }
+});
+
+test("multiple powered-on snapshots with the same identity collapse to one deterministic VM", () => {
+  const b = browser();
+  const records = [
+    {ServerID:"a",HostName:"VM-DUP01",IP:"192.0.2.114",Customer:"TEST",Status:" Ligada "},
+    {ServerID:"b",HostName:"VM-DUP01",IP:"192.0.2.114",Customer:"TEST",Status:"LIGADA",SO:"Windows Server 2022"}
+  ];
+  b.element("input").value = "VM-DUP01 192.0.2.114";
+  for (const ordered of [records, [...records].reverse()]) {
+    b.read(`isCmdbLoaded = true; cmdbDatabase = ${JSON.stringify(ordered)};`);
+    assert.equal(b.read("processInput().activeVMs.length"), 1);
+    assert(b.read("processInput().activeVMs[0].info").includes("Windows Server 2022"));
+  }
+});
+
+test("powered-on preference never crosses customer boundaries or replaces an explicitly different IP", () => {
+  const b = browser();
+  const off = {HostName:"VM-DUP01",IP:"192.0.2.114",Customer:"TEST",Status:"Desligada"};
+  const on = {...off,IP:"192.0.2.115",Status:"Ligada"};
+  b.read(`isCmdbLoaded = true; cmdbDatabase = ${JSON.stringify([off,on])};`);
+  b.element("input").value = "VM-DUP01 192.0.2.114";
+  assert.equal(b.read("processInput().activeVMs.length"), 0);
+  assert.equal(b.read("processInput().offlineVMs.length"), 1);
+  b.read(`cmdbDatabase = ${JSON.stringify([off,{...on,Customer:"OTHER"}])};`);
+  b.element("input").value = "VM-DUP01";
+  assert.equal(b.read("processInput().activeVMs.length"), 0);
+  assert.equal(b.read("processInput().unknownVMs.length"), 1);
+});
+
+test("only powered-off duplicates remain powered off, without inventing an active VM", () => {
+  const b = browser();
+  b.element("onlyPoweredOn").checked = true;
+  b.element("input").value = "VM-DUP01 192.0.2.114";
+  b.read('isCmdbLoaded = true; cmdbDatabase = [{HostName:"VM-DUP01",IP:"192.0.2.114",Customer:"TEST",Status:"Desligada"},{HostName:"VM-DUP01",IP:"192.0.2.114",Customer:"TEST",Status:"Desligada"}];');
+  assert.equal(b.read("processInput().activeVMs.length"), 0);
+  assert.equal(b.read("processInput().offlineVMs.length"), 1);
+  assert.equal(b.read("processInput().hostnames.length"), 0);
+});

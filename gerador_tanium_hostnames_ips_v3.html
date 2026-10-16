@@ -1987,6 +1987,25 @@ function suggestKBs(lines) {
   return items;
 }
 
+function selectPreferredCmdbRecord(candidates) {
+  if (candidates.length < 2) return candidates[0] || null;
+  const customer = record => normalizeOsDetectionText(record.Customer).trim();
+  const customers = new Set(candidates.map(customer).filter(value => value && value !== "n/a"));
+  if (customers.size > 1) return null;
+
+  const status = record => String(record.Status || "Desconhecido").trim().toLowerCase();
+  const poweredOn = candidates.filter(record => status(record) === "ligada");
+  const pool = poweredOn.length ? poweredOn : candidates;
+  const names = new Set(pool.map(record => getVmHostname(record.HostName).toLowerCase()).filter(Boolean));
+  const ips = new Set(pool.map(record => String(record.IP || "").trim()).filter(isValidIp));
+  if (names.size > 1 || ips.size > 1 || new Set(pool.map(status)).size > 1) return null;
+
+  const score = record => Number(isValidIp(String(record.IP || "").trim())) * 4
+    + [record.HostName, record.SO, record.Customer].filter(value => value && String(value).trim() !== "N/A").length;
+  const key = record => JSON.stringify([record.HostName, record.IP, record.Customer, record.SO, record.ServerUUID, record.ServerID]);
+  return [...pool].sort((a, b) => score(b) - score(a) || key(a).localeCompare(key(b)))[0];
+}
+
 function processInput() {
   const input = document.getElementById("input").value;
   const lines = input.split(/\r?\n/).filter(line => line.trim());
@@ -2051,10 +2070,9 @@ function processInput() {
       if (lineIps.length > 0) {
         const ipMatches = [...new Set(lineIps.flatMap(ip => cmdbIpMap[ip] || []))];
         const exactMatches = ipMatches.filter(server => hostMatches.includes(server));
-        if (exactMatches.length === 1) matchedServer = exactMatches[0];
-        else if (ipMatches.length === 1) matchedServer = ipMatches[0];
-      } else if (hostMatches.length === 1) {
-        matchedServer = hostMatches[0];
+        matchedServer = selectPreferredCmdbRecord(exactMatches.length ? exactMatches : ipMatches);
+      } else {
+        matchedServer = selectPreferredCmdbRecord(hostMatches);
       }
 
       if (matchedServer) {
@@ -2099,7 +2117,7 @@ function processInput() {
     detectedServers.forEach(srv => {
       if (srv.isRegistered) {
         const info = srv.serverInfo;
-        const status = info.Status || "Desconhecido";
+        const status = String(info.Status || "Desconhecido").trim();
         const cmdbOs = getOsLabelFromText(info.SO);
         const inputOs = getExplicitWindowsServerVersion(srv.sourceLine) && !/or\s+later|ou\s+posterior|ou\s+superior/i.test(srv.sourceLine) ? srv.lineOs : "";
         const effectiveOs = inputOs && inputOs !== cmdbOs ? inputOs : (info.SO || srv.lineOs || srv.sourceLine);
