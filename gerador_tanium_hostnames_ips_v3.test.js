@@ -112,6 +112,7 @@ assert(html.includes("grid-template-columns:repeat(2,minmax(0,1fr))"), "resultad
 assert(html.includes("align-items:stretch"), "paineis paralelos devem preencher toda a altura disponivel");
 assert(html.includes("grid-template-rows:repeat(2,minmax(0,1fr))"), "resultados da coluna esquerda devem preencher o espaco vertical");
 const requiredCcList = "noc@br.clara.net; henrique.urbaninho@claranet.com; filipe.evangelista@claranet.com; ronald.magalhaes@claranet.com; aliffe.santos@claranet.com";
+getElement("schedGmudTitle").value = "GMUD XXX - TEST | Atualizações de Segurança";
 assert(html.includes(`id="schedCc" value="${requiredCcList}"`), "campo Cc deve iniciar com todos os destinatarios obrigatorios");
 assert.strictEqual(vm.runInContext('ensureRequiredCc("")', sandbox), requiredCcList);
 assert.strictEqual(vm.runInContext('ensureRequiredCc("cliente@empresa.com; NOC@BR.CLARA.NET")', sandbox), `cliente@empresa.com; NOC@BR.CLARA.NET; henrique.urbaninho@claranet.com; filipe.evangelista@claranet.com; ronald.magalhaes@claranet.com; aliffe.santos@claranet.com`);
@@ -406,6 +407,7 @@ assert.strictEqual(getElement("windowsMachineCount").innerText, 1);
 assert.strictEqual(getElement("linuxMachineCount").innerText, 1);
 
 getElement("schedGmud").value = "GMUD-TESTE";
+getElement("schedGmudTitle").value = "GMUD GMUD-TESTE - GER7 | Atualizações de Segurança";
 getElement("input").value = [
   "VISA011-B Microsoft Windows Server 2022 (64-bit)",
   "VISA029-1 Microsoft Windows Server 2016 (64-bit)",

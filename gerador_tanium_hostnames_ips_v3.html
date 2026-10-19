@@ -448,6 +448,10 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
             <label for="schedTime">Hora (preenchida automaticamente)</label>
             <input type="time" id="schedTime">
           </div>
+          <div style="grid-column: 1 / -1;">
+            <label for="schedGmudTitle">Nome completo da GMUD</label>
+            <input type="text" id="schedGmudTitle" required placeholder="GMUD 1007 - LIOTECNICA | 1ªONDA ATUALIZAÇÕES DE SEGURANÇA">
+          </div>
           <div style="grid-column: span 2;">
             <label for="schedTo">Para (To) — separados por ;</label>
             <input type="text" id="schedTo" placeholder="email1@empresa.com; email2@empresa.com">
@@ -2503,6 +2507,20 @@ function updateOperationalOverview(data, suggestedKbs, unsupportedNotices, monit
   return review;
 }
 
+function extractFullGmudName(text, number) {
+  const pattern = new RegExp(`\\bGMUD[\\s:#-]*${escapeRegExp(number)}\\s*[-\\u2013\\u2014]\\s*([^\\r\\n]+)`, "i");
+  const match = String(text || "").replace(/\*\*/g, "").match(pattern);
+  if (!match) return "";
+  const suffix = match[1].split(/,\s*(?:em que|na qual|conforme|para acompanhamento)\b/i)[0].trim().replace(/[.;]+$/, "");
+  return suffix ? `GMUD ${number} - ${suffix}` : "";
+}
+
+function getFullGmudName() {
+  const number = document.getElementById("schedGmud").value.trim() || "XXX";
+  return extractFullGmudName(document.getElementById("schedGmudTitle").value, number)
+    || extractFullGmudName(document.getElementById("gmudEmailRaw").value, number);
+}
+
 function generate() {
   const gmudNumber = document.getElementById("schedGmud").value || "XXX";
   const data = processInput();
@@ -2526,7 +2544,8 @@ function generate() {
   const monitoredAlerts = getMonitoredVmAlerts(data);
   updateMonitoredVmAlerts(monitoredAlerts);
   
-  let emailHtml = `Senhores, boa noite.<br><br>Informamos que estamos iniciando as atividades referentes à GMUD ${gmudNumber}, conforme planejamento aprovado.<br><br>A partir deste momento, será dado início ao processo de atualização dos servidores relacionados abaixo:<br><br>`;
+  const fullGmudName = getFullGmudName();
+  let emailHtml = `Senhores, boa noite.<br><br>Informamos que estamos iniciando as atividades referentes à ${escapeHtml(fullGmudName)}, conforme planejamento aprovado.<br><br>A partir deste momento, será dado início ao processo de atualização dos servidores relacionados abaixo:<br><br>`;
   
   if (data.isCmdbApplied) {
     if (data.activeVMs.length > 0) {
@@ -2619,6 +2638,7 @@ function generate() {
   if (data.poweredOnOnly && (!data.isCmdbApplied || data.activeVMs.length === 0)) {
     emailHtml = "<strong>Escopo nao liberado:</strong> carregue a base CMDB pela API e confirme ao menos uma VM Ligada antes de gerar o e-mail.";
   }
+  if (!fullGmudName) emailHtml = "<strong>Nome completo da GMUD pendente:</strong> preencha o nome completo antes de gerar o e-mail de inicio.";
   document.getElementById("emailText").innerHTML = emailHtml;
   if (data.poweredOnOnly) document.getElementById("closureEmailText").innerHTML = buildClosureEmailHtml();
   updateScopeTable(data, monitoredAlerts);
@@ -3155,6 +3175,7 @@ function getClosurePayload() {
 
   return {
     scopeBlocked: data.poweredOnOnly && servers.length === 0,
+    fullGmudName: getFullGmudName(),
     gmudNumber,
     client,
     executor,
@@ -3592,9 +3613,10 @@ async function ensureClosureEvidenceOcr() {
 
 function buildClosureEmailHtml() {
   const payload = getClosurePayload();
+  if (!payload.fullGmudName) return "<strong>Nome completo da GMUD pendente:</strong> preencha o nome completo antes de gerar o e-mail de encerramento.";
   if (payload.scopeBlocked) return "<strong>Escopo nao liberado:</strong> nenhuma VM confirmada como Ligada pela API. Carregue a base CMDB e revise a conferencia antes de gerar o encerramento.";
   const observations = payload.observations || "Sem observacoes adicionais.";
-  let html = `Senhores, boa noite.<br><br>Encerramento da GMUD ${escapeHtml(payload.gmudNumber)}.<br><br>`;
+  let html = `Senhores, boa noite.<br><br>Encerramento da ${escapeHtml(payload.fullGmudName)}.<br><br>`;
 
   html += `<strong>Status final:</strong> ${escapeHtml(payload.status)}<br>`;
   html += `<strong>Data/Hora de encerramento:</strong> ${escapeHtml(payload.closureDateTime)}<br><br>`;
@@ -3729,7 +3751,7 @@ function buildClosureConclusion(payload) {
 function buildClosureReportHtml() {
   const payload = getClosurePayload();
   if (payload.scopeBlocked) return '<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>Escopo nao liberado</title><body><h1>Escopo nao liberado</h1><p>Nenhuma VM confirmada como Ligada pela API. Carregue a base CMDB e revise a conferencia antes de emitir o relatorio.</p></body></html>';
-  const titleLine = `GMUD ${payload.gmudNumber} - ${payload.client} | Atualizações de Segurança`;
+  const titleLine = payload.fullGmudName || `GMUD ${payload.gmudNumber} - ${payload.client} | Atualizações de Segurança`;
   const serversHtml = payload.servers.length > 0
     ? payload.servers.map(server => `<tr><td>${escapeHtml(server.name)}${getVmDatabaseClassification(server.name)}</td><td>${escapeHtml(server.os || "Nao informado")}</td><td>${escapeHtml(server.result || getClosureResultLabel(payload.status))}</td></tr>`).join("")
     : "<tr><td colspan='3'>Nao informado</td></tr>";
@@ -3959,6 +3981,8 @@ function copyText(id) {
 // ── Scheduling Script Core ─────────────────────────────────────────────────
 
 function buildSchedulingScript() {
+  const fullGmudName = getFullGmudName();
+  if (!fullGmudName) return null;
   const gmudNum    = document.getElementById("schedGmud").value.trim() || "XXX";
   const schedDate  = document.getElementById("schedDate").value;   // YYYY-MM-DD
   const schedTime  = document.getElementById("schedTime").value;   // HH:MM
@@ -3979,7 +4003,7 @@ function buildSchedulingScript() {
 
   const emailContent = document.getElementById("emailText").innerHTML;
   const escapedHtml  = emailContent.replace(/'/g, "''");
-  const subject = "Inicio das Atividades - GMUD " + gmudNum;
+  const subject = ("Inicio das Atividades - " + fullGmudName).replace(/'/g, "''");
 
   const lines = [
     "# Agendamento de E-mail de GMUD via Outlook (Envio Agendado)",
@@ -4170,6 +4194,7 @@ function parseGmudEmail() {
 
   // 5. Fill in the form fields (except emails — user will confirm via selector)
   if (gmudNum) document.getElementById("schedGmud").value = gmudNum;
+  document.getElementById("schedGmudTitle").value = extractFullGmudName(raw, gmudNum);
   if (schedDate) document.getElementById("schedDate").value = schedDate;
   if (schedTime) document.getElementById("schedTime").value = schedTime;
   if (serverLines.length) document.getElementById("input").value = serverLines.join("\n");
@@ -4213,7 +4238,7 @@ function parseGmudEmail() {
   document.getElementById("schedCc").value = ensureRequiredCc(autoCc.join("; "));
 
   // Show parsed preview
-  document.getElementById("previewGmud").textContent = gmudNum || "(não encontrado)";
+  document.getElementById("previewGmud").textContent = getFullGmudName() || gmudNum || "(não encontrado)";
   document.getElementById("previewDatetime").textContent = schedDate && schedTime ? `${schedDate.split('-').reverse().join('/')} às ${schedTime}` : "(não encontrado)";
   document.getElementById("previewServers").textContent = serverLines.join("\n") || "(nenhum servidor detectado)";
   document.getElementById("parsedPreview").style.display = "block";
@@ -4343,6 +4368,7 @@ function clearAll() {
 document.getElementById("input").addEventListener("input", () => { generate(); generateClosure(); });
 document.querySelectorAll("input[type=checkbox]").forEach(el => el.addEventListener("change", () => { generate(); generateClosure(); }));
 document.getElementById("schedGmud").addEventListener("input", () => { generate(); generateClosure(); updateScriptPreview(); });
+document.getElementById("schedGmudTitle").addEventListener("input", () => { generate(); generateClosure(); updateScriptPreview(); });
 ["schedDate","schedTime","schedTo","schedCc"].forEach(id => {
   document.getElementById(id).addEventListener("input", () => { updateScriptPreview(); generate(); });
   document.getElementById(id).addEventListener("change", () => { updateScriptPreview(); generate(); });

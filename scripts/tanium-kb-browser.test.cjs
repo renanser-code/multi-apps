@@ -45,6 +45,7 @@ function browser(realGenerators = false) {
   const load = vm.runInContext("loadLatestKBsFromMicrosoft", context);
   const initialize = vm.runInContext("initializeKbSynchronization", context);
   const read = expression => vm.runInContext(expression, context);
+  element("schedGmudTitle").value = "GMUD XXX - TEST | Atualizações de Segurança";
   return { context, elements, timers, stored, events, element, load, initialize, read };
 }
 
@@ -178,6 +179,43 @@ test("HTML uses shared engine, raw catalog first, and shows current heartbeat wi
   assert(b.element("kbSyncStatus").textContent.includes("12/11/2026"));
   assert.equal([...b.timers.values()].at(-1).delay, 15 * 60 * 1000);
   assert.equal(b.element("kbSyncRefresh").disabled, false);
+});
+
+test("full GMUD name is extracted and preserved in opening, closure, report and scheduling subject", () => {
+  const b=browser(true);
+  const title="GMUD 1007 - LIOTECNICA | 1ªONDA ATUALIZAÇÕES DE SEGURANÇA";
+  b.element("gmudEmailRaw").value=`Estou organizando a reuniao para acompanhamento da ${title}, em que sera aplicado conforme cronograma.\nVM-APP01 192.0.2.1 WIN/2022`;
+  b.read("parseGmudEmail();generateClosure();");
+  assert.equal(b.element("schedGmudTitle").value,title);
+  assert(b.element("emailText").innerHTML.includes(`referentes à ${title}, conforme`));
+  assert(b.element("closureEmailText").innerHTML.includes(`Encerramento da ${title}.`));
+  assert(b.read("buildClosureReportHtml()").includes(title));
+  b.element("schedDate").value="2026-10-19";
+  b.element("schedTime").value="23:00";
+  assert(b.read("buildSchedulingScript()").includes(`Inicio das Atividades - ${title}`));
+});
+
+test("missing or mismatched complete GMUD name never silently generates number-only client emails", () => {
+  const b=browser(true);
+  b.element("schedGmud").value="1008";
+  b.element("schedGmudTitle").value="GMUD 1007 - CLIENTE | 1ªONDA";
+  b.element("input").value="VM-APP01 WIN/2022";
+  b.read("generate();generateClosure();");
+  assert(b.element("emailText").innerHTML.includes("Nome completo da GMUD pendente"));
+  assert(b.element("closureEmailText").innerHTML.includes("Nome completo da GMUD pendente"));
+  assert.equal(b.read("buildSchedulingScript()"),null);
+});
+
+test("manual full GMUD title escapes HTML and PowerShell quotes", () => {
+  const b=browser(true);
+  b.element("schedGmud").value="1007";
+  b.element("schedGmudTitle").value="GMUD 1007 - D'CLIENTE | <script>alert(1)</script>";
+  b.element("schedDate").value="2026-10-19";
+  b.element("schedTime").value="23:00";
+  b.read("generate();generateClosure();");
+  assert(!b.element("emailText").innerHTML.includes("<script>"));
+  assert(b.element("closureEmailText").innerHTML.includes("&lt;script&gt;"));
+  assert(b.read("buildSchedulingScript()").includes("D''CLIENTE"));
 });
 
 test("locked ON-only policy excludes OFF, retired and missing VMs from all deployment and client outputs", () => {
@@ -369,6 +407,7 @@ test("new month regenerates opening email, closure email and PDF report using on
   ].join("\n");
   b.element("closureStatus").value = "Concluida com sucesso";
   b.element("schedGmud").value = "TEST-SYNC";
+  b.element("schedGmudTitle").value = "GMUD TEST-SYNC - TEST | Atualizações de Segurança";
   b.element("closureClient").value = "TEST";
   b.context.TaniumKbSync.request = async () => snapshot(false);
   b.context.TaniumKbSync.synchronize = async () => snapshot(true, true);
