@@ -286,7 +286,7 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
         <label class="check"><input type="checkbox" id="escapeIps"> Escapar pontos dos IPs com \.</label>
         <label class="check"><input type="checkbox" id="appendWildcard" checked> Adicionar .* no final</label>
         <label class="check"><input type="checkbox" id="ignoreInvalidIps" checked> Ignorar IPs inválidos</label>
-        <label class="check"><input type="checkbox" id="onlyPoweredOn" checked> 🟢 Filtrar apenas VMs com Status "Ligada"</label>
+        <label class="check"><input type="checkbox" id="onlyPoweredOn" checked disabled> Somente VMs confirmadas como Ligada na API</label>
       </div>
 
       <div class="review-panel" id="gmudReviewPanel">
@@ -1188,6 +1188,7 @@ function getUnsupportedWindowsServerNotices(lines) {
 }
 
 function getOsDetectionLines(data) {
+  if (data.poweredOnOnly) return (data.activeVMs || []).map(vm => `${vm.name} ${vm.info || ""}`);
   const cmdbLines = [
     ...((data.activeVMs || []).map(vm => `${vm.name || ""} ${vm.info || ""}`)),
     ...((data.offlineVMs || []).map(vm => `${vm.name || ""} ${vm.info || ""}`))
@@ -1265,6 +1266,7 @@ function getVmEmailClassification(name) {
 }
 
 function getMonitoredVmAlerts(data) {
+  if (data.poweredOnOnly) data = { ...data, lines: [], offlineVMs: [], unknownVMs: [] };
   const parts = [
     ...(data.lines || []),
     ...(data.hostnames || []),
@@ -1610,6 +1612,10 @@ async function loadCmdbData() {
   statusLabel.innerText = "Carregando base de dados (getDataLake)...";
   statusLabel.style.color = "#f59e0b";
   btnLoad.disabled = true;
+  isCmdbLoaded = false;
+  cmdbDatabase = [];
+  btnFilter.disabled = true;
+  generate();
   
   try {
     const directUrl = "https://clarahub.claranet.com.br/cmdb-servers-api/api/getDataLake";
@@ -1624,7 +1630,9 @@ async function loadCmdbData() {
     
     if (!response.ok) throw new Error("Status HTTP incorreto da API CMDB");
     
-    cmdbDatabase = await response.json();
+    const records = await response.json();
+    if (!Array.isArray(records)) throw new Error("Resposta CMDB invalida");
+    cmdbDatabase = records;
     isCmdbLoaded = true;
     
     statusLabel.innerText = `Base CMDB carregada! (${cmdbDatabase.length} servidores carregados)`;
@@ -2205,7 +2213,7 @@ function processInput() {
           <span class="status-badge ${badgeClass}">${status}</span>
         </div>`;
         if (osConflict) listHtml += `<div class="small">${escapeHtml(srv.displayName)}: ${escapeHtml(osConflict)}</div>`;
-        copyLines.push(`${srv.displayName} | Cliente: ${info.Customer || "N/A"} | IP: ${info.IP || "N/A"} | OS: ${effectiveOs || "N/A"} | Status: ${status}`);
+        if (!onlyPoweredOn || status === "Ligada") copyLines.push(`${srv.displayName} | Cliente: ${info.Customer || "N/A"} | IP: ${info.IP || "N/A"} | OS: ${effectiveOs || "N/A"} | Status: ${status}`);
       } else {
         const details = "Não encontrado no CMDB";
         unknownVMs.push({ name: srv.displayName, info: details, reason: "Não cadastrado no CMDB" });
@@ -2226,7 +2234,7 @@ function processInput() {
           <span><strong>${srv.displayName}</strong> (${details})</span>
           <span class="status-badge status-desconhecido">Desconhecido</span>
         </div>`;
-        copyLines.push(`${srv.displayName} | CMDB: Nao encontrado | Status: Desconhecido`);
+        if (!onlyPoweredOn) copyLines.push(`${srv.displayName} | CMDB: Nao encontrado | Status: Desconhecido`);
       }
     });
 
@@ -2242,7 +2250,7 @@ function processInput() {
     }
 
     const osData = buildOsGroups(scopedEntries);
-    return { lines, hostnames: finalHostnames, ips: finalIps, osGroups: osData.groups, osNames: osData.osNames, activeVMs, offlineVMs, unknownVMs, isCmdbApplied: true };
+    return { lines, hostnames: finalHostnames, ips: finalIps, osGroups: osData.groups, osNames: osData.osNames, activeVMs, offlineVMs, unknownVMs, isCmdbApplied: true, poweredOnOnly: onlyPoweredOn };
   } else {
     vmStatusPanel.style.display = "none";
     if (cmdbCopyResult) cmdbCopyResult.value = "";
@@ -2253,8 +2261,8 @@ function processInput() {
     finalIps.sort(numericIpCompare);
   }
 
-  const osData = buildOsGroups(rawEntries);
-  return { lines, hostnames: finalHostnames, ips: finalIps, osGroups: osData.groups, osNames: osData.osNames, isCmdbApplied: false };
+  const osData = buildOsGroups(onlyPoweredOn ? [] : rawEntries);
+  return { lines, hostnames: onlyPoweredOn ? [] : finalHostnames, ips: onlyPoweredOn ? [] : finalIps, osGroups: osData.groups, osNames: osData.osNames, isCmdbApplied: false, poweredOnOnly: onlyPoweredOn };
 }
 
 function getDuplicateValues(values) {
@@ -2385,7 +2393,8 @@ function updateScopeTable(data, monitoredAlerts) {
 }
 
 function copyFilteredScopeTable() {
-  const rows = renderScopeTable();
+  const data = processInput();
+  const rows = renderScopeTable().filter(row => !data.poweredOnOnly || row.status === "Ligada");
   const text = rows.map(row => `${row.name} | IP: ${row.ip} | Cliente: ${row.client} | OS: ${row.os} | Status: ${row.status}${row.classifications.length ? ` | ${row.classifications.join(" / ")}` : ""}${row.problems.length ? ` | Alertas: ${row.problems.join(" / ")}` : ""}`).join("\n");
   if (!text) return;
   if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).catch(err => console.warn("Falha ao copiar escopo:", err));
@@ -2526,13 +2535,13 @@ function generate() {
       emailHtml += "<strong>Servidores LIGADOS:</strong><br>- n/a<br>";
     }
     
-    if (data.offlineVMs.length > 0) {
+    if (!data.poweredOnOnly && data.offlineVMs.length > 0) {
       emailHtml += "<br><strong>Servidores DESLIGADOS / Fora do escopo (Não serão atualizados):</strong><br>";
       data.offlineVMs.forEach(vm => {
         emailHtml += `- <strong>${vm.name}</strong>${getVmEmailClassification(vm.name)} (Evidência: ${vm.reason} | ${getCustomerEmailVmInfo(vm)})<br>`;
       });
     }
-    if (data.unknownVMs.length > 0) {
+    if (!data.poweredOnOnly && data.unknownVMs.length > 0) {
       emailHtml += "<br><strong>Servidores com status não confirmado (validar antes da atualização):</strong><br>";
       data.unknownVMs.forEach(vm => {
         emailHtml += `- <strong>${vm.name}</strong>${getVmEmailClassification(vm.name)} (Evidência: ${vm.reason})<br>`;
@@ -2604,7 +2613,11 @@ function generate() {
   }
 
   emailHtml += "<br>Qualquer dúvida, estamos à disposição.<br>Atenciosamente,";
+  if (data.poweredOnOnly && (!data.isCmdbApplied || data.activeVMs.length === 0)) {
+    emailHtml = "<strong>Escopo nao liberado:</strong> carregue a base CMDB pela API e confirme ao menos uma VM Ligada antes de gerar o e-mail.";
+  }
   document.getElementById("emailText").innerHTML = emailHtml;
+  if (data.poweredOnOnly) document.getElementById("closureEmailText").innerHTML = buildClosureEmailHtml();
   updateScopeTable(data, monitoredAlerts);
   updateOperationalOverview(data, suggestedKbs, unsupportedNotices, monitoredAlerts);
 }
@@ -3038,6 +3051,10 @@ function getClosureServerItems(data, observations = "") {
   const evidenceText = getClosureEvidenceText();
   const evidenceState = getClosureEvidenceAnalysisState();
   let servers = [];
+  if (data.poweredOnOnly) {
+    servers = (data.activeVMs || []).map(vm => ({ name: vm.name, info: vm.info || "", os: getOsFromText(vm.info || ""), result }));
+    return applyEvidenceResultsToServers(servers, evidenceText, observations, evidenceState);
+  }
 
   if (data.isCmdbApplied && data.activeVMs && data.activeVMs.length > 0) {
     servers = data.activeVMs.map(vm => ({
@@ -3134,6 +3151,7 @@ function getClosurePayload() {
     : evidenceAnalysisState.hasImages && /sucesso/i.test(selectedStatus) ? "Concluída com ressalvas" : selectedStatus;
 
   return {
+    scopeBlocked: data.poweredOnOnly && servers.length === 0,
     gmudNumber,
     client,
     executor,
@@ -3571,6 +3589,7 @@ async function ensureClosureEvidenceOcr() {
 
 function buildClosureEmailHtml() {
   const payload = getClosurePayload();
+  if (payload.scopeBlocked) return "<strong>Escopo nao liberado:</strong> nenhuma VM confirmada como Ligada pela API. Carregue a base CMDB e revise a conferencia antes de gerar o encerramento.";
   const observations = payload.observations || "Sem observacoes adicionais.";
   let html = `Senhores, boa noite.<br><br>Encerramento da GMUD ${escapeHtml(payload.gmudNumber)}.<br><br>`;
 
@@ -3706,6 +3725,7 @@ function buildClosureConclusion(payload) {
 
 function buildClosureReportHtml() {
   const payload = getClosurePayload();
+  if (payload.scopeBlocked) return '<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>Escopo nao liberado</title><body><h1>Escopo nao liberado</h1><p>Nenhuma VM confirmada como Ligada pela API. Carregue a base CMDB e revise a conferencia antes de emitir o relatorio.</p></body></html>';
   const titleLine = `GMUD ${payload.gmudNumber} - ${payload.client} | Atualizações de Segurança`;
   const serversHtml = payload.servers.length > 0
     ? payload.servers.map(server => `<tr><td>${escapeHtml(server.name)}${getVmDatabaseClassification(server.name)}</td><td>${escapeHtml(server.os || "Nao informado")}</td><td>${escapeHtml(server.result || getClosureResultLabel(payload.status))}</td></tr>`).join("")
@@ -3883,6 +3903,7 @@ function copyEmailAddress(button) {
 }
 
 function copyText(id) {
+  if (document.getElementById("onlyPoweredOn").checked) generate();
   const el = document.getElementById(id);
   
   if (id === "emailText" || id === "closureEmailText") {

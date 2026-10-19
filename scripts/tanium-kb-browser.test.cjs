@@ -180,6 +180,66 @@ test("HTML uses shared engine, raw catalog first, and shows current heartbeat wi
   assert.equal(b.element("kbSyncRefresh").disabled, false);
 });
 
+test("locked ON-only policy excludes OFF, retired and missing VMs from all deployment and client outputs", () => {
+  assert.match(html, /id="onlyPoweredOn" checked disabled/);
+  const b = browser(true);
+  b.element("onlyPoweredOn").checked=true;
+  const records=[
+    {HostName:"VM-ON01",IP:"192.0.2.1",SO:"Windows Server 2022",Status:"ON"},
+    {HostName:"VM-LIN01",IP:"192.0.2.2",SO:"Debian Linux",Status:"Ligada"},
+    {HostName:"VM-SQL-OFF01",IP:"192.0.2.3",SO:"Windows Server 2012",Status:"OFF"},
+    {HostName:"VM-RET01",IP:"192.0.2.4",SO:"Windows Server 2025",Status:"Descontinuada"}
+  ];
+  b.element("input").value=records.map(r=>`${r.HostName} ${r.IP}`).join("\n")+"\nVM-MISS01 192.0.2.5";
+  b.read(`isCmdbLoaded=true;cmdbDatabase=${JSON.stringify(records)};generate();generateClosure();`);
+  assert.equal(b.read("processInput().hostnames.length"),2);
+  assert.equal(b.read("getClosurePayload().servers.length"),2);
+  for(const output of [b.element("emailText").innerHTML,b.element("closureEmailText").innerHTML,b.read("buildClosureReportHtml()"),b.element("cmdbCopyResult").value]) {
+    for(const record of records.slice(2)) assert(!output.includes(record.HostName));
+    assert(!output.includes("VM-MISS01"));
+    assert(output.includes("VM-ON01"));
+  }
+  assert.equal(b.read("getMonitoredVmAlerts(processInput()).length"),0);
+  assert(!b.element("emailText").innerHTML.includes("2012"));
+  assert(b.element("windowsHostnameRegex").value.includes("VM-ON01"));
+  assert(!b.element("windowsHostnameRegex").value.includes("OFF"));
+  assert(b.element("linuxHostnameRegex").value.includes("VM-LIN01"));
+  assert(b.element("vmsList").innerHTML.includes("VM-SQL-OFF01"));
+  b.read('cmdbDatabase=[];generate();');
+  assert.equal(b.read("getClosurePayload().servers.length"),0);
+  assert(b.element("closureEmailText").innerHTML.includes("Escopo nao liberado"));
+  assert(b.read("buildClosureReportHtml()").includes("Escopo nao liberado"));
+});
+
+test("without API validation the ON-only policy never falls back to raw input", () => {
+  const b=browser(true);
+  b.element("onlyPoweredOn").checked=true;
+  b.element("input").value="VM-RAW01 192.0.2.1 WIN/2022";
+  b.read("generate();generateClosure();");
+  assert.equal(b.read("processInput().hostnames.length"),0);
+  assert.equal(b.read("processInput().ips.length"),0);
+  assert.equal(b.read("getClosurePayload().servers.length"),0);
+  assert(b.element("emailText").innerHTML.includes("Escopo nao liberado"));
+  assert(!b.element("closureEmailText").innerHTML.includes("VM-RAW01"));
+});
+
+test("a failed or malformed API reload invalidates previously eligible machines", async () => {
+  for(const malformed of [false,true]) {
+    const b=browser(true);
+    b.context.console.error=()=>{};
+    b.element("onlyPoweredOn").checked=true;
+    b.element("input").value="VM-ON01 192.0.2.1 WIN/2022";
+    b.read('isCmdbLoaded=true;cmdbDatabase=[{HostName:"VM-ON01",IP:"192.0.2.1",Status:"ON"}];generate();');
+    assert(b.element("hostnameRegex").value.includes("VM-ON01"));
+    b.context.fetch=async()=>{if(!malformed)throw Error("offline");return {ok:true,json:async()=>({error:"bad"})};};
+    await b.read("loadCmdbData()");
+    assert.equal(b.read("isCmdbLoaded"),false);
+    assert.equal(b.read("processInput().hostnames.length"),0);
+    assert(!b.element("hostnameRegex").value.includes("VM-ON01"));
+    assert(b.element("closureEmailText").innerHTML.includes("Escopo nao liberado"));
+  }
+});
+
 test("previous-month catalog is not accepted after Patch Tuesday; direct sync refreshes all versions", async () => {
   const b = browser();
   b.context.TaniumKbSync.request = async () => snapshot();
@@ -416,13 +476,14 @@ test("SQL classification preserves configured priority and never duplicates a re
   assert.equal(b.read("getMonitoredVmAlerts(processInput()).length"), 1);
 });
 
-test("SQL VM from CMDB is highlighted even when powered off and outside update scope", () => {
+test("powered-off SQL VM stays in review but not in client emails", () => {
   const b = browser(true);
   b.element("onlyPoweredOn").checked = true;
   b.element("input").value = "SRV-SQL 192.0.2.66 WIN/2022";
   b.read('isCmdbLoaded = true; cmdbDatabase = [{HostName:"SRV-SQL.example.test",IP:"192.0.2.66",SO:"Windows Server 2022",Status:"Desligada"}]; generate()');
-  assert(b.element("emailText").innerHTML.includes("[BANCO DE DADOS]"));
-  assert(b.element("scopeTableBody").innerHTML.includes("Banco de dados"));
+  assert(!b.element("emailText").innerHTML.includes("SRV-SQL"));
+  assert(b.element("scopeTableBody").innerHTML.includes("SRV-SQL"));
+  assert(b.element("scopeTableBody").innerHTML.includes("Desligada"));
 });
 
 test("duplicate CMDB records always select the powered-on VM regardless of order or input style", () => {
@@ -547,9 +608,10 @@ test("missing and discontinued VMs are pending validation, never labelled powere
   const html = b.element("emailText").innerHTML;
   assert(!html.includes("Servidores DESLIGADOS"));
   assert(!html.includes("Não serão atualizados"));
-  const pending = html.split("Servidores com status não confirmado")[1];
-  assert(pending.includes("VM-MISSING01"));
-  assert(pending.includes("VM-RETIRED01"));
+  assert(html.includes("Escopo nao liberado"));
+  assert(!html.includes("VM-MISSING01"));
+  assert(!html.includes("VM-RETIRED01"));
+  assert(b.element("vmsList").innerHTML.includes("VM-MISSING01"));
 });
 
 test("opening email separates confirmed powered-off VMs from unconfirmed records", () => {
