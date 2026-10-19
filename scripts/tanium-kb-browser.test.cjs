@@ -204,7 +204,8 @@ test("locked ON-only policy excludes OFF, retired and missing VMs from all deplo
   assert(b.element("windowsHostnameRegex").value.includes("VM-ON01"));
   assert(!b.element("windowsHostnameRegex").value.includes("OFF"));
   assert(b.element("linuxHostnameRegex").value.includes("VM-LIN01"));
-  assert(b.element("vmsList").innerHTML.includes("VM-SQL-OFF01"));
+  assert(!b.element("vmsList").innerHTML.includes("VM-SQL-OFF01"));
+  assert(b.element("scopeTableBody").innerHTML.includes("VM-SQL-OFF01"));
   b.read('cmdbDatabase=[];generate();');
   assert.equal(b.read("getClosurePayload().servers.length"),0);
   assert(b.element("closureEmailText").innerHTML.includes("Escopo nao liberado"));
@@ -238,6 +239,27 @@ test("a failed or malformed API reload invalidates previously eligible machines"
     assert(!b.element("hostnameRegex").value.includes("VM-ON01"));
     assert(b.element("closureEmailText").innerHTML.includes("Escopo nao liberado"));
   }
+});
+
+test("CMDB panel counts and displays only ON records, retaining retired records internally for alias resolution", async () => {
+  const b=browser(true);
+  b.element("onlyPoweredOn").checked=true;
+  b.element("input").value="VM-APP01 192.0.2.1\nVM-OFF01 192.0.2.2\nVM-MISS01";
+  const records=[
+    {HostName:"VM-APP01",IP:"192.0.2.1",Customer:"TEST",Status:"Descontinuada"},
+    {HostName:"VM-APP01_R_24SET",IP:"192.0.2.1",Customer:"TEST",Status:"Ligada"},
+    {HostName:"VM-OTHER01",IP:"192.0.2.3",Customer:"TEST",Status:"PoweredOn"},
+    {HostName:"VM-OFF01",IP:"192.0.2.2",Status:"Desligada"}
+  ];
+  b.context.fetch=async()=>({ok:true,json:async()=>records});
+  await b.read("loadCmdbData()");
+  assert.equal(b.element("cmdbApiStatus").innerText,"Base CMDB carregada! (2 servidores LIGADOS)");
+  const list=b.element("vmsList").innerHTML;
+  assert(list.includes("VM-APP01_R_24SET"));
+  assert(!list.includes("VM-OFF01"));
+  assert(!list.includes("VM-MISS01"));
+  assert.equal(b.read("cmdbDatabase.length"),4);
+  assert.equal(b.read("processInput().activeVMs.length"),1);
 });
 
 test("previous-month catalog is not accepted after Patch Tuesday; direct sync refreshes all versions", async () => {
@@ -611,7 +633,8 @@ test("missing and discontinued VMs are pending validation, never labelled powere
   assert(html.includes("Escopo nao liberado"));
   assert(!html.includes("VM-MISSING01"));
   assert(!html.includes("VM-RETIRED01"));
-  assert(b.element("vmsList").innerHTML.includes("VM-MISSING01"));
+  assert(!b.element("vmsList").innerHTML.includes("VM-MISSING01"));
+  assert(b.element("scopeTableBody").innerHTML.includes("VM-MISSING01"));
 });
 
 test("opening email separates confirmed powered-off VMs from unconfirmed records", () => {

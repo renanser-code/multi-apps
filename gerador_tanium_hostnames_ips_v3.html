@@ -333,7 +333,7 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
               <button class="purple" id="btnFilterStatus" onclick="generate()" disabled>2. Atualizar Status das VMs</button>
             </div>
             <div class="hint" style="color: #cbd5e1;">
-              Como a base possui cerca de 9.600 servidores, o gerador baixa a base localmente no navegador em memória de forma segura para fazer consultas instantâneas offline, sem travar seu fluxo.
+              Servidores ligados disponiveis para consulta. A contagem e a listagem deste painel consideram somente status Ligada confirmado pela API.
             </div>
           </div>
           <div class="kb-quick-search">
@@ -1635,7 +1635,8 @@ async function loadCmdbData() {
     cmdbDatabase = records;
     isCmdbLoaded = true;
     
-    statusLabel.innerText = `Base CMDB carregada! (${cmdbDatabase.length} servidores carregados)`;
+    const poweredOnCount = cmdbDatabase.filter(server => normalizeCmdbPowerStatus(server.Status) === "Ligada").length;
+    statusLabel.innerText = `Base CMDB carregada! (${poweredOnCount} servidores LIGADOS)`;
     statusLabel.style.color = "#10b981";
     btnFilter.disabled = false;
     btnLoad.innerText = "Recarregar Base CMDB";
@@ -2208,11 +2209,13 @@ function processInput() {
           }
         }
         
+        if (!onlyPoweredOn || status === "Ligada") {
         listHtml += `<div class="vm-item">
           <span><strong>${srv.displayName}</strong> (${details})</span>
           <span class="status-badge ${badgeClass}">${status}</span>
         </div>`;
         if (osConflict) listHtml += `<div class="small">${escapeHtml(srv.displayName)}: ${escapeHtml(osConflict)}</div>`;
+        }
         if (!onlyPoweredOn || status === "Ligada") copyLines.push(`${srv.displayName} | Cliente: ${info.Customer || "N/A"} | IP: ${info.IP || "N/A"} | OS: ${effectiveOs || "N/A"} | Status: ${status}`);
       } else {
         const details = "Não encontrado no CMDB";
@@ -2230,7 +2233,7 @@ function processInput() {
           scopedEntries.push(createOsEntry(entryHost, entryIps, srv.lineOs || srv.sourceLine));
         }
         
-        listHtml += `<div class="vm-item">
+        if (!onlyPoweredOn) listHtml += `<div class="vm-item">
           <span><strong>${srv.displayName}</strong> (${details})</span>
           <span class="status-badge status-desconhecido">Desconhecido</span>
         </div>`;

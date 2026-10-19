@@ -21,6 +21,15 @@ Continuam cobertos os registros duplicados e restaurados com sufixo.
 
 ## Rollback
 
+### Painel CMDB
+
+O contador do topo indica apenas registros com status normalizado Ligada;
+a listagem do painel tambem exclui OFF, descontinuados e nao encontrados.
+A base completa permanece apenas em memoria para resolver aliases e registros
+restaurados pelo mesmo IP/cliente. A conferencia detalhada continua separada.
+Checkpoint anterior a este ajuste visual:
+`rollback/pre-cmdb-on-display-20261019`.
+
 Tag anterior: `rollback/pre-only-on-20261019`.
 Backup local de HTML/teste:
 `Documentos/Manuais/backups-gerador-tanium/pre-only-on-20261019`.
