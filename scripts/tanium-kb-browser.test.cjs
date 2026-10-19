@@ -48,6 +48,123 @@ function browser(realGenerators = false) {
   return { context, elements, timers, stored, events, element, load, initialize, read };
 }
 
+test("evidence correlates each table row without validating prefix hosts or counting unrelated successes", () => {
+  const b = browser(true);
+  b.element("input").value = "VM-APP01 WIN/2022\nVM-APP010 WIN/2022\nVM-APP02 WIN/2022";
+  b.read(`closureEvidenceFiles=[{type:"image/png",ocrAnalyzed:true,ocrText:"VM-APP010.example.local Complete All Patches Applied\\nVM-OTHER03 Complete All Patches Applied\\nVM-OTHER04 Complete All Patches Applied"}];generateClosure();`);
+  const servers = b.read("getClosurePayload().servers");
+  assert.equal(servers.find(s => s.name === "VM-APP010").result, "Complete, All Patches Applied");
+  for (const name of ["VM-APP01", "VM-APP02"]) assert.notEqual(servers.find(s => s.name === name).evidenceState, "evidenced");
+  assert(b.read("buildClosureReportHtml()").includes("Nao evidenciado no encerramento"));
+});
+
+test("contradictory evidence for one VM requires review without borrowing the next VM status", () => {
+  const b = browser(true);
+  b.element("input").value = "VM-APP01 WIN/2022\nVM-APP02 WIN/2022";
+  b.read(`closureEvidenceFiles=[{type:"image/png",ocrAnalyzed:true,ocrText:"VM-APP01 Complete All Patches Applied\\nVM-APP02 Pending Restart\\nVM-APP01 Failed"}];generateClosure();`);
+  const servers = b.read("getClosurePayload().servers");
+  assert.match(servers[0].result, /divergentes/);
+  assert.match(servers[1].result, /Pending Restart/);
+  assert(!b.read("getClosurePayload().allServersEvidencedSuccessfully"));
+});
+
+test("PDF native text keeps spatial rows and avoids unnecessary OCR", async () => {
+  const b = browser();
+  let destroyed = false;
+  const item = (str, x, y) => ({str,transform:[1,0,0,1,x,y],width:100,height:10});
+  b.context.window.pdfjsLib = {getDocument: () => ({promise: Promise.resolve({numPages:1,
+    getPage: async () => ({getTextContent: async () => ({items:[item("VM-APP02",10,80),item("Pending Restart",300,80),item("Complete All Patches Applied",300,100),item("VM-APP01",10,100)]})}),
+    destroy: async () => {destroyed = true;}
+  })})};
+  b.context.pdfFixture = {file:{arrayBuffer:async () => new ArrayBuffer(1)}};
+  const text = await b.read("extractPdfEvidenceText(pdfFixture)");
+  assert.equal(text, "VM-APP01 Complete All Patches Applied\nVM-APP02 Pending Restart");
+  assert(destroyed);
+});
+
+test("a failed evidence file does not stop later files or report overall success", async () => {
+  const b = browser(true);
+  b.element("input").value = "VM-APP01 WIN/2022";
+  b.read(`closureEvidenceFiles=[{name:"bad.pdf",type:"application/pdf"},{name:"good.pdf",type:"application/pdf"}];extractPdfEvidenceText=async file=>{if(file.name==="bad.pdf")throw Error("Falha simulada");return "VM-APP01 Complete All Patches Applied";};`);
+  await b.read("analyzeClosureEvidenceStatus()");
+  assert.equal(b.read("closureEvidenceFiles[1].ocrAnalyzed"), true);
+  assert.equal(b.read("closureEvidenceFiles[0].ocrError"), "Falha simulada");
+  assert.equal(b.element("closureStatus").value, "Concluída com ressalvas");
+  assert.match(b.element("closureOcrFeedback").textContent, /1 falha\(s\).*1\/1 VM/);
+  assert.match(b.element("closureEvidenceList").innerHTML, /Falha simulada/);
+});
+
+test("image OCR retries sparse segmentation when the first pass misses scope rows", async () => {
+  const b = browser(true);
+  b.element("input").value = "VM-APP01 WIN/2022";
+  b.context.modes = [];
+  b.read(`closureEvidenceFiles=[{name:"table.png",type:"image/png",dataUrl:"source"}];runTesseractRecognize=async (source,progress,mode=6)=>{modes.push(mode);return {data:{text:mode===6?"unreadable":"VM-APP01 Complete All Patches Applied"}};};`);
+  await b.read("analyzeClosureEvidenceStatus()");
+  assert.deepEqual(b.context.modes, [6,11]);
+  assert.equal(b.read("getClosurePayload().servers[0].result"), "Complete, All Patches Applied");
+});
+
+test("Installing tables accept letter-only SVR names and unique S/5 and transposed OCR aliases", () => {
+  const b = browser(true);
+  b.element("input").value = "SVR-SE-HMG WIN/2016\nSVR-APP-WAP WIN/2016\nSVR-DB-HMG WIN/2022";
+  b.read(`closureEvidenceFiles=[{type:"image/png",ocrAnalyzed:true,ocrText:"SVR-5E-HMG.example.local Windows Server 2016 Installing Installing Yes\\nSRV-APP-WAP.example.local Windows Server 2016 Installing Installing Yes\\nSVR-DB-HMG.example.local Windows Server 2022 Installing Installing Yes"}];generateClosure();`);
+  const servers = b.read("getClosurePayload().servers");
+  assert.equal(servers.length,3);
+  assert(servers.every(s=>s.result === "Installing - instalacao em andamento"));
+  assert(!b.read("getClosurePayload().allServersEvidencedSuccessfully"));
+  assert.equal(b.read("getClosurePayload().status"), "Concluída com ressalvas");
+  assert(b.element("closureEmailText").innerHTML.includes("Installing - instalacao em andamento"));
+  assert(b.read("buildClosureReportHtml()").includes("Installing - instalacao em andamento"));
+});
+
+test("OCR row reconstruction does not duplicate word sources or merge adjacent short rows", () => {
+  const b = browser();
+  const words = [{text:"VM-APP01",bbox:{x0:10,y0:10,y1:20}}, {text:"Complete",bbox:{x0:100,y0:10,y1:20}},
+    {text:"VM-APP02",bbox:{x0:10,y0:21,y1:31}}, {text:"Installing",bbox:{x0:100,y0:21,y1:31}}];
+  b.context.ocrFixture = {data:{words,blocks:[{paragraphs:[{lines:[{words}]}]}]}};
+  assert.equal(b.read("buildStructuredOcrText(ocrFixture)"), "VM-APP01 Complete\nVM-APP02 Installing");
+});
+
+test("one file hostname cannot borrow a status from a separate evidence file", () => {
+  const b = browser();
+  b.read(`closureEvidenceFiles=[{type:"image/png",ocrText:"VM-APP01"},{type:"image/png",ocrText:"Complete All Patches Applied"}];`);
+  const context = b.read('getServerEvidenceContext(getClosureEvidenceText(), {name:"VM-APP01"}, [{name:"VM-APP01"}])');
+  assert.equal(context,"VM-APP01");
+  assert.equal(b.read(`inferClosureResultFromEvidenceContext(${JSON.stringify(context)})`), "");
+});
+
+test("Incomplete is never interpreted as Complete or successful closure", () => {
+  const b = browser(true);
+  b.element("input").value = "VM-APP01 WIN/2022";
+  b.read('closureEvidenceFiles=[{type:"image/png",ocrAnalyzed:true,ocrText:"VM-APP01 Incomplete"}];');
+  assert.equal(b.read("getClosurePayload().servers[0].result"), "Nao concluido na evidencia");
+  assert.equal(b.read("getClosurePayload().allServersEvidencedSuccessfully"),false);
+  assert.equal(b.read("getClosurePayload().status"), "Concluída com ressalvas");
+});
+
+test("a merged OCR row with two scope hostnames cannot validate either VM", () => {
+  const b = browser(true);
+  b.element("input").value = "VM-APP01 WIN/2022\nVM-APP02 WIN/2022";
+  b.read('closureEvidenceFiles=[{type:"image/png",ocrAnalyzed:true,ocrText:"VM-APP01 VM-APP02 Complete All Patches Applied"}];');
+  assert(b.read('getClosurePayload().servers.every(s=>s.evidenceState === "ocr_unmatched")'));
+});
+
+test("a replaced attachment set cannot receive stale OCR results and overlapping analyses are ignored", async () => {
+  const b = browser();
+  let release;
+  b.context.delayedText = new Promise(resolve => {release=resolve;});
+  b.read('closureEvidenceFiles=[{name:"first.pdf",type:"application/pdf"}];extractPdfEvidenceText=()=>delayedText;');
+  const first = b.read("analyzeClosureEvidenceStatus()");
+  assert.equal(await b.read("analyzeClosureEvidenceStatus()"),null);
+  b.element("closureStatus").value = "UNCHANGED";
+  b.read('closureEvidenceFiles=[{name:"replacement.pdf",type:"application/pdf"}];');
+  release("VM-APP01 Complete All Patches Applied");
+  assert.equal(await first,null);
+  assert.equal(b.read("closureEvidenceFiles[0].ocrText"),undefined);
+  assert.equal(b.element("closureStatus").value,"UNCHANGED");
+  assert.equal(b.read("closureOcrBusy"),false);
+});
+
 test("HTML uses shared engine, raw catalog first, and shows current heartbeat with automatic polling", async () => {
   const b = browser();
   const urls = [];

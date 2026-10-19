@@ -434,7 +434,7 @@ sandbox.__generateClosure();
 
 const closureEmailHtml = getElement("closureEmailText").innerHTML;
 assert(closureEmailHtml.includes("Encerramento da GMUD GMUD-TESTE"));
-assert(closureEmailHtml.includes("Concluída com sucesso"));
+assert(closureEmailHtml.includes("Concluída com ressalvas"), "evidencias pendentes nao comprovam sucesso");
 assert(closureEmailHtml.includes("Atualizacao finalizada sem incidentes"));
 assert(closureEmailHtml.includes("KB5120242"));
 assert(closureEmailHtml.includes("VISA011-B"));
@@ -446,7 +446,7 @@ assert(closureReportHtml.includes("RELATÓRIO TÉCNICO DE EVIDÊNCIA"));
 assert(closureReportHtml.includes("GMUD GMUD-TESTE - GER7 | Atualizações de Segurança"));
 assert(closureReportHtml.includes("<td class=\"meta-label\">Cliente</td><td>GER7</td>"));
 assert(closureReportHtml.includes("<td class=\"meta-label\">Executor</td><td>Renan Serafim Pires</td>"));
-assert(closureReportHtml.includes("<td class=\"meta-label\">Status</td><td>Concluída com sucesso</td>"));
+assert(closureReportHtml.includes("<td class=\"meta-label\">Status</td><td>Concluída com ressalvas</td>"));
 assert(closureReportHtml.includes("Resumo Executivo"));
 assert(closureReportHtml.includes("<th>Servidor</th><th>SO</th><th>Resultado</th>"));
 assert(closureReportHtml.includes("Evidência - Console de Gerenciamento"));
@@ -526,8 +526,7 @@ const fullCoverageResults = vm.runInContext(`applyEvidenceResultsToServers(
   "",
   { hasPending: false, hasFailures: false, hasImages: true }
 )`, sandbox);
-assert(fullCoverageResults.every(server => server.evidenceState === "evidenced"), "linhas de sucesso suficientes devem cobrir todo o escopo mesmo com hostnames ilegíveis");
-assert(fullCoverageResults.every(server => server.result === "Complete, All Patches Applied"));
+assert(fullCoverageResults.every(server => server.evidenceState !== "evidenced"), "contar linhas de sucesso sem correlacao nao comprova nenhuma VM");
 const insufficientCoverageResults = vm.runInContext(`applyEvidenceResultsToServers(
   [{ name: "HOST-A" }, { name: "HOST-B" }],
   "nome ilegivel Complete, All Patches Applied",

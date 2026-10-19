@@ -1063,6 +1063,7 @@ const AUTOMATIC_KB_CATALOG_URL = "https://raw.githubusercontent.com/renanser-cod
 let cmdbDatabase = [];
 let isCmdbLoaded = false;
 let closureEvidenceFiles = [];
+let closureOcrBusy = false;
 let scopeTableRows = [];
 let scopeTableFilter = "all";
 let filteredScopeTableRows = [];
@@ -1665,7 +1666,7 @@ const HOSTNAME_WORD_DENYLIST = new Set([
 
 const HOSTNAME_INFRA_PREFIXES = new Set([
   "AD", "APP", "DB", "DC", "FS", "FTP", "FW", "HYP", "LIN", "LNX", "PRD", "SAP",
-  "SQL", "SRV", "SV", "VDI", "WEB", "WIN", "WS"
+  "SQL", "SRV", "SVR", "SV", "VDI", "WEB", "WIN", "WS"
 ]);
 
 function normalizeHostnameToken(token) {
@@ -2649,7 +2650,7 @@ function buildStructuredOcrText(result) {
       )
     )
   );
-  const words = [...(Array.isArray(data.words) ? data.words : []), ...blockWords]
+  const words = (blockWords.length ? blockWords : (Array.isArray(data.words) ? data.words : []))
     .filter(word => word && word.text && word.bbox);
   if (words.length === 0) return String(data.text || "");
 
@@ -2660,7 +2661,7 @@ function buildStructuredOcrText(result) {
     height: Math.max(1, (Number(word.bbox.y1) || 0) - (Number(word.bbox.y0) || 0))
   })).filter(word => word.text);
   const averageHeight = positionedWords.reduce((sum, word) => sum + word.height, 0) / Math.max(1, positionedWords.length);
-  const rowTolerance = Math.max(8, averageHeight * 0.7);
+  const rowTolerance = Math.max(3, averageHeight * 0.45);
   const rows = [];
 
   positionedWords.sort((a, b) => a.y - b.y || a.x - b.x).forEach(word => {
@@ -2681,7 +2682,7 @@ function buildStructuredOcrText(result) {
 
 function inferClosureStatusFromEvidenceText(text) {
   const normalized = normalizeEvidenceText(text);
-  const hasIssue = /\b(failed|failure|error|erro|falha|pending|pendente|waiting|reboot required|restart required|pending restart|not targeted|not applicable)\b/.test(normalized);
+  const hasIssue = /\b(incomplete|not complete|installing|downloading|in progress|instalando|failed|failure|error|erro|falha|pending|pendente|waiting|reboot required|restart required|pending restart|not targeted|not applicable)\b/.test(normalized);
   if (hasIssue) {
     return {
       status: "Concluída com ressalvas",
@@ -2724,7 +2725,7 @@ function getClosureEvidenceText(files = closureEvidenceFiles) {
   return (files || [])
     .map(file => file.ocrText || file.recognizedText || file.text || "")
     .filter(Boolean)
-    .join("\n");
+    .join("\n\f\n");
 }
 
 function isClosureImageEvidence(file) {
@@ -2779,12 +2780,17 @@ function evidenceIdentifierDistance(left, right) {
   if (!b.length) return a.length;
 
   let previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+  let beforePrevious = null;
   for (let row = 1; row <= a.length; row++) {
     const current = [row];
     for (let column = 1; column <= b.length; column++) {
       const substitution = previous[column - 1] + (a[row - 1] === b[column - 1] ? 0 : 1);
       current[column] = Math.min(previous[column] + 1, current[column - 1] + 1, substitution);
+      if (beforePrevious && column > 1 && a[row - 1] === b[column - 2] && a[row - 2] === b[column - 1]) {
+        current[column] = Math.min(current[column], beforePrevious[column - 2] + 1);
+      }
     }
+    beforePrevious = previous;
     previous = current;
   }
   return previous[b.length];
@@ -2798,7 +2804,7 @@ function getEvidenceIdentifierTokens(text) {
       const variants = unique([raw, raw.split(".")[0]]);
       variants.forEach(variant => {
         const compact = compactEvidenceIdentifier(variant);
-        if (compact.length < 6 || !/[a-z]/i.test(variant) || !/\d/.test(variant)) return;
+        if (compact.length < 6 || !/[a-z]/i.test(variant) || !/[\d_-]/.test(variant)) return;
         tokens.push({ raw: variant, compact, canonical: canonicalEvidenceIdentifier(variant), lineIndex });
       });
     });
@@ -2821,7 +2827,7 @@ function enrichEvidenceTextWithFuzzyServerAliases(text, servers) {
 
   serverAliases.forEach((aliases, serverIndex) => {
     tokens.forEach((token, tokenIndex) => {
-      if (aliases.some(alias => alias.compact === token.compact || alias.canonical === token.canonical)) {
+      if (aliases.some(alias => alias.compact === token.compact)) {
         exactServerIndexes.add(serverIndex);
         reservedTokenIndexes.add(tokenIndex);
       }
@@ -2836,13 +2842,17 @@ function enrichEvidenceTextWithFuzzyServerAliases(text, servers) {
       let distance = Infinity;
       aliases.forEach(alias => {
         if (Math.abs(alias.compact.length - token.compact.length) > 1) return;
+        const aliasNumber = alias.compact.match(/\d+$/);
+        const tokenNumber = token.compact.match(/\d+$/);
+        if (aliasNumber && tokenNumber && aliasNumber[0] !== tokenNumber[0]
+          && alias.compact.replace(/\d+$/, "") === token.compact.replace(/\d+$/, "")) return;
         distance = Math.min(
           distance,
           evidenceIdentifierDistance(alias.compact, token.compact),
           evidenceIdentifierDistance(alias.canonical, token.canonical)
         );
       });
-      if (distance === 1) candidates.push({ serverIndex, tokenIndex, distance });
+      if (distance <= 1) candidates.push({ serverIndex, tokenIndex, distance });
     });
   });
 
@@ -2888,20 +2898,14 @@ function getClosureServerAliases(server) {
 }
 
 function textContainsAnyAlias(text, aliases) {
-  const normalized = normalizeEvidenceText(text);
-  const compactText = compactEvidenceIdentifier(text);
-  const canonicalText = canonicalEvidenceIdentifier(text);
-
-  return aliases.some(alias => {
+  const tokens = String(text || "").match(/[a-z0-9][a-z0-9._-]*/gi) || [];
+  return aliases.some(alias => tokens.some(token => {
     const normalizedAlias = normalizeEvidenceText(alias);
-    if (normalizedAlias && normalized.includes(normalizedAlias)) return true;
-
-    const compactAlias = compactEvidenceIdentifier(alias);
-    if (compactAlias.length >= 5 && compactText.includes(compactAlias)) return true;
-
-    const canonicalAlias = canonicalEvidenceIdentifier(alias);
-    return canonicalAlias.length >= 5 && canonicalText.includes(canonicalAlias);
-  });
+    const normalizedToken = normalizeEvidenceText(token).replace(/[.]+$/, "");
+    // A short hostname may match an FQDN, but never another VM's suffix/digits.
+    if (normalizedToken === normalizedAlias || (!normalizedAlias.includes(".") && normalizedToken.split(".")[0] === normalizedAlias)) return true;
+    return false;
+  }));
 }
 
 function serverIsMentionedInText(server, text) {
@@ -2918,59 +2922,54 @@ function getServerEvidenceContext(evidenceText, server, allServers) {
   if (aliases.length === 0) return "";
 
   const otherAliases = (allServers || [])
-    .filter(item => item !== server)
+    .filter(item => item !== server && normalizeEvidenceText(item.name) !== normalizeEvidenceText(server.name))
     .flatMap(getClosureServerAliases)
     .map(normalizeEvidenceText)
     .filter(Boolean);
 
   const lines = text.split(/\r?\n/);
+  const contexts = [];
   for (let index = 0; index < lines.length; index++) {
     if (!textContainsAnyAlias(lines[index], aliases)) continue;
+    if (textContainsAnyAlias(lines[index], otherAliases)) {
+      contexts.push("Linha OCR com multiplos servidores; validar status");
+      continue;
+    }
 
     const contextLines = [lines[index]];
-    const lineHasStatus = /complete|all patches|pending|restart|required|waiting|failed|failure|error|erro|falha/i.test(lines[index]);
-    if (lineHasStatus) return lines[index];
+    const lineHasStatus = /installing|downloading|in progress|instalando|complete|all patches|pending|restart|required|waiting|failed|failure|error|erro|falha/i.test(lines[index]);
+    if (lineHasStatus) { contexts.push(lines[index]); continue; }
     for (let next = index + 1; next < lines.length && contextLines.length < 5; next++) {
+      if (lines[next].includes("\f")) break;
       if (textContainsAnyAlias(lines[next], otherAliases)) break;
       contextLines.push(lines[next]);
     }
-    return contextLines.join(" ");
+    contexts.push(contextLines.join(" "));
   }
-
-  const normalizedText = normalizeEvidenceText(text);
-  let hitIndex = -1;
-  aliases.forEach(alias => {
-    const aliasIndex = normalizedText.indexOf(alias);
-    if (aliasIndex >= 0 && (hitIndex === -1 || aliasIndex < hitIndex)) {
-      hitIndex = aliasIndex;
-    }
-  });
-  if (hitIndex < 0) return "";
-
-  let endIndex = Math.min(text.length, hitIndex + 600);
-  otherAliases.forEach(alias => {
-    const otherIndex = normalizedText.indexOf(alias, hitIndex + 1);
-    if (otherIndex > hitIndex && otherIndex < endIndex) {
-      endIndex = otherIndex;
-    }
-  });
-
-  return text.slice(hitIndex, endIndex);
+  return contexts.join("\n");
 }
 
 function inferClosureResultFromEvidenceContext(context) {
   if (!context) return "";
+  const rows = String(context).split(/\r?\n/).filter(Boolean);
+  if (rows.length > 1) {
+    const results = unique(rows.map(row => inferClosureResultFromEvidenceContext(row)).filter(Boolean));
+    if (results.length > 1) return "Evidencias divergentes; validar status";
+  }
 
   const normalized = normalizeEvidenceText(context);
+  if (/\bincomplete\b|\bnot complete\b|\bnao concluid[oa]\b/.test(normalized)) return "Nao concluido na evidencia";
   if (/\b(failed|failure|error|erro|falha)\b/.test(normalized)) return "Falha identificada na evidencia";
   if (/pending restart|restart required|reinicio (?:necessario|pendente)/.test(normalized)) return "Pending Restart - reinicio necessario";
   if (/waiting for deployment|waiting for .*start time|aguardando .*inicio/.test(normalized)) return "Waiting for Deployment Start Time";
+  if (/\b(installing|instalando)\b/.test(normalized)) return "Installing - instalacao em andamento";
+  if (/\b(downloading|in progress)\b/.test(normalized)) return "Atualizacao em andamento";
   const hasComplete = normalized.includes("complete") || normalized.includes("concluido") || normalized.includes("concluida");
   const hasAllPatches = normalized.includes("all patches applied") || normalized.includes("sem pendencias") || normalized.includes("100% de sucesso");
   const hasIssue = /\b(failed|failure|error|erro|falha|pending|pendente|waiting|reboot required|restart required|not targeted|not applicable)\b/.test(normalized);
 
-  if (hasComplete && hasAllPatches) return "Complete, All Patches Applied";
   if (hasIssue) return "Validado com ressalvas";
+  if (hasComplete && hasAllPatches) return "Complete, All Patches Applied";
   if (hasComplete) return "Complete";
   return "";
 }
@@ -2979,30 +2978,13 @@ function inferClosureResultFromEvidence(server, evidenceText, allServers) {
   return inferClosureResultFromEvidenceContext(getServerEvidenceContext(evidenceText, server, allServers));
 }
 
-function evidenceShowsSuccessForEntireScope(evidenceText, serverCount) {
-  if (!serverCount) return false;
-  const normalized = normalizeEvidenceText(evidenceText);
-  if (/\b(failed|failure|error|erro|falha|pending|pendente|waiting|reboot required|restart required|not targeted|not applicable)\b/.test(normalized)) return false;
-  const successfulRows = String(evidenceText || "").split(/\r?\n/).filter(line => {
-    const row = normalizeEvidenceText(line);
-    const complete = /\bcomplete\b|\bconcluid[oa]\b/.test(row);
-    const applied = row.includes("all patches applied") || row.includes("sem pendencias") || row.includes("100% de sucesso");
-    return complete && applied;
-  }).length;
-  return successfulRows >= serverCount;
-}
-
 function applyEvidenceResultsToServers(servers, evidenceText, observationText, evidenceState) {
   const correlatedEvidenceText = enrichEvidenceTextWithFuzzyServerAliases(evidenceText, servers);
   const hasEvidenceText = !!String(correlatedEvidenceText || "").trim();
-  const hasFullSuccessCoverage = evidenceShowsSuccessForEntireScope(correlatedEvidenceText, servers.length);
   const hasAnyServerEvidenceContext = hasEvidenceText
     && servers.some(server => !!getServerEvidenceContext(correlatedEvidenceText, server, servers));
 
   return servers.map(server => {
-    if (hasFullSuccessCoverage) {
-      return { ...server, result: "Complete, All Patches Applied", evidenceState: "evidenced" };
-    }
     const evidenceContext = getServerEvidenceContext(correlatedEvidenceText, server, servers);
     const evidenceResult = inferClosureResultFromEvidenceContext(evidenceContext);
 
@@ -3011,7 +2993,7 @@ function applyEvidenceResultsToServers(servers, evidenceText, observationText, e
     }
 
     if (evidenceContext) {
-      return { ...server, result: "Consta na evidencia; validar status", evidenceState: "evidenced" };
+      return { ...server, result: "Consta na evidencia; validar status", evidenceState: "ocr_unmatched" };
     }
 
     if (serverIsMentionedInText(server, observationText)) {
@@ -3093,6 +3075,10 @@ function getClosureServerItems(data, observations = "") {
 }
 
 function reconcileClosureInferenceWithScope(inference) {
+  const analysis = getClosureEvidenceAnalysisState();
+  if (analysis.hasFailures || analysis.hasPending) {
+    return { status: "Concluída com ressalvas", reason: "Existem arquivos com leitura pendente ou falha; valide as evidencias antes do envio." };
+  }
   const data = processInput();
   const observationsElement = document.getElementById("closureObservations");
   const observations = observationsElement ? observationsElement.value : "";
@@ -3102,13 +3088,13 @@ function reconcileClosureInferenceWithScope(inference) {
   const reviewServers = servers.filter(server => {
     const result = normalizeEvidenceText(server.result || "");
     return server.evidenceState !== "evidenced"
-      || /ressalva|falha|pendente|nao evidenciado|validar/.test(result);
+      || /ressalva|falha|pendente|nao evidenciado|nao concluido|validar|installing|andamento|pending|waiting|restart/.test(result);
   });
 
   if (reviewServers.length === 0) return inference;
   return {
     status: "Concluída com ressalvas",
-    reason: `${reviewServers.length} de ${servers.length} servidor(es) do escopo exigem validacao ou nao foram correlacionados com seguranca na evidencia.`
+    reason: `${reviewServers.length} de ${servers.length} servidor(es) do escopo possuem status nao concluido ou exigem validacao da evidencia.`
   };
 }
 
@@ -3134,15 +3120,18 @@ function getClosurePayload() {
     const result = normalizeEvidenceText(server.result || "");
     return server.evidenceState === "evidenced"
       && /complete|concluid/.test(result)
-      && !/falha|erro|pending|pendente|waiting|restart|reinicio|ressalva/.test(result);
+      && !/falha|erro|pending|pendente|waiting|restart|reinicio|ressalva|nao concluido/.test(result);
   });
   const allServersEvidencedSuccessfully = servers.length > 0
     && evidenceAnalysisState.hasImages
+    && !evidenceAnalysisState.hasFailures
+    && !evidenceAnalysisState.hasPending
     && evidencedSuccessServers.length === servers.length
     && pendingOcrServers.length === 0
     && manualReviewServers.length === 0
     && missingEvidenceServers.length === 0;
-  const status = allServersEvidencedSuccessfully ? "Concluída com sucesso" : selectedStatus;
+  const status = allServersEvidencedSuccessfully ? "Concluída com sucesso"
+    : evidenceAnalysisState.hasImages && /sucesso/i.test(selectedStatus) ? "Concluída com ressalvas" : selectedStatus;
 
   return {
     gmudNumber,
@@ -3175,7 +3164,10 @@ function renderEvidenceList(files) {
   return files.map(file => {
     const typeKey = String(file.type || "").toLowerCase();
     const typeLabel = typeKey.includes("pdf") ? "PDF" : (typeKey.startsWith("image/") ? "Imagem" : "Arquivo");
-    return `<div class="closure-file-item"><span>${escapeHtml(file.name)} (${typeLabel})</span><span>${formatFileSize(file.size)}</span></div>`;
+    const analysis = file.ocrError ? `Falha: ${file.ocrError}` : file.ocrAnalyzed ? `${String(file.ocrText || "").length} caracteres extraidos` : "Analise pendente";
+    const detail = file.ocrAnalyzed || file.ocrError
+      ? `<details><summary>${escapeHtml(analysis)}</summary><pre style="white-space:pre-wrap;max-height:180px;overflow:auto">${escapeHtml(file.ocrText || file.ocrError || "Sem texto legivel")}</pre></details>` : "";
+    return `<div class="closure-file-item"><span>${escapeHtml(file.name)} (${typeLabel})${detail}</span><span>${formatFileSize(file.size)}</span></div>`;
   }).join("");
 }
 
@@ -3357,7 +3349,7 @@ function loadTesseractOcr() {
     document.head.appendChild(script);
   });
 
-  return tesseractLoadPromise;
+  return tesseractLoadPromise.catch(error => { tesseractLoadPromise = null; throw error; });
 }
 
 function loadPdfJs() {
@@ -3381,7 +3373,7 @@ function loadPdfJs() {
     script.onerror = () => reject(new Error("Nao foi possivel carregar PDF.js pela internet."));
     document.head.appendChild(script);
   });
-  return pdfJsLoadPromise;
+  return pdfJsLoadPromise.catch(error => { pdfJsLoadPromise = null; throw error; });
 }
 
 async function extractPdfEvidenceText(evidence, progressCallback) {
@@ -3392,25 +3384,38 @@ async function extractPdfEvidenceText(evidence, progressCallback) {
   const bytes = await evidence.file.arrayBuffer();
   const pdf = await api.getDocument({ data: bytes }).promise;
   const pageTexts = [];
-
+  try {
   for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
     if (progressCallback) progressCallback(`pagina ${pageNumber}/${pdf.numPages}`);
     const page = await pdf.getPage(pageNumber);
+    const content = await page.getTextContent();
+    const nativeText = buildStructuredOcrText({ data: { words: content.items.filter(item => item.str && item.transform).map(item => ({
+      text: item.str,
+      bbox: { x0: item.transform[4], x1: item.transform[4] + item.width,
+        y0: -item.transform[5], y1: -item.transform[5] + Math.max(1, item.height || 10) }
+    })) } });
+    if (/installing|downloading|in progress|complete|pending|waiting|failed|patches applied/i.test(nativeText) && getEvidenceIdentifierTokens(nativeText).length > 0) {
+      pageTexts.push(nativeText);
+      continue;
+    }
     const viewport = page.getViewport({ scale: 2.2 });
     const canvas = document.createElement("canvas");
     canvas.width = Math.ceil(viewport.width);
     canvas.height = Math.ceil(viewport.height);
     const context = canvas.getContext("2d");
     await page.render({ canvasContext: context, viewport }).promise;
-    const result = await runTesseractRecognize(canvas.toDataURL("image/png"), step => {
+    const text = await readEvidenceImageText(canvas.toDataURL("image/png"), step => {
       if (progressCallback) progressCallback(`pagina ${pageNumber}/${pdf.numPages} - ${step}`);
     });
-    pageTexts.push(buildStructuredOcrText(result));
+    pageTexts.push(text);
   }
-  return pageTexts.filter(Boolean).join("\n");
+  return pageTexts.filter(Boolean).join("\n\f\n");
+  } finally {
+    if (pdf.destroy) await pdf.destroy();
+  }
 }
 
-async function runTesseractRecognize(source, progressCallback) {
+async function runTesseractRecognize(source, progressCallback, pageMode = 6) {
   const api = await loadTesseractOcr();
 
   if (api.createWorker) {
@@ -3424,7 +3429,7 @@ async function runTesseractRecognize(source, progressCallback) {
     });
     try {
       if (worker.setParameters) {
-        await worker.setParameters({ tessedit_pageseg_mode: "6", preserve_interword_spaces: "1" });
+        await worker.setParameters({ tessedit_pageseg_mode: String(pageMode), preserve_interword_spaces: "1" });
       }
       return await worker.recognize(source, {}, { text: true, blocks: true });
     } finally {
@@ -3434,7 +3439,7 @@ async function runTesseractRecognize(source, progressCallback) {
 
   if (api.recognize) {
     return await api.recognize(source, "eng", {
-      tessedit_pageseg_mode: 6,
+      tessedit_pageseg_mode: pageMode,
       preserve_interword_spaces: "1",
       logger: message => {
         if (message && message.status && progressCallback) {
@@ -3448,7 +3453,25 @@ async function runTesseractRecognize(source, progressCallback) {
   throw new Error("API de OCR indisponivel no Tesseract.js carregado.");
 }
 
+async function readEvidenceImageText(rawSource, progressCallback) {
+  const source = await preprocessImageForOcr(rawSource);
+  let text = buildStructuredOcrText(await runTesseractRecognize(source, progressCallback));
+  const scope = getClosureServerItems(processInput());
+  const correlated = enrichEvidenceTextWithFuzzyServerAliases(text, scope);
+  const fullyRead = scope.length > 0 && scope.every(server =>
+    !!inferClosureResultFromEvidence(server, correlated, scope));
+  if (!fullyRead) {
+    const retry = await runTesseractRecognize(source, step => {
+      if (progressCallback) progressCallback(`segunda leitura - ${step}`);
+    }, 11);
+    text = [text, buildStructuredOcrText(retry)].filter(Boolean).join("\n");
+  }
+  return text;
+}
+
 async function analyzeClosureEvidenceStatus(options = {}) {
+  if (closureOcrBusy) return null;
+  const originalFiles = closureEvidenceFiles;
   const feedback = document.getElementById("closureOcrFeedback");
   const imageEvidences = closureEvidenceFiles.filter(isClosureOcrEvidence);
   const force = options.force !== false;
@@ -3477,11 +3500,14 @@ async function analyzeClosureEvidenceStatus(options = {}) {
   }
 
   try {
+    closureOcrBusy = true;
     feedback.textContent = `OCR: carregando motor de leitura para ${targets.length} arquivo(s)...`;
     feedback.style.color = "#93c5fd";
 
     for (let index = 0; index < targets.length; index++) {
       const imageEvidence = targets[index];
+      imageEvidence.ocrError = "";
+      try {
       feedback.textContent = `OCR: preparando ${imageEvidence.name || `imagem ${index + 1}`} (${index + 1}/${targets.length})...`;
 
       let text = "";
@@ -3491,26 +3517,35 @@ async function analyzeClosureEvidenceStatus(options = {}) {
         });
       } else {
         const rawSource = await getEvidenceImageSource(imageEvidence);
-        const source = await preprocessImageForOcr(rawSource);
-        const result = await runTesseractRecognize(source, step => {
+        text = await readEvidenceImageText(rawSource, step => {
           feedback.textContent = `OCR: ${imageEvidence.name || `imagem ${index + 1}`} - ${step}`;
         });
-        text = buildStructuredOcrText(result);
       }
       const inference = inferClosureStatusFromEvidenceText(text);
       imageEvidence.ocrText = text;
       imageEvidence.ocrInference = inference;
       imageEvidence.ocrAnalyzed = true;
       imageEvidence.ocrError = "";
+      if (!text.trim()) throw new Error("Nenhum texto legivel extraido; envie uma evidencia com maior resolucao.");
+      } catch (error) {
+        imageEvidence.ocrText = "";
+        imageEvidence.ocrAnalyzed = false;
+        imageEvidence.ocrError = error.message || String(error);
+      }
     }
 
+    if (closureEvidenceFiles !== originalFiles) return null;
     const combinedText = getClosureEvidenceText();
     const inference = reconcileClosureInferenceWithScope(inferClosureStatusFromEvidenceText(combinedText));
 
     document.getElementById("closureStatus").value = inference.status;
-    feedback.textContent = `OCR: ${targets.length} arquivo(s) analisado(s). ${inference.status} sugerido. ${inference.reason}`;
+    const failures = imageEvidences.filter(file => file.ocrError).length;
+    const results = getClosurePayload().servers;
+    const matched = results.filter(server => server.evidenceState === "evidenced").length;
+    feedback.textContent = `OCR: ${targets.length} arquivo(s) processado(s); ${failures} falha(s). ${matched}/${results.length} VM(s) correlacionada(s). ${inference.status} sugerido. ${inference.reason}`;
     feedback.style.color = inference.status.includes("sucesso") ? "#86efac" : "#fde68a";
     if (!options.skipGenerate) generateClosure();
+    updateClosureEvidenceList();
     generate();
     return inference;
   } catch (err) {
@@ -3523,6 +3558,8 @@ async function analyzeClosureEvidenceStatus(options = {}) {
     feedback.style.color = "#fca5a5";
     generate();
     return null;
+  } finally {
+    closureOcrBusy = false;
   }
 }
 
