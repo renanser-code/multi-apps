@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "documentId": "2026-Oct",
   "documentTitle": "Windows Server Security / Out-of-Band Cumulative Updates",
-  "generatedAt": "2026-10-20T16:46:34.740Z",
+  "generatedAt": "2026-10-20T20:25:33.792Z",
   "sourceUrl": "https://learn.microsoft.com/en-us/windows/release-health/windows-server-release-info",
   "catalog": {
     "10": {
@@ -32,9 +32,9 @@
   },
   "sync": {
     "status": "success",
-    "lastAttemptAt": "2026-10-20T16:46:34.740Z",
-    "lastSuccessfulAt": "2026-10-20T16:46:34.740Z",
-    "lastCompleteSuccessAt": "2026-10-20T16:46:34.740Z",
+    "lastAttemptAt": "2026-10-20T20:25:33.792Z",
+    "lastSuccessfulAt": "2026-10-20T20:25:33.792Z",
+    "lastCompleteSuccessAt": "2026-10-20T20:25:33.792Z",
     "checks": [
       {
         "source": "Microsoft release history",
