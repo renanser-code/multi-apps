@@ -1050,7 +1050,10 @@ const DATABASE_VM_NAMES = [
   "BRSAOENGDBS03"
 ];
 
+const CRITICAL_VISA_VM_NAMES = ["VISA009", "VISA010", "VISA007", "VISA008"];
+
 const MONITORED_VM_ALERTS = [
+  ...CRITICAL_VISA_VM_NAMES.map(name => ({ name, type: "VM prioritaria / Critica", message: `VM critica: acompanhamento prioritario durante toda a GMUD. ${PRIORITY_VM_ALERT_MESSAGE}` })),
   { name: "PPCFXPRDDB2", type: "VM prioritaria / Banco de Dados", message: `${PRIORITY_VM_ALERT_MESSAGE} ${DATABASE_VM_ALERT_MESSAGE}` },
   { name: "PPCFXPRDFTPE1", type: "VM prioritaria", message: PRIORITY_VM_ALERT_MESSAGE },
   { name: "PPSPFSV1", type: "VM prioritaria", message: PRIORITY_VM_ALERT_MESSAGE },
@@ -1265,10 +1268,16 @@ function getVmDatabaseClassification(name) {
 function getVmEmailClassification(name) {
   const alert = getMonitoredVmAlertByName(name);
   if (!alert) return "";
+  if (/critica/i.test(alert.type)) return getVmCriticalClassification(name);
   if (alert.type && alert.type.includes("Banco de Dados")) return getVmDatabaseClassification(name);
   if (alert.type && alert.type.includes("3a onda VISA")) return ' <strong style="color:#b45309;">[VM PRIORITARIA - 3a ONDA VISA]</strong>';
   if (alert.type && alert.type.includes("VM prioritaria")) return ' <strong style="color:#b45309;">[VM PRIORITARIA]</strong>';
   return "";
+}
+
+function getVmCriticalClassification(name) {
+  return /critica/i.test(getMonitoredVmAlertByName(name)?.type || "")
+    ? ' <strong style="color:#b91c1c;">[VM CRITICA]</strong>' : "";
 }
 
 function getMonitoredVmAlerts(data) {
@@ -2343,6 +2352,7 @@ function buildScopeTableRows(data, monitoredAlerts) {
     const alert = alertMap.get(normalizeMonitoredVmName(name)) || alertMap.get(normalizeMonitoredVmName(getVmHostname(name)));
     const classifications = [];
     if (alert?.type && /VM prioritaria|3a onda VISA/i.test(alert.type)) classifications.push("Prioritária");
+    if (alert?.type && /critica/i.test(alert.type)) classifications.push("Crítica");
     if (alert?.type && /Banco de Dados/i.test(alert.type)) classifications.push("Banco de dados");
     const problems = [...(row.problems || [])];
     if (/Windows Server 2012/i.test(row.os || "")) problems.push("Sem atualização");
@@ -2637,7 +2647,7 @@ function generate() {
     emailHtml += '<tr><td style="background-color:#b45309;color:#ffffff;padding:10px 12px;border:1px solid #92400e;font-size:16px;"><strong>ATENCAO: VMs PRIORITARIAS</strong></td></tr>';
     emailHtml += '<tr><td style="background-color:#fffbeb;color:#78350f;padding:12px;border:1px solid #f59e0b;"><strong>As VMs abaixo exigem acompanhamento prioritario durante toda a GMUD:</strong><br><br>';
     individualPriorityAlerts.forEach(alert => {
-      emailHtml += `&#9888; <strong style="color:#b45309;font-size:16px;">${escapeHtml(alert.name)}</strong> <strong>[VM PRIORITARIA]</strong><br>${escapeHtml(alert.message)}<br><br>`;
+      emailHtml += `&#9888; <strong style="color:#b45309;font-size:16px;">${escapeHtml(alert.name)}</strong> <strong>${/critica/i.test(alert.type) ? "[VM CRITICA]" : "[VM PRIORITARIA]"}</strong><br>${escapeHtml(alert.message)}<br><br>`;
     });
     if (visaThirdWaveAlerts.length > 0) {
       emailHtml += `<strong style="color:#b45309;font-size:16px;">3a ONDA VISA (${visaThirdWaveAlerts.length} VMs)</strong> <strong>[VMs PRIORITARIAS]</strong><br>`;
@@ -3685,7 +3695,7 @@ function buildClosureEmailHtml() {
     payload.servers.forEach(server => {
       const filteredInfo = getCustomerEmailVmInfo(server);
       const info = filteredInfo ? ` (${escapeHtml(filteredInfo)})` : "";
-      html += `- <strong>${escapeHtml(server.name)}</strong>${getVmDatabaseClassification(server.name)}${info} - ${escapeHtml(server.result || "Validacao nao informada")}<br>`;
+      html += `- <strong>${escapeHtml(server.name)}</strong>${getVmCriticalClassification(server.name)}${getVmDatabaseClassification(server.name)}${info} - ${escapeHtml(server.result || "Validacao nao informada")}<br>`;
     });
   } else {
     html += "- Nao informado<br>";
@@ -3812,7 +3822,7 @@ function buildClosureReportHtml() {
   if (payload.scopeBlocked) return '<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>Escopo nao liberado</title><body><h1>Escopo nao liberado</h1><p>Nenhuma VM confirmada como Ligada pela API. Carregue a base CMDB e revise a conferencia antes de emitir o relatorio.</p></body></html>';
   const titleLine = payload.fullGmudName || `GMUD ${payload.gmudNumber} - ${payload.client} | Atualizações de Segurança`;
   const serversHtml = payload.servers.length > 0
-    ? payload.servers.map(server => `<tr><td>${escapeHtml(server.name)}${getVmDatabaseClassification(server.name)}</td><td>${escapeHtml(server.os || "Nao informado")}</td><td>${escapeHtml(server.result || getClosureResultLabel(payload.status))}</td></tr>`).join("")
+    ? payload.servers.map(server => `<tr><td>${escapeHtml(server.name)}${getVmCriticalClassification(server.name)}${getVmDatabaseClassification(server.name)}</td><td>${escapeHtml(server.os || "Nao informado")}</td><td>${escapeHtml(server.result || getClosureResultLabel(payload.status))}</td></tr>`).join("")
     : "<tr><td colspan='3'>Nao informado</td></tr>";
   const kbHtml = payload.suggestedKbs.length > 0
     ? payload.suggestedKbs.map(item => `<li>${escapeHtml(item.kb)} - ${escapeHtml(item.name)}</li>`).join("")

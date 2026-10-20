@@ -181,6 +181,26 @@ test("HTML uses shared engine, raw catalog first, and shows current heartbeat wi
   assert.equal(b.element("kbSyncRefresh").disabled, false);
 });
 
+test("four registered VISA critical VMs retain critical alerts without exposing hostnames in client emails", () => {
+  const b=browser(true);
+  const names=["VISA009","VISA010","VISA007","VISA008"];
+  const records=names.map((name,i)=>({HostName:name.toLowerCase()+".example.test",IP:`192.0.2.${i+1}`,Customer:"VISA",SO:"Windows Server 2022",Status:"Ligada"}));
+  b.element("onlyPoweredOn").checked=true;
+  b.element("input").value=records.map(r=>`${r.HostName} ${r.IP}`).join("\n");
+  b.read(`isCmdbLoaded=true;cmdbDatabase=${JSON.stringify(records)};generate();generateClosure();`);
+  for(const name of names) {
+    assert.match(b.read(`getMonitoredVmAlertByName(${JSON.stringify(name.toLowerCase()+".example.test")}).type`),/Critica/);
+    for(const output of [b.element("emailText").innerHTML,b.element("closureEmailText").innerHTML]) {
+      assert(!output.toLowerCase().includes(name.toLowerCase()));
+      assert(output.includes("[VM CRITICA]"));
+    }
+    assert(b.read("buildClosureReportHtml()").toLowerCase().includes(name.toLowerCase()));
+  }
+  assert(b.read("buildClosureReportHtml()").includes("[VM CRITICA]"));
+  assert(b.element("scopeTableBody").innerHTML.includes("Crítica"));
+  assert.equal(b.read('getVmCriticalClassification("VISA011")'),"");
+});
+
 test("VISA emails hide hostnames throughout bodies, priority alerts, observations, filenames and scheduling subject", () => {
   const b=browser(true);
   b.element("onlyPoweredOn").checked=true;
