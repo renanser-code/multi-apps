@@ -181,6 +181,41 @@ test("HTML uses shared engine, raw catalog first, and shows current heartbeat wi
   assert.equal(b.element("kbSyncRefresh").disabled, false);
 });
 
+test("VISA emails hide hostnames throughout bodies, priority alerts, observations, filenames and scheduling subject", () => {
+  const b=browser(true);
+  b.element("onlyPoweredOn").checked=true;
+  b.element("schedGmud").value="758";
+  b.element("schedGmudTitle").value="GMUD 758 - VISA-HYPERATIVA | 3ª ONDA - VISA035";
+  b.element("schedDate").value="2026-10-20";
+  b.element("schedTime").value="23:00";
+  b.element("input").value="VISA035 192.0.2.1 WIN/2022\nSVR-SQL01 192.0.2.2 WIN/2022";
+  b.element("closureObservations").value="VISA035.visabrasil.local e SVR-SQL01 validados. Reinicio pendente em VISA035. IP 192.0.2.1.";
+  b.read('isCmdbLoaded=true;cmdbDatabase=[{HostName:"VISA035",Customer:"VISA-HYPERATIVA",IP:"192.0.2.1",SO:"Windows Server 2022",Status:"ON"},{HostName:"SVR-SQL01",Customer:"VISA-HYPERATIVA",IP:"192.0.2.2",SO:"Windows Server 2022",Status:"ON"}];closureEvidenceFiles=[{name:"VISA035-SVR-SQL01.png",type:"image/png",ocrAnalyzed:true,ocrText:"VISA035 Complete All Patches Applied\\nSVR-SQL01 Pending Restart"}];generate();generateClosure();');
+  for(const output of [b.element("emailText").innerHTML,b.element("closureEmailText").innerHTML,b.read("buildSchedulingScript()")]) {
+    for(const forbidden of ["VISA035","SVR-SQL01","192.0.2.1","192.0.2.2","visabrasil.local"]) assert(!output.toLowerCase().includes(forbidden.toLowerCase()), forbidden);
+    assert(output.includes("VISA-HYPERATIVA"));
+  }
+  assert(b.element("emailText").innerHTML.includes("PRIORITARIAS"));
+  assert(b.element("closureEmailText").innerHTML.includes("Pending Restart"));
+  assert(b.element("closureEmailText").innerHTML.includes("Evidencia 1"));
+  assert(b.element("windowsHostnameRegex").value.includes("VISA035"));
+  assert(b.read("getClosurePayload().servers[0].name").includes("VISA035"));
+  assert(b.read("buildClosureReportHtml()").includes("VISA035"));
+});
+
+test("VISA customer detection works for non-VISA hostnames and non-VISA emails remain unchanged", () => {
+  for(const client of ["VISA-HYPERATIVA","VISA","HYPERATIVA","LIOTECNICA"]) {
+    const b=browser(true);
+    b.element("onlyPoweredOn").checked=true;
+    b.element("input").value="SVR-DB01 192.0.2.1 WIN/2022";
+    b.element("closureClient").value="VISA"; // stale manual field must not override verified non-VISA customer
+    b.read(`isCmdbLoaded=true;cmdbDatabase=[{HostName:"SVR-DB01",Customer:${JSON.stringify(client)},IP:"192.0.2.1",SO:"Windows Server 2022",Status:"ON"}];generate();generateClosure();`);
+    for(const output of [b.element("emailText").innerHTML,b.element("closureEmailText").innerHTML]) {
+      assert.equal(output.includes("SVR-DB01"),client === "LIOTECNICA");
+    }
+  }
+});
+
 test("selecting another evidence batch preserves prior files and OCR without duplicating reselected files", () => {
   const b=browser(true);
   b.context.batchOne=[{name:"one.png",type:"image/png",size:100,lastModified:1}];

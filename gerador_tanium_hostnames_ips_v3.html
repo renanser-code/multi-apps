@@ -1895,6 +1895,41 @@ function getCustomerEmailVmInfo(vm) {
   return isVisaHiperativa ? info.replace(/\s*\|\s*IP:\s*[^|]+\s*/i, " ") : info;
 }
 
+function isVisaEmailScope(data) {
+  const visaClient = value => /\b(?:visa|hiperativa|hyperativa)\b/i.test(String(value || ""));
+  if (visaClient(getFullGmudName())) return true;
+  const servers = data.activeVMs || [];
+  const clients = servers.map(vm => getScopeInfoValue(vm.info, "Cliente")).filter(value => value && value !== "N/A");
+  if (clients.length) return clients.some(visaClient);
+  return visaClient(document.getElementById("closureClient").value)
+    || servers.some(vm => /^visa\d/i.test(vm.name))
+    || (data.hostnames || []).some(name => /^visa\d/i.test(name));
+}
+
+function applyVisaEmailPrivacy(html, data) {
+  if (!isVisaEmailScope(data)) return html;
+  let output = String(html || "");
+  closureEvidenceFiles.forEach((file, index) => {
+    if (!file.name) return;
+    output = output.split(escapeHtml(file.name)).join(`Evidencia ${index + 1}`);
+  });
+  const servers = [...(data.activeVMs || []), ...(data.offlineVMs || []), ...(data.unknownVMs || [])];
+  const names = [...(data.hostnames || []), ...servers.map(vm => vm.name), ...(data.lines || []).map(findHostname)];
+  const text = output.replace(/<[^>]*>/g, " ");
+  // Also cover hosts mentioned only in observations, not in the deployment rows.
+  (text.match(/[a-z0-9][a-z0-9._-]*/gi) || []).forEach(token => {
+    if (/\d/.test(token) && !/^(?:kb\d|gmud|rfc|r2$|win(?:dows)?\d|server\d)/i.test(token) && isLikelyHostnameToken(token)) names.push(token);
+  });
+  const aliases = unique(names.filter(Boolean).flatMap(name => [String(name), getVmHostname(name)]))
+    .sort((a, b) => b.length - a.length);
+  const pattern = aliases.length ? new RegExp(`(^|[^a-z0-9])(?:${aliases.map(name => escapeRegExp(escapeHtml(name))).join("|")})(?:\\.[a-z0-9_-]+)*(?=$|[^a-z0-9])`, "gi") : null;
+  return output.split(/(<[^>]*>)/g).map(part => {
+    if (part.startsWith("<")) return part;
+    const redacted = pattern ? part.replace(pattern, "$1Servidor do escopo") : part;
+    return redacted.replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, "[IP omitido]");
+  }).join("");
+}
+
 function renderKbCopyButton(kb) {
   const kbText = escapeHtml(kb);
   return `<button type="button" class='kb-copy-btn' data-kb="${kbText}" onclick="copyKbName(this.dataset.kb)" title="Copiar ${kbText}">Copiar KB</button>`;
@@ -2641,7 +2676,7 @@ function generate() {
     emailHtml = "<strong>Escopo nao liberado:</strong> carregue a base CMDB pela API e confirme ao menos uma VM Ligada antes de gerar o e-mail.";
   }
   if (!fullGmudName) emailHtml = "<strong>Nome completo da GMUD pendente:</strong> preencha o nome completo antes de gerar o e-mail de inicio.";
-  document.getElementById("emailText").innerHTML = emailHtml;
+  document.getElementById("emailText").innerHTML = applyVisaEmailPrivacy(emailHtml, data);
   if (data.poweredOnOnly) document.getElementById("closureEmailText").innerHTML = buildClosureEmailHtml();
   updateScopeTable(data, monitoredAlerts);
   updateOperationalOverview(data, suggestedKbs, unsupportedNotices, monitoredAlerts);
@@ -3712,7 +3747,7 @@ function buildClosureEmailHtml() {
   }
 
   html += "<br>Qualquer duvida, estamos a disposicao.<br>Atenciosamente,";
-  return html;
+  return applyVisaEmailPrivacy(html, processInput());
 }
 
 function generateClosure() {
@@ -4027,7 +4062,7 @@ function buildSchedulingScript() {
 
   const emailContent = document.getElementById("emailText").innerHTML;
   const escapedHtml  = emailContent.replace(/'/g, "''");
-  const subject = ("Inicio das Atividades - " + fullGmudName).replace(/'/g, "''");
+  const subject = applyVisaEmailPrivacy("Inicio das Atividades - " + fullGmudName, processInput()).replace(/'/g, "''");
 
   const lines = [
     "# Agendamento de E-mail de GMUD via Outlook (Envio Agendado)",
