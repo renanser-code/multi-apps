@@ -514,11 +514,11 @@ sandbox.__setClosureEvidenceFiles([
 sandbox.__generateClosure();
 const missingEvidenceEmailHtml = getElement("closureEmailText").innerHTML;
 const missingEvidenceReportHtml = sandbox.__buildClosureReportHtml();
-assert(missingEvidenceEmailHtml.includes("Servidores sem evidencia ou observacao no encerramento"));
+assert(missingEvidenceEmailHtml.includes("Servidores com validacao manual necessaria"));
 assert(missingEvidenceEmailHtml.includes("VISA029-1"));
-assert(missingEvidenceReportHtml.includes("<td>VISA029-1</td><td>Windows Server 2016</td><td>Nao evidenciado no encerramento</td>"));
+assert(missingEvidenceReportHtml.includes("<td>VISA029-1</td><td>Windows Server 2016</td><td>OCR sem correspondencia com o servidor; validar manualmente</td>"));
 assert(missingEvidenceReportHtml.includes("<td>VISA050-X</td><td>Windows Server 2022</td><td>Registrado nas observacoes da GMUD</td>"));
-assert(missingEvidenceReportHtml.includes("Servidores sem evidencia ou observacao no encerramento"));
+assert(missingEvidenceReportHtml.includes("validacao manual"));
 
 const successStatus = sandbox.__inferClosureStatusFromEvidenceText("Parent Status Complete Status Complete, All Patches Applied Currently Targeted Yes");
 assert.strictEqual(successStatus.status, "Concluída com sucesso");
@@ -563,8 +563,8 @@ sandbox.__setClosureEvidenceFiles([{
   ocrText: [
     "VWCSC001.grupo.jm Complete All Patches Applied Yes",
     "VWCSC014.grupo.jm Complete All Patches Applied Yes",
-    "VWCSC0G16.grupo.jm Complete All Patches Applied Yes",
-    "VWCSC0T7.grupo.jm Complete All Patches Applied Yes",
+    "VWCSCO16.grupo.jm Complete All Patches Applied Yes",
+    "VWCSC0I7.grupo.jm Complete All Patches Applied Yes",
     "VWCSC018.grupo.jm Complete All Patches Applied Yes",
     "VWCSC019.grupo.jm Complete All Patches Applied Yes"
   ].join("\n")

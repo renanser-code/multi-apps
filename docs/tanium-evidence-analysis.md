@@ -1,5 +1,31 @@
 # Precisao da analise de evidencias
 
+## Correcao de escopo e anexos - 20/10/2026
+
+- Selecoes consecutivas acumulam arquivos; a selecao de um complemento nao
+  substitui mais os anexos anteriores. Arquivos identicos por nome, tamanho e
+  lastModified nao sao duplicados. Limpar evidencias remove todo o conjunto.
+- FileReader associa a imagem ao objeto do arquivo, nao ao indice de uma lista
+  que pode mudar durante uma leitura assincrona.
+- A aproximacao de nomes nao aceita mais uma edicao arbitraria: limita-se a
+  confusoes OCR conhecidas, prefixos SRV/SVR e duplicacoes numericas semelhantes
+  ao OCR, mantendo a exigencia de correspondencia unica. PAPP e HAPP nao sao
+  intercambiaveis, nem sufixos numericos diferentes.
+- Correspondencia parcial nao transforma os demais hosts em nao atualizados:
+  eles ficam como validacao manual do OCR. Ausencia de correlacao nao e falha
+  de atualizacao. Essa regra vale para e-mail e relatorio PDF.
+- Not Applicable aparece como tal, sem virar sucesso ou host ausente.
+- Cada anexo mostra nomes lidos e contagem de correlacao com o escopo atual.
+
+Validacao real adicional em Edge/Tesseract 5.1.1 com o PNG original enviado em
+20/10: os 16 hosts visiveis foram correlacionados, sendo 15 Complete, All Patches
+Applied e 1 Not Applicable. Ao usar o escopo diferente da captura de e-mail,
+somente os hosts efetivamente correspondentes sao confirmados. Arquivo privado
+nao incluido no repositorio. Viewport mobile sem overflow horizontal.
+
+Rollback desta correcao: `rollback/pre-evidence-scope-20261020`.
+Backup local: `backups-gerador-tanium/pre-evidence-scope-20261020`.
+
 ## Alteracao de 18/10/2026
 
 - Reconstrucao espacial das linhas sem duplicar palavras entre `words` e `blocks`.

@@ -56,7 +56,7 @@ test("evidence correlates each table row without validating prefix hosts or coun
   const servers = b.read("getClosurePayload().servers");
   assert.equal(servers.find(s => s.name === "VM-APP010").result, "Complete, All Patches Applied");
   for (const name of ["VM-APP01", "VM-APP02"]) assert.notEqual(servers.find(s => s.name === name).evidenceState, "evidenced");
-  assert(b.read("buildClosureReportHtml()").includes("Nao evidenciado no encerramento"));
+  assert(b.read("buildClosureReportHtml()").includes("OCR sem correspondencia com o servidor; validar manualmente"));
 });
 
 test("contradictory evidence for one VM requires review without borrowing the next VM status", () => {
@@ -179,6 +179,47 @@ test("HTML uses shared engine, raw catalog first, and shows current heartbeat wi
   assert(b.element("kbSyncStatus").textContent.includes("12/11/2026"));
   assert.equal([...b.timers.values()].at(-1).delay, 15 * 60 * 1000);
   assert.equal(b.element("kbSyncRefresh").disabled, false);
+});
+
+test("selecting another evidence batch preserves prior files and OCR without duplicating reselected files", () => {
+  const b=browser(true);
+  b.context.batchOne=[{name:"one.png",type:"image/png",size:100,lastModified:1}];
+  b.context.batchTwo=[{name:"two.png",type:"image/png",size:200,lastModified:2}];
+  b.read('handleClosureEvidenceFiles(batchOne);closureEvidenceFiles[0].ocrText="VM-APP01 Complete All Patches Applied";closureEvidenceFiles[0].ocrAnalyzed=true;handleClosureEvidenceFiles(batchTwo);handleClosureEvidenceFiles(batchOne);');
+  assert.equal(b.read("closureEvidenceFiles.length"),2);
+  assert.equal(b.read("closureEvidenceFiles[0].ocrAnalyzed"),true);
+  assert(b.read("getClosureEvidenceText()").includes("VM-APP01"));
+  assert.equal(b.read("getClosureEvidenceAnalysisState().hasPending"),true);
+  b.read("clearClosureEvidence()");
+  assert.equal(b.read("closureEvidenceFiles.length"),0);
+});
+
+test("similar real hostnames are not silently equated and partial OCR never claims update failure", () => {
+  const b=browser(true);
+  b.element("input").value="VM-HAPP004 WIN/2022\nVM-APP025 WIN/2022\nVM-DBS003 WIN/2022";
+  b.read('closureEvidenceFiles=[{name:"complement.png",type:"image/png",ocrAnalyzed:true,ocrText:"VM-PAPP004 Complete All Patches Applied\\nVM-APP025 Complete All Patches Applied\\nVM-DBS003 Not Applicable"}];generateClosure();updateClosureEvidenceList();');
+  const servers=b.read("getClosurePayload().servers");
+  assert.equal(servers[0].evidenceState,"ocr_unmatched");
+  assert.equal(servers[1].result,"Complete, All Patches Applied");
+  assert.equal(servers[2].result,"Not Applicable - nao aplicavel");
+  for(const output of [b.element("closureEmailText").innerHTML,b.read("buildClosureReportHtml()")]) {
+    assert(!output.includes("devem ser tratados como nao atualizados"));
+    assert(!output.includes("Nao evidenciado no encerramento"));
+    assert(output.includes("validar manualmente"));
+  }
+  assert(b.element("closureEvidenceList").innerHTML.includes("2/3 VMs do escopo correlacionadas"));
+  assert(b.element("closureEvidenceList").innerHTML.includes("VM-PAPP004"));
+});
+
+test("only OCR-like confusions and repeated zeroes are accepted as automatic aliases", () => {
+  const b=browser();
+  for(const [a,c] of [["VM-APP001","VM-APPO01"],["VM-PDC001N","VM-PDCOO01N"],["SVR-WEB-HMG","SRV-WEB-HMG"]]) {
+    assert(b.read(`isSafeEvidenceAlias(${JSON.stringify(a)},${JSON.stringify(c)})`));
+  }
+  for(const [a,c] of [["VM-HAPP004","VM-PAPP004"],["VM-APP019","VM-APP018"],["VM-APP016","VM-APP0G16"]]) {
+    const enriched=b.read(`enrichEvidenceTextWithFuzzyServerAliases(${JSON.stringify(c+" Complete All Patches Applied")},[{name:${JSON.stringify(a)}}])`);
+    assert(!enriched.includes(a));
+  }
 });
 
 test("registered database VMs are highlighted in both client emails and the report only when ON", () => {

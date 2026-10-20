@@ -2804,10 +2804,24 @@ function compactEvidenceIdentifier(value) {
 
 function canonicalEvidenceIdentifier(value) {
   return compactEvidenceIdentifier(value)
+    .replace(/^srv/, "svr")
     .replace(/o/g, "0")
     .replace(/[il]/g, "1")
     .replace(/b/g, "8")
     .replace(/s/g, "5");
+}
+
+function isSafeEvidenceAlias(left, right) {
+  const a = canonicalEvidenceIdentifier(left);
+  const b = canonicalEvidenceIdentifier(right);
+  if (a === b) return true;
+  if (Math.abs(a.length - b.length) !== 1) return false;
+  const longer = a.length > b.length ? a : b;
+  const shorter = a.length > b.length ? b : a;
+  // OCR can duplicate O/0 or I/1; arbitrary edits can identify a different VM.
+  return [...longer].some((char, index) => /[0158]/.test(char)
+    && (longer[index - 1] === char || longer[index + 1] === char)
+    && longer.slice(0, index) + longer.slice(index + 1) === shorter);
 }
 
 function evidenceIdentifierDistance(left, right) {
@@ -2858,14 +2872,14 @@ function enrichEvidenceTextWithFuzzyServerAliases(text, servers) {
   if (tokens.length === 0) return source;
 
   const serverAliases = servers.map(server => getClosureServerAliases(server)
-    .map(alias => ({ compact: compactEvidenceIdentifier(alias), canonical: canonicalEvidenceIdentifier(alias) }))
+    .map(alias => ({ raw: alias, compact: compactEvidenceIdentifier(alias), canonical: canonicalEvidenceIdentifier(alias) }))
     .filter(alias => alias.compact.length >= 6));
   const exactServerIndexes = new Set();
   const reservedTokenIndexes = new Set();
 
   serverAliases.forEach((aliases, serverIndex) => {
     tokens.forEach((token, tokenIndex) => {
-      if (aliases.some(alias => alias.compact === token.compact)) {
+      if (textContainsAnyAlias(token.raw, aliases.map(alias => alias.raw))) {
         exactServerIndexes.add(serverIndex);
         reservedTokenIndexes.add(tokenIndex);
       }
@@ -2880,6 +2894,7 @@ function enrichEvidenceTextWithFuzzyServerAliases(text, servers) {
       let distance = Infinity;
       aliases.forEach(alias => {
         if (Math.abs(alias.compact.length - token.compact.length) > 1) return;
+        if (!isSafeEvidenceAlias(alias.raw, token.raw)) return;
         const aliasNumber = alias.compact.match(/\d+$/);
         const tokenNumber = token.compact.match(/\d+$/);
         if (aliasNumber && tokenNumber && aliasNumber[0] !== tokenNumber[0]
@@ -2998,6 +3013,7 @@ function inferClosureResultFromEvidenceContext(context) {
   const normalized = normalizeEvidenceText(context);
   if (/\bincomplete\b|\bnot complete\b|\bnao concluid[oa]\b/.test(normalized)) return "Nao concluido na evidencia";
   if (/\b(failed|failure|error|erro|falha)\b/.test(normalized)) return "Falha identificada na evidencia";
+  if (/\bnot applicable\b|\bnao aplicavel\b/.test(normalized)) return "Not Applicable - nao aplicavel";
   if (/pending restart|restart required|reinicio (?:necessario|pendente)/.test(normalized)) return "Pending Restart - reinicio necessario";
   if (/waiting for deployment|waiting for .*start time|aguardando .*inicio/.test(normalized)) return "Waiting for Deployment Start Time";
   if (/\b(installing|instalando)\b/.test(normalized)) return "Installing - instalacao em andamento";
@@ -3019,8 +3035,6 @@ function inferClosureResultFromEvidence(server, evidenceText, allServers) {
 function applyEvidenceResultsToServers(servers, evidenceText, observationText, evidenceState) {
   const correlatedEvidenceText = enrichEvidenceTextWithFuzzyServerAliases(evidenceText, servers);
   const hasEvidenceText = !!String(correlatedEvidenceText || "").trim();
-  const hasAnyServerEvidenceContext = hasEvidenceText
-    && servers.some(server => !!getServerEvidenceContext(correlatedEvidenceText, server, servers));
 
   return servers.map(server => {
     const evidenceContext = getServerEvidenceContext(correlatedEvidenceText, server, servers);
@@ -3046,7 +3060,7 @@ function applyEvidenceResultsToServers(servers, evidenceText, observationText, e
       return { ...server, result: "Falha na analise OCR; validar manualmente", evidenceState: "ocr_failed" };
     }
 
-    if (evidenceState.hasImages && hasEvidenceText && !hasAnyServerEvidenceContext) {
+    if (evidenceState.hasImages && hasEvidenceText) {
       return { ...server, result: "OCR sem correspondencia com o servidor; validar manualmente", evidenceState: "ocr_unmatched" };
     }
 
@@ -3130,7 +3144,7 @@ function reconcileClosureInferenceWithScope(inference) {
   const reviewServers = servers.filter(server => {
     const result = normalizeEvidenceText(server.result || "");
     return server.evidenceState !== "evidenced"
-      || /ressalva|falha|pendente|nao evidenciado|nao concluido|validar|installing|andamento|pending|waiting|restart/.test(result);
+      || /ressalva|falha|pendente|nao evidenciado|nao concluido|validar|installing|andamento|pending|waiting|restart|not applicable|nao aplicavel/.test(result);
   });
 
   if (reviewServers.length === 0) return inference;
@@ -3209,8 +3223,13 @@ function renderEvidenceList(files) {
     const typeKey = String(file.type || "").toLowerCase();
     const typeLabel = typeKey.includes("pdf") ? "PDF" : (typeKey.startsWith("image/") ? "Imagem" : "Arquivo");
     const analysis = file.ocrError ? `Falha: ${file.ocrError}` : file.ocrAnalyzed ? `${String(file.ocrText || "").length} caracteres extraidos` : "Analise pendente";
+    const text = file.ocrText || "";
+    const readNames = unique(text.split(/\r?\n/).map(findHostname).filter(Boolean).map(getVmHostname));
+    const scope = file.ocrAnalyzed ? getClosureServerItems(processInput()) : [];
+    const fileResults = file.ocrAnalyzed ? applyEvidenceResultsToServers(scope, text, "", { hasImages: true }) : [];
+    const matched = fileResults.filter(server => server.evidenceState === "evidenced").length;
     const detail = file.ocrAnalyzed || file.ocrError
-      ? `<details><summary>${escapeHtml(analysis)}</summary><pre style="white-space:pre-wrap;max-height:180px;overflow:auto">${escapeHtml(file.ocrText || file.ocrError || "Sem texto legivel")}</pre></details>` : "";
+      ? `<details><summary>${escapeHtml(analysis)}${file.ocrAnalyzed ? ` | ${matched}/${scope.length} VMs do escopo correlacionadas` : ""}</summary><div>Nomes lidos pelo OCR: ${escapeHtml(readNames.join(", ") || "Nenhum hostname legivel")}</div><pre style="white-space:pre-wrap;max-height:180px;overflow:auto">${escapeHtml(file.ocrText || file.ocrError || "Sem texto legivel")}</pre></details>` : "";
     return `<div class="closure-file-item"><span>${escapeHtml(file.name)} (${typeLabel})${detail}</span><span>${formatFileSize(file.size)}</span></div>`;
   }).join("");
 }
@@ -3223,7 +3242,8 @@ function updateClosureEvidenceList() {
 
 function handleClosureEvidenceFiles(fileList) {
   const files = Array.from(fileList || []);
-  closureEvidenceFiles = files.map(file => ({
+  const additions = files.filter(file => !closureEvidenceFiles.some(existing => existing.name === file.name
+    && existing.size === file.size && existing.file?.lastModified === file.lastModified)).map(file => ({
     name: file.name,
     type: file.type || "",
     size: file.size || 0,
@@ -3233,16 +3253,18 @@ function handleClosureEvidenceFiles(fileList) {
     ocrError: "",
     file
   }));
+  closureEvidenceFiles = [...closureEvidenceFiles, ...additions];
   updateClosureEvidenceList();
   generate();
 
-  files.forEach((file, index) => {
+  additions.forEach(evidence => {
+    const file = evidence.file;
     if (!file.type || !file.type.toLowerCase().startsWith("image/") || typeof FileReader === "undefined") return;
 
     const reader = new FileReader();
     reader.onload = event => {
-      if (closureEvidenceFiles[index]) {
-        closureEvidenceFiles[index].dataUrl = event.target.result || "";
+      if (closureEvidenceFiles.includes(evidence)) {
+        evidence.dataUrl = event.target.result || "";
         updateClosureEvidenceList();
       }
     };
@@ -3639,7 +3661,7 @@ function buildClosureEmailHtml() {
     payload.missingEvidenceServers.forEach(server => {
       html += `- <strong>${escapeHtml(server.name)}</strong>: nao localizado na evidencia OCR e sem citacao nas observacoes finais da GMUD.<br>`;
     });
-    html += "Esses itens devem ser tratados como nao atualizados ou com pendencia/problema sem evidencia registrada no encerramento.<br>";
+    html += "Resultado nao confirmado. Conferir os anexos e o escopo; ausencia de correlacao automatica nao comprova falha nem ausencia de atualizacao.<br>";
   }
 
   if (payload.pendingOcrServers.length > 0) {
@@ -3719,7 +3741,7 @@ function buildClosureExecutiveSummary(payload) {
     : manualReviewCount > 0
     ? `A leitura OCR foi executada, porem ${manualReviewCount} servidor(es) exigem validacao manual porque o OCR nao conseguiu correlacionar a evidencia aos hostnames ou IPs do escopo.`
     : missingCount > 0
-    ? `Foram identificados ${missingCount} servidor(es) do escopo sem localizacao na evidencia OCR e sem citacao nas observacoes finais, devendo ser tratados como nao atualizados ou pendentes ate validacao complementar.`
+    ? `O resultado de ${missingCount} servidor(es) do escopo requer conferencia dos anexos e observacoes. A ausencia de correlacao automatica nao comprova falha de atualizacao.`
     : normalizeEvidenceText(payload.status).includes("sucesso")
     ? "A execução foi concluída com 100% de sucesso, sem pendências identificadas."
     : `A execução foi encerrada com o status "${payload.status}", conforme observações e evidências registradas.`;
@@ -3780,7 +3802,7 @@ function buildClosureReportHtml() {
     : "";
   const missingEvidenceHtml = payload.missingEvidenceServers.length > 0
     ? `<h2>Servidores sem evidencia ou observacao no encerramento</h2>
-    <p>Os servidores abaixo constavam no escopo original, mas nao foram localizados no texto OCR da evidencia e tambem nao foram citados nas observacoes finais da GMUD. Devem ser tratados como nao atualizados ou com pendencia/problema sem evidencia registrada no encerramento.</p>
+    <p>O resultado dos servidores abaixo requer conferencia dos anexos e observacoes finais. A ausencia de correlacao automatica nao comprova falha nem ausencia de atualizacao.</p>
     <ul>${payload.missingEvidenceServers.map(server => `<li>${escapeHtml(server.name)}</li>`).join("")}</ul>`
     : "";
   const pendingOcrHtml = payload.pendingOcrServers.length > 0
