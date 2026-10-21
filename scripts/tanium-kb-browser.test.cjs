@@ -114,7 +114,7 @@ test("Installing tables accept letter-only SVR names and unique S/5 and transpos
   assert(servers.every(s=>s.result === "Installing - instalacao em andamento"));
   assert(!b.read("getClosurePayload().allServersEvidencedSuccessfully"));
   assert.equal(b.read("getClosurePayload().status"), "Concluída com ressalvas");
-  assert(b.element("closureEmailText").innerHTML.includes("Installing - instalacao em andamento"));
+  assert(b.element("closureEmailText").innerHTML.includes("Installing - instalação em andamento"));
   assert(b.read("buildClosureReportHtml()").includes("Installing - instalacao em andamento"));
 });
 
@@ -181,6 +181,36 @@ test("HTML uses shared engine, raw catalog first, and shows current heartbeat wi
   assert.equal(b.element("kbSyncRefresh").disabled, false);
 });
 
+test("generated email language uses Brazilian Portuguese without rewriting operational or user-entered values", () => {
+  const b=browser(true);
+  const title="GMUD 42 - VALIDACAO | ATUALIZACOES DE SEGURANCA";
+  const observation="Observacoes originais: nao alterar o codigo VALIDACAO.";
+  b.element("onlyPoweredOn").checked=true;
+  b.element("schedGmud").value="42";
+  b.element("schedGmudTitle").value=title;
+  b.element("input").value="SV-NAO-01 192.0.2.1 WIN/2022";
+  b.element("closureObservations").value=observation;
+  b.element("closureDate").value="2026-10-21";
+  b.element("closureTime").value="23:00";
+  b.read('isCmdbLoaded=true;cmdbDatabase=[{HostName:"SV-NAO-01",IP:"192.0.2.1",Customer:"VALIDACAO",SO:"Windows Server 2022",Status:"ON"}];closureEvidenceFiles=[{name:"evidencia-original.png",type:"image/png",ocrAnalyzed:true,ocrText:"SV-NAO-01 Pending Restart"}];generate();generateClosure();');
+  const opening=b.element("emailText").innerHTML;
+  const closure=b.element("closureEmailText").innerHTML;
+  for(const output of [opening,closure]) {
+    assert(output.includes(title));
+    assert(output.includes("SV-NAO-01"));
+    assert(output.includes("Cliente: VALIDACAO"));
+    assert(output.includes("Em caso de dúvidas, estamos à disposição."));
+  }
+  assert(closure.includes("21/10/2026 às 23:00"));
+  assert(closure.includes("reinício necessário"));
+  assert(closure.includes("Observações finais"));
+  assert(closure.includes("Evidências de encerramento"));
+  assert(closure.includes(observation));
+  b.element("closureObservations").value="";
+  b.read("generateClosure()");
+  assert(b.element("closureEmailText").innerHTML.includes("Sem observações adicionais."));
+});
+
 test("four registered VISA critical VMs retain critical alerts without exposing hostnames in client emails", () => {
   const b=browser(true);
   const names=["VISA009","VISA010","VISA007","VISA008"];
@@ -192,7 +222,7 @@ test("four registered VISA critical VMs retain critical alerts without exposing 
     assert.match(b.read(`getMonitoredVmAlertByName(${JSON.stringify(name.toLowerCase()+".example.test")}).type`),/Critica/);
     for(const output of [b.element("emailText").innerHTML,b.element("closureEmailText").innerHTML]) {
       assert(!output.toLowerCase().includes(name.toLowerCase()));
-      assert(output.includes("[VM CRITICA]"));
+      assert(output.includes("[VM CRÍTICA]"));
     }
     assert(b.read("buildClosureReportHtml()").toLowerCase().includes(name.toLowerCase()));
   }
@@ -215,9 +245,9 @@ test("VISA emails hide hostnames throughout bodies, priority alerts, observation
     for(const forbidden of ["VISA035","SVR-SQL01","192.0.2.1","192.0.2.2","visabrasil.local"]) assert(!output.toLowerCase().includes(forbidden.toLowerCase()), forbidden);
     assert(output.includes("VISA-HYPERATIVA"));
   }
-  assert(b.element("emailText").innerHTML.includes("PRIORITARIAS"));
+  assert(b.element("emailText").innerHTML.includes("PRIORITÁRIAS"));
   assert(b.element("closureEmailText").innerHTML.includes("Pending Restart"));
-  assert(b.element("closureEmailText").innerHTML.includes("Evidencia 1"));
+  assert(b.element("closureEmailText").innerHTML.includes("Evidência 1"));
   assert(b.element("windowsHostnameRegex").value.includes("VISA035"));
   assert(b.read("getClosurePayload().servers[0].name").includes("VISA035"));
   assert(b.read("buildClosureReportHtml()").includes("VISA035"));
@@ -306,7 +336,7 @@ test("full GMUD name is extracted and preserved in opening, closure, report and 
   assert(b.read("buildClosureReportHtml()").includes(title));
   b.element("schedDate").value="2026-10-19";
   b.element("schedTime").value="23:00";
-  assert(b.read("buildSchedulingScript()").includes(`Inicio das Atividades - ${title}`));
+  assert(b.read("buildSchedulingScript()").includes(`Início das atividades - ${title}`));
 });
 
 test("missing or mismatched complete GMUD name never silently generates number-only client emails", () => {
@@ -360,7 +390,7 @@ test("locked ON-only policy excludes OFF, retired and missing VMs from all deplo
   assert(b.element("scopeTableBody").innerHTML.includes("VM-SQL-OFF01"));
   b.read('cmdbDatabase=[];generate();');
   assert.equal(b.read("getClosurePayload().servers.length"),0);
-  assert(b.element("closureEmailText").innerHTML.includes("Escopo nao liberado"));
+  assert(b.element("closureEmailText").innerHTML.includes("Escopo não liberado"));
   assert(b.read("buildClosureReportHtml()").includes("Escopo nao liberado"));
 });
 
@@ -372,7 +402,7 @@ test("without API validation the ON-only policy never falls back to raw input", 
   assert.equal(b.read("processInput().hostnames.length"),0);
   assert.equal(b.read("processInput().ips.length"),0);
   assert.equal(b.read("getClosurePayload().servers.length"),0);
-  assert(b.element("emailText").innerHTML.includes("Escopo nao liberado"));
+  assert(b.element("emailText").innerHTML.includes("Escopo não liberado"));
   assert(!b.element("closureEmailText").innerHTML.includes("VM-RAW01"));
 });
 
@@ -389,7 +419,7 @@ test("a failed or malformed API reload invalidates previously eligible machines"
     assert.equal(b.read("isCmdbLoaded"),false);
     assert.equal(b.read("processInput().hostnames.length"),0);
     assert(!b.element("hostnameRegex").value.includes("VM-ON01"));
-    assert(b.element("closureEmailText").innerHTML.includes("Escopo nao liberado"));
+    assert(b.element("closureEmailText").innerHTML.includes("Escopo não liberado"));
   }
 });
 
@@ -645,7 +675,7 @@ test("SQL classification preserves configured priority and never duplicates a re
   b.read('MONITORED_VM_ALERTS.push({name:"PRIORITY-SQL01",type:"VM prioritaria",message:"Acompanhamento prioritario"})');
   b.element("input").value = "PRIORITY-SQL01 192.0.2.66 WIN/2022";
   b.read("generate()");
-  assert(b.element("emailText").innerHTML.includes("[VM PRIORITARIA / BANCO DE DADOS]"));
+  assert(b.element("emailText").innerHTML.includes("[VM PRIORITÁRIA / BANCO DE DADOS]"));
   assert(b.read('getMonitoredVmAlertByName("PRIORITY-SQL01").message').includes("Acompanhamento prioritario"));
   b.element("input").value = "SV-SQL3 192.0.2.67 WIN/2022\nsv-sql3.example.test 192.0.2.67 WIN/2022";
   assert.equal(b.read("getMonitoredVmAlerts(processInput()).length"), 1);
@@ -783,7 +813,7 @@ test("missing and discontinued VMs are pending validation, never labelled powere
   const html = b.element("emailText").innerHTML;
   assert(!html.includes("Servidores DESLIGADOS"));
   assert(!html.includes("Não serão atualizados"));
-  assert(html.includes("Escopo nao liberado"));
+  assert(html.includes("Escopo não liberado"));
   assert(!html.includes("VM-MISSING01"));
   assert(!html.includes("VM-RETIRED01"));
   assert(!b.element("vmsList").innerHTML.includes("VM-MISSING01"));

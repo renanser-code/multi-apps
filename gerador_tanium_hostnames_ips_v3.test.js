@@ -277,9 +277,9 @@ assert(getElement("kbSuggestions").innerHTML.includes("Windows Server 2012/2012 
 getElement("input").value = "LEGADO01 Microsoft Windows Server 2012 R2 (64-bit)";
 sandbox.__generate();
 const server2012EmailHtml = getElement("emailText").innerHTML;
-assert(server2012EmailHtml.includes("ATENCAO: WINDOWS SERVER 2012/2012 R2 NAO SERAO ATUALIZADOS NESTA GMUD"));
-assert(server2012EmailHtml.includes("Estas VMs nao serao atualizadas nesta GMUD"));
-assert(server2012EmailHtml.includes("Windows Server 2012/2012 R2 (sem atualizacao padrao)"));
+assert(server2012EmailHtml.includes("ATENÇÃO: WINDOWS SERVER 2012/2012 R2 NÃO SERÃO ATUALIZADOS NESTA GMUD"));
+assert(server2012EmailHtml.includes("Estas VMs não serão atualizadas nesta GMUD"));
+assert(server2012EmailHtml.includes("Windows Server 2012/2012 R2 (sem atualização padrão)"));
 assert(!server2012EmailHtml.includes("Windows Server / Client (Padr"));
 assert(!server2012EmailHtml.includes("Cumulative Security Updates (Tanium Patch)"));
 assert(getElement("gmudReviewItems").innerHTML.includes("Windows Server 2012/2012 R2 detectado"), "revisao deve sinalizar Server 2012 como alerta critico");
@@ -325,11 +325,11 @@ assert(monitoredAlertsHtml.includes("Alertas de VMs monitoradas"));
 assert(monitoredAlertsHtml.includes("PPCFXPRDDB2"));
 assert(monitoredAlertsHtml.includes("PPCFXPRDFTPE1"));
 assert(monitoredAlertsHtml.includes("PPSPFSV1"));
-assert(monitoredAlertEmailHtml.includes("ATENCAO: VMs PRIORITARIAS"));
+assert(monitoredAlertEmailHtml.includes("ATENÇÃO: VMs PRIORITÁRIAS"));
 assert(monitoredAlertEmailHtml.includes("background-color:#fffbeb"));
-assert(monitoredAlertEmailHtml.includes("[VM PRIORITARIA / BANCO DE DADOS]"));
-assert(monitoredAlertEmailHtml.includes("[VM PRIORITARIA]"));
-assert(monitoredAlertEmailHtml.includes("acompanhamento prioritario"));
+assert(monitoredAlertEmailHtml.includes("[VM PRIORITÁRIA / BANCO DE DADOS]"));
+assert(monitoredAlertEmailHtml.includes("[VM PRIORITÁRIA]"));
+assert(monitoredAlertEmailHtml.includes("acompanhamento prioritário"));
 assert(monitoredAlertEmailHtml.includes("PPCFXPRDDB2"));
 assert(monitoredAlertEmailHtml.includes("PPCFXPRDFTPE1"));
 assert(monitoredAlertEmailHtml.includes("PPSPFSV1"));
@@ -355,7 +355,7 @@ assert(databaseAlertsHtml.includes("SV-SAP3"));
 assert(databaseAlertsHtml.includes("ATB-SV-DBP-05"));
 assert(databaseAlertsHtml.includes("SV-DBO-EBAM02"));
 assert(!databaseAlertsHtml.includes("<strong>GER7-PROD</strong>"));
-assert(databaseAlertEmailHtml.includes("ATENCAO: SERVIDORES DE BANCO DE DADOS"));
+assert(databaseAlertEmailHtml.includes("ATENÇÃO: SERVIDORES DE BANCO DE DADOS"));
 assert(databaseAlertEmailHtml.includes("[BANCO DE DADOS]"));
 assert(databaseAlertEmailHtml.includes("SV-SQL3"));
 assert(databaseAlertEmailHtml.includes("SV-SAP3"));
@@ -364,7 +364,7 @@ assert(databaseAlertEmailHtml.includes('<strong>ATB-SV-DBP-05</strong> <strong s
 assert(databaseAlertEmailHtml.includes('<strong>SV-DBO-EBAM02</strong> <strong style="color:#b91c1c;">[BANCO DE DADOS]</strong>'));
 assert(databaseAlertEmailHtml.includes("background-color:#b91c1c"));
 assert(databaseAlertEmailHtml.includes("background-color:#fff1f2"));
-assert(databaseAlertEmailHtml.includes("acompanhamento prioritario durante toda a GMUD"));
+assert(databaseAlertEmailHtml.includes("acompanhamento prioritário durante toda a GMUD"));
 
 getElement("input").value = [
   "VISA035 Microsoft Windows Server 2016 (64-bit)",
@@ -376,10 +376,10 @@ const visaThirdWaveEmailHtml = getElement("emailText").innerHTML;
 assert(visaThirdWaveAlertsHtml.includes("VISA035"));
 assert(visaThirdWaveAlertsHtml.includes("VISA034-W"));
 assert(!visaThirdWaveAlertsHtml.includes("<strong>VISA034</strong>"));
-assert(visaThirdWaveEmailHtml.includes("[VM PRIORITARIA - 3a ONDA VISA]"));
-assert(visaThirdWaveEmailHtml.includes("3a onda VISA: VM prioritaria"));
-assert(visaThirdWaveEmailHtml.includes("3a ONDA VISA (2 VMs)"));
-assert.strictEqual((visaThirdWaveEmailHtml.match(/3a onda VISA: VM prioritaria/g) || []).length, 1);
+assert(visaThirdWaveEmailHtml.includes("[VM PRIORITÁRIA - 3ª ONDA VISA]"));
+assert(visaThirdWaveEmailHtml.includes("3ª onda VISA: VM prioritária"));
+assert(visaThirdWaveEmailHtml.includes("3ª ONDA VISA (2 VMs)"));
+assert.strictEqual((visaThirdWaveEmailHtml.match(/3ª onda VISA: VM prioritária/g) || []).length, 1);
 
 getElement("input").value = [
   "WINAPP01 Microsoft Windows Server 2019 (64-bit) 10.10.10.1",
@@ -441,7 +441,7 @@ assert(closureEmailHtml.includes("Atualizacao finalizada sem incidentes"));
 assert(closureEmailHtml.includes("KB5120242"));
 assert(!closureEmailHtml.includes("VISA011-B"));
 assert(!closureEmailHtml.includes("print-finalizacao.png"));
-assert(closureEmailHtml.includes("Evidencia 1"));
+assert(closureEmailHtml.includes("Evidência 1"));
 
 const closureReportHtml = sandbox.__buildClosureReportHtml();
 assert(closureReportHtml.includes("RELATÓRIO TÉCNICO DE EVIDÊNCIA"));
@@ -514,7 +514,7 @@ sandbox.__setClosureEvidenceFiles([
 sandbox.__generateClosure();
 const missingEvidenceEmailHtml = getElement("closureEmailText").innerHTML;
 const missingEvidenceReportHtml = sandbox.__buildClosureReportHtml();
-assert(missingEvidenceEmailHtml.includes("Servidores com validacao manual necessaria"));
+assert(missingEvidenceEmailHtml.includes("Servidores com validação manual necessária"));
 assert(!missingEvidenceEmailHtml.includes("VISA029-1"));
 assert(missingEvidenceReportHtml.includes("<td>VISA029-1</td><td>Windows Server 2016</td><td>OCR sem correspondencia com o servidor; validar manualmente</td>"));
 assert(missingEvidenceReportHtml.includes("<td>VISA050-X</td><td>Windows Server 2022</td><td>Registrado nas observacoes da GMUD</td>"));
