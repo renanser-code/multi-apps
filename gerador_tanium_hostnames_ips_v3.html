@@ -1940,20 +1940,9 @@ function applyVisaEmailPrivacy(html, data) {
     if (!file.name) return;
     output = output.split(escapeHtml(file.name)).join(`Evidência ${index + 1}`);
   });
-  const servers = [...(data.activeVMs || []), ...(data.offlineVMs || []), ...(data.unknownVMs || [])];
-  const names = [...(data.hostnames || []), ...servers.map(vm => vm.name), ...(data.lines || []).map(findHostname)];
-  const text = output.replace(/<[^>]*>/g, " ");
-  // Also cover hosts mentioned only in observations, not in the deployment rows.
-  (text.match(/[a-z0-9][a-z0-9._-]*/gi) || []).forEach(token => {
-    if (/\d/.test(token) && !/^(?:kb\d|gmud|rfc|r2$|win(?:dows)?\d|server\d)/i.test(token) && isLikelyHostnameToken(token)) names.push(token);
-  });
-  const aliases = unique(names.filter(Boolean).flatMap(name => [String(name), getVmHostname(name)]))
-    .sort((a, b) => b.length - a.length);
-  const pattern = aliases.length ? new RegExp(`(^|[^a-z0-9])(?:${aliases.map(name => escapeRegExp(escapeHtml(name))).join("|")})(?:\\.[a-z0-9_-]+)*(?=$|[^a-z0-9])`, "gi") : null;
   return output.split(/(<[^>]*>)/g).map(part => {
     if (part.startsWith("<")) return part;
-    const redacted = pattern ? part.replace(pattern, "$1Servidor do escopo") : part;
-    return redacted.replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, "[IP omitido]");
+    return part.replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, "[IP omitido]");
   }).join("");
 }
 
