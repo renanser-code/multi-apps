@@ -4,11 +4,21 @@ on:
   schedule:
     - cron: "7,37 * * * *"
   workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/**"
+      - "package*.json"
+      - "gerador_tanium_hostnames_ips_v3.html"
+      - "gerador_tanium_hostnames_ips_v3.test.js"
+      - ".github/workflows/update-tanium-kb-catalog.yml"
   push:
     branches: [main]
     paths:
       - "scripts/**"
       - "package*.json"
+      - "gerador_tanium_hostnames_ips_v3.html"
+      - "gerador_tanium_hostnames_ips_v3.test.js"
       - ".github/workflows/update-tanium-kb-catalog.yml"
 
 permissions:
@@ -33,6 +43,7 @@ jobs:
         run: npm run test:tanium
       - name: Consultar o catalogo oficial da Microsoft
         id: sync
+        if: github.event_name != 'pull_request'
         run: node scripts/update-tanium-kb-catalog.mjs
       - name: Publicar somente quando houver mudanca
         if: ${{ always() && (steps.sync.outcome == 'success' || steps.sync.outcome == 'failure') }}

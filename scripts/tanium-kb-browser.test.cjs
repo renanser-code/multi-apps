@@ -211,7 +211,7 @@ test("generated email language uses Brazilian Portuguese without rewriting opera
   assert(b.element("closureEmailText").innerHTML.includes("Sem observações adicionais."));
 });
 
-test("four registered VISA critical VMs retain critical alerts without exposing hostnames in client emails", () => {
+test("four registered VISA critical VMs retain hostnames and critical alerts without exposing IPs in client emails", () => {
   const b=browser(true);
   const names=["VISA009","VISA010","VISA007","VISA008"];
   const records=names.map((name,i)=>({HostName:name.toLowerCase()+".example.test",IP:`192.0.2.${i+1}`,Customer:"VISA",SO:"Windows Server 2022",Status:"Ligada"}));
@@ -221,7 +221,8 @@ test("four registered VISA critical VMs retain critical alerts without exposing 
   for(const name of names) {
     assert.match(b.read(`getMonitoredVmAlertByName(${JSON.stringify(name.toLowerCase()+".example.test")}).type`),/Critica/);
     for(const output of [b.element("emailText").innerHTML,b.element("closureEmailText").innerHTML]) {
-      assert(!output.toLowerCase().includes(name.toLowerCase()));
+      assert(output.toLowerCase().includes(name.toLowerCase()));
+      for (const record of records) assert(!output.includes(record.IP));
       assert(output.includes("[VM CRÍTICA]"));
     }
     assert(b.read("buildClosureReportHtml()").toLowerCase().includes(name.toLowerCase()));
@@ -231,7 +232,7 @@ test("four registered VISA critical VMs retain critical alerts without exposing 
   assert.equal(b.read('getVmCriticalClassification("VISA011")'),"");
 });
 
-test("VISA emails hide hostnames throughout bodies, priority alerts, observations, filenames and scheduling subject", () => {
+test("VISA emails retain hostnames and scheduling subject while masking IPs and evidence filenames", () => {
   const b=browser(true);
   b.element("onlyPoweredOn").checked=true;
   b.element("schedGmud").value="758";
@@ -242,11 +243,17 @@ test("VISA emails hide hostnames throughout bodies, priority alerts, observation
   b.element("closureObservations").value="VISA035.visabrasil.local e SVR-SQL01 validados. Reinicio pendente em VISA035. IP 192.0.2.1.";
   b.read('isCmdbLoaded=true;cmdbDatabase=[{HostName:"VISA035",Customer:"VISA-HYPERATIVA",IP:"192.0.2.1",SO:"Windows Server 2022",Status:"ON"},{HostName:"SVR-SQL01",Customer:"VISA-HYPERATIVA",IP:"192.0.2.2",SO:"Windows Server 2022",Status:"ON"}];closureEvidenceFiles=[{name:"VISA035-SVR-SQL01.png",type:"image/png",ocrAnalyzed:true,ocrText:"VISA035 Complete All Patches Applied\\nSVR-SQL01 Pending Restart"}];generate();generateClosure();');
   for(const output of [b.element("emailText").innerHTML,b.element("closureEmailText").innerHTML,b.read("buildSchedulingScript()")]) {
-    for(const forbidden of ["VISA035","SVR-SQL01","192.0.2.1","192.0.2.2","visabrasil.local"]) assert(!output.toLowerCase().includes(forbidden.toLowerCase()), forbidden);
+    assert(output.includes("VISA035"));
+    for(const forbidden of ["192.0.2.1","192.0.2.2"]) assert(!output.includes(forbidden), forbidden);
     assert(output.includes("VISA-HYPERATIVA"));
   }
   assert(b.element("emailText").innerHTML.includes("PRIORITÁRIAS"));
   assert(b.element("closureEmailText").innerHTML.includes("Pending Restart"));
+  for (const output of [b.element("emailText").innerHTML, b.element("closureEmailText").innerHTML]) {
+    assert(output.includes("SVR-SQL01"));
+  }
+  assert(b.element("closureEmailText").innerHTML.includes("VISA035.visabrasil.local"));
+  assert(!b.element("closureEmailText").innerHTML.includes("VISA035-SVR-SQL01.png"));
   assert(b.element("closureEmailText").innerHTML.includes("Evidência 1"));
   assert(b.element("windowsHostnameRegex").value.includes("VISA035"));
   assert(b.read("getClosurePayload().servers[0].name").includes("VISA035"));
@@ -261,7 +268,8 @@ test("VISA customer detection works for non-VISA hostnames and non-VISA emails r
     b.element("closureClient").value="VISA"; // stale manual field must not override verified non-VISA customer
     b.read(`isCmdbLoaded=true;cmdbDatabase=[{HostName:"SVR-DB01",Customer:${JSON.stringify(client)},IP:"192.0.2.1",SO:"Windows Server 2022",Status:"ON"}];generate();generateClosure();`);
     for(const output of [b.element("emailText").innerHTML,b.element("closureEmailText").innerHTML]) {
-      assert.equal(output.includes("SVR-DB01"),client === "LIOTECNICA");
+      assert(output.includes("SVR-DB01"));
+      assert.equal(output.includes("192.0.2.1"),client === "LIOTECNICA");
     }
   }
 });
