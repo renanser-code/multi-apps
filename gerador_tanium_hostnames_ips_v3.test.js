@@ -68,6 +68,8 @@ script = script.replace(/generate\(\);\s*(?:generateClosure\(\);\s*)?updateScrip
 vm.createContext(sandbox);
 vm.runInContext(`${script}\nthis.__buildKbCatalogFromMsrc = buildKbCatalogFromMsrc;\nthis.__suggestKBs = suggestKBs;\nthis.__generate = generate;\nthis.__processInput = processInput;\nthis.__findHostname = findHostname;\nthis.__copyKbName = typeof copyKbName === "function" ? copyKbName : undefined;\nthis.__setKbCatalog = (catalog) => { KB_CATALOG = catalog; };\nthis.__generateClosure = typeof generateClosure === "function" ? generateClosure : undefined;\nthis.__buildClosureReportHtml = typeof buildClosureReportHtml === "function" ? buildClosureReportHtml : undefined;\nthis.__inferClosureStatusFromEvidenceText = typeof inferClosureStatusFromEvidenceText === "function" ? inferClosureStatusFromEvidenceText : undefined;\nthis.__analyzeClosureEvidenceStatus = typeof analyzeClosureEvidenceStatus === "function" ? analyzeClosureEvidenceStatus : undefined;\nthis.__enrichEvidenceTextWithFuzzyServerAliases = typeof enrichEvidenceTextWithFuzzyServerAliases === "function" ? enrichEvidenceTextWithFuzzyServerAliases : undefined;\nthis.__reconcileClosureInferenceWithScope = typeof reconcileClosureInferenceWithScope === "function" ? reconcileClosureInferenceWithScope : undefined;\nthis.__setClosureEvidenceFiles = (files) => { closureEvidenceFiles = files; };`, sandbox);
 
+// Keep automatic-mode regressions; the browser suite covers the active hold.
+vm.runInContext("KB_DEPLOYMENT_HOLD.enabled = false;", sandbox);
 assert.strictEqual(typeof sandbox.__buildKbCatalogFromMsrc, "function");
 assert.strictEqual(typeof sandbox.__suggestKBs, "function");
 assert.strictEqual(typeof sandbox.__generate, "function");
