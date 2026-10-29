@@ -1884,6 +1884,19 @@ function buildOsGroups(entries) {
   return { groups, osNames };
 }
 
+function buildDeploymentTargets(hostnames, ips, entries) {
+  const excluded = entries.filter(entry => detectWindowsServer2012(entry.os));
+  const blockedNames = new Set(excluded.map(entry => getVmHostname(entry.hostname).toLowerCase()));
+  const blockedIps = new Set(excluded.flatMap(entry => entry.ips || []));
+  const eligible = entries.filter(entry => !blockedNames.has(getVmHostname(entry.hostname).toLowerCase()) && !detectWindowsServer2012(entry.os))
+    .map(entry => ({ ...entry, ips: (entry.ips || []).filter(ip => !blockedIps.has(ip)) }));
+  return {
+    hostnames: hostnames.filter(name => !blockedNames.has(getVmHostname(name).toLowerCase())),
+    ips: ips.filter(ip => !blockedIps.has(ip)),
+    osGroups: buildOsGroups(eligible).groups
+  };
+}
+
 function getAffectedOsNames(data, suggestedKbs, unsupportedNotices) {
   const names = [];
   (data.osNames || []).forEach(os => {
@@ -2333,7 +2346,7 @@ function processInput() {
     }
 
     const osData = buildOsGroups(scopedEntries);
-    return { lines, hostnames: finalHostnames, ips: finalIps, osGroups: osData.groups, osNames: osData.osNames, activeVMs, offlineVMs, unknownVMs, isCmdbApplied: true, poweredOnOnly: onlyPoweredOn };
+    return { lines, ...buildDeploymentTargets(finalHostnames, finalIps, scopedEntries), osNames: osData.osNames, activeVMs, offlineVMs, unknownVMs, isCmdbApplied: true, poweredOnOnly: onlyPoweredOn };
   } else {
     vmStatusPanel.style.display = "none";
     if (cmdbCopyResult) cmdbCopyResult.value = "";
@@ -2345,7 +2358,7 @@ function processInput() {
   }
 
   const osData = buildOsGroups(onlyPoweredOn ? [] : rawEntries);
-  return { lines, hostnames: onlyPoweredOn ? [] : finalHostnames, ips: onlyPoweredOn ? [] : finalIps, osGroups: osData.groups, osNames: osData.osNames, isCmdbApplied: false, poweredOnOnly: onlyPoweredOn };
+  return { lines, ...buildDeploymentTargets(onlyPoweredOn ? [] : finalHostnames, onlyPoweredOn ? [] : finalIps, onlyPoweredOn ? [] : rawEntries), osNames: osData.osNames, isCmdbApplied: false, poweredOnOnly: onlyPoweredOn };
 }
 
 function getDuplicateValues(values) {
@@ -2625,13 +2638,21 @@ function generate() {
   let emailHtml = `Senhores, boa noite.<br><br>Informamos que estamos iniciando as atividades referentes à ${escapeHtml(fullGmudName)}, conforme planejamento aprovado.<br><br>A partir deste momento, será dado início ao processo de atualização dos servidores relacionados abaixo:<br><br>`;
   
   if (data.isCmdbApplied) {
-    if (data.activeVMs.length > 0) {
+    const eligibleVMs = data.activeVMs.filter(vm => !detectWindowsServer2012(vm.info));
+    const excludedVMs = data.activeVMs.filter(vm => detectWindowsServer2012(vm.info));
+    if (eligibleVMs.length > 0) {
       emailHtml += "<strong>Servidores LIGADOS (Patches serão aplicados):</strong><br>";
-      data.activeVMs.forEach(vm => {
+      eligibleVMs.forEach(vm => {
         emailHtml += `- <strong>${vm.name}</strong>${formatEmailSystemText(getVmEmailClassification(vm.name))} (${getCustomerEmailVmInfo(vm)})<br>`;
       });
     } else {
       emailHtml += "<strong>Servidores LIGADOS:</strong><br>- n/a<br>";
+    }
+    if (excludedVMs.length > 0) {
+      emailHtml += "<br><strong>Windows Server 2012/2012 R2 - Não serão atualizados (fora do deploy):</strong><br>";
+      excludedVMs.forEach(vm => {
+        emailHtml += `- <strong>${escapeHtml(vm.name)}</strong> (${getCustomerEmailVmInfo(vm)})<br>`;
+      });
     }
     
     if (!data.poweredOnOnly && data.offlineVMs.length > 0) {

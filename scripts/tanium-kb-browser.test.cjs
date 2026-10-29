@@ -548,6 +548,47 @@ test("local file uses remote automatic catalog without a server or same-origin J
   assert.equal(b.read('KB_CATALOG["2016"].kb'), "KB6000001");
 });
 
+test("Server 2012 and R2 never enter Tanium hostname or IP outputs, even when powered on", () => {
+  for (const os of ["Windows Server 2012", "Microsoft Windows Server 2012 R2 (64-bit)", "WIN/2012 R2", "Microsoft Server 2012 x64"]) {
+    for (const ipOnly of [false, true]) {
+      const b = browser(true);
+      const records = [
+        {HostName:"VM-LEGACY01.example.test",IP:"192.0.2.12",Customer:"TEST",SO:os,Status:"ON"},
+        {HostName:"VM-SUPPORTED01",IP:"192.0.2.22",Customer:"TEST",SO:"Windows Server 2022",Status:"ON"},
+        {HostName:"VM-LINUX01",IP:"192.0.2.33",Customer:"TEST",SO:"Debian GNU/Linux 12",Status:"ON"}
+      ];
+      b.element("input").value = records.map(r => ipOnly ? r.IP : `${r.HostName} ${r.IP}`).join("\n");
+      b.read(`isCmdbLoaded=true;cmdbDatabase=${JSON.stringify(records)};generate();`);
+      const data = b.read("processInput()");
+      assert.equal(data.activeVMs.length, 3, "inventory must retain the ON legacy VM");
+      for (const id of ["cleanHostnames", "cleanIps", "hostnameRegex", "ipRegex", "windowsHostnameRegex", "windowsIpRegex", "linuxHostnameRegex", "linuxIpRegex"]) {
+        const output = b.element(id).value.replace(/\\/g, "");
+        assert(!output.includes("LEGACY01"), id);
+        assert(!output.includes("192.0.2.12"), id);
+      }
+      assert(b.element("windowsHostnameRegex").value.includes("VM-SUPPORTED01"));
+      assert(b.element("windowsIpRegex").value.includes("192.0.2.22"));
+      assert(b.element("linuxHostnameRegex").value.includes("VM-LINUX01"));
+      const email = b.element("emailText").innerHTML;
+      assert(!email.split("fora do deploy")[0].includes("LEGACY01"));
+      assert(email.includes("LEGACY01"));
+      assert(email.includes("Não serão atualizados (fora do deploy)"));
+    }
+  }
+});
+
+test("all-2012 scope has empty deploy outputs, and legacy IP conflicts are blocked conservatively", () => {
+  const b = browser(true);
+  b.element("input").value = "VM-LEGACY01 192.0.2.12";
+  b.read('isCmdbLoaded=true;cmdbDatabase=[{HostName:"VM-LEGACY01",IP:"192.0.2.12",SO:"Windows Server 2012 R2",Status:"ON"}];generate();');
+  for (const id of ["hostnameRegex", "ipRegex", "windowsHostnameRegex", "windowsIpRegex"]) assert.equal(b.element(id).value, "");
+  assert(b.element("emailText").innerHTML.includes("fora do deploy"));
+  const target = b.read('buildDeploymentTargets(["VM-LEGACY01","VM-NEW01"],["192.0.2.12"],[createOsEntry("VM-LEGACY01",["192.0.2.12"],"Windows Server 2012"),createOsEntry("VM-NEW01",["192.0.2.12"],"Windows Server 2022")])');
+  assert.equal(target.ips.length, 0);
+  assert.equal(target.osGroups.windows.ips.length, 0);
+  assert.equal(target.hostnames.join(","), "VM-NEW01");
+});
+
 test("deployment hold preserves October 13 KBs across newer official snapshots, lookup, emails and PDF", async () => {
   const b = browser(true, true);
   assert.equal(b.read("KB_DEPLOYMENT_HOLD.enabled"), true);
