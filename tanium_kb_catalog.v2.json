@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "documentId": "2026-Oct",
   "documentTitle": "Windows Server Security / Out-of-Band Cumulative Updates",
-  "generatedAt": "2026-11-01T00:22:06.694Z",
+  "generatedAt": "2026-11-01T01:50:14.784Z",
   "sourceUrl": "https://learn.microsoft.com/en-us/windows/release-health/windows-server-release-info",
   "catalog": {
     "10": {
@@ -55,10 +55,10 @@
     }
   },
   "sync": {
-    "status": "degraded",
-    "lastAttemptAt": "2026-11-01T00:22:06.694Z",
-    "lastSuccessfulAt": "2026-11-01T00:22:06.694Z",
-    "lastCompleteSuccessAt": "2026-10-31T21:22:12.352Z",
+    "status": "success",
+    "lastAttemptAt": "2026-11-01T01:50:14.784Z",
+    "lastSuccessfulAt": "2026-11-01T01:50:14.784Z",
+    "lastCompleteSuccessAt": "2026-11-01T01:50:14.784Z",
     "checks": [
       {
         "source": "Microsoft release history",
@@ -67,10 +67,6 @@
       {
         "source": "MSRC publications",
         "ok": true
-      },
-      {
-        "source": "MSRC 2026-Nov",
-        "ok": false
       },
       {
         "source": "MSRC 2026-Oct",
@@ -113,12 +109,7 @@
         "ok": true
       }
     ],
-    "errors": [
-      {
-        "source": "MSRC 2026-Nov",
-        "message": "https://api.msrc.microsoft.com/cvrf/v3.0/cvrf/2026-Nov: HTTP 404"
-      }
-    ]
+    "errors": []
   },
   "history": [
     {
