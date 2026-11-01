@@ -258,7 +258,9 @@
       const updates = Array.isArray(data) ? data : data.value;
       if (!Array.isArray(updates)) throw new Error("MSRC: lista de publicacoes invalida");
       const recent = updates.filter(item => /^\d{4}-[A-Z][a-z]{2}$/.test(item.ID || "") && isoDate(item.InitialReleaseDate) >= `${monthLabel(now, -2)}-01` && isoDate(item.InitialReleaseDate) <= now.toISOString().slice(0, 10));
-      ids = [...new Set([...ids, ...recent.map(item => item.ID)])];
+      // The current month's document may not exist yet; query published IDs only.
+      // Keep the initial fallback IDs only if the publication index itself fails.
+      ids = [...new Set(recent.map(item => item.ID))];
     });
     for (const id of ids) await check(`MSRC ${id}`, async () => {
       const items = parseMsrc(await read(`${MSRC}/cvrf/${id}`, true), id, now);

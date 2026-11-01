@@ -49,6 +49,61 @@ test("Catalog publication is accepted while MSRC is early and history still cont
   assert.equal(result.catalog["2022"].osVersion, "2022");
 });
 
+test("unpublished current month is not requested and does not falsely degrade synchronization", async () => {
+  const early = new Date("2026-11-01T00:30:00Z");
+  const calls = [];
+  const sources = fakeSources();
+  const fetchImpl = async url => {
+    calls.push(url);
+    if (url.endsWith("/updates")) return response({ value: [{ ID: "2026-Oct", InitialReleaseDate: "2026-10-13T07:00:00Z" }] });
+    if (url.endsWith("/cvrf/2026-Nov")) return response("", 404);
+    return sources(url);
+  };
+  const result = await sync.synchronize({ previous: baseline(), now: early, Parser: DOMParser, fetchImpl, sleep: async () => {} });
+  assert.equal(result.sync.status, "success");
+  assert.equal(result.sync.errors.length, 0);
+  assert(calls.some(url => url.endsWith("/cvrf/2026-Oct")));
+  assert(!calls.some(url => url.endsWith("/cvrf/2026-Nov")));
+  versions.forEach((v, i) => assert.equal(result.catalog[v].kb, `KB500000${i + 1}`));
+});
+
+test("newly announced MSRC document is queried on the next sync without a calendar gate", async () => {
+  const calls = [];
+  const sources = fakeSources();
+  const result = await sync.synchronize({ previous: baseline(), now, Parser: DOMParser, sleep: async () => {}, fetchImpl: async url => {
+    calls.push(url);
+    if (url.endsWith("/updates")) return response({ value: [{ ID: "2026-Nov", InitialReleaseDate: "2026-11-10T07:00:00Z" }] });
+    return sources(url);
+  } });
+  assert.equal(result.sync.status, "success");
+  assert(calls.some(url => url.endsWith("/cvrf/2026-Nov")));
+});
+
+test("404 for a published MSRC document remains a real source failure", async () => {
+  const sources = fakeSources();
+  const result = await sync.synchronize({ previous: baseline(), now, Parser: DOMParser, sleep: async () => {}, fetchImpl: async url => {
+    if (url.endsWith("/updates")) return response([{ ID: "2026-Nov", InitialReleaseDate: "2026-11-10" }]);
+    if (url.endsWith("/cvrf/2026-Nov")) return response("", 404);
+    return sources(url);
+  } });
+  assert.equal(result.sync.status, "degraded");
+  assert(result.sync.errors.some(error => error.source === "MSRC 2026-Nov" && error.message.includes("404")));
+});
+
+test("publication index outage preserves fallback document queries and reports the failure", async () => {
+  const calls = [];
+  const sources = fakeSources();
+  const result = await sync.synchronize({ previous: baseline(), now, Parser: DOMParser, sleep: async () => {}, fetchImpl: async url => {
+    calls.push(url);
+    if (url.endsWith("/updates")) return response("", 503);
+    return sources(url);
+  } });
+  assert.equal(result.sync.status, "degraded");
+  assert(result.sync.errors.some(error => error.source === "MSRC publications"));
+  assert(calls.some(url => url.endsWith("/cvrf/2026-Nov")));
+  assert(calls.some(url => url.endsWith("/cvrf/2026-Oct")));
+});
+
 test("emergency classified as Updates is verified with official support article and replaces monthly KB", async () => {
   const result = await sync.synchronize({ previous: baseline(), now, Parser: DOMParser, fetchImpl: fakeSources({ oob: true }), sleep: async () => {} });
   assert.equal(result.catalog["2022"].kind, "oob");
