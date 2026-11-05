@@ -450,7 +450,7 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
           </div>
           <div style="grid-column: 1 / -1;">
             <label for="schedGmudTitle">Nome completo da GMUD</label>
-            <input type="text" id="schedGmudTitle" required placeholder="GMUD 1007 - LIOTECNICA | 1ªONDA ATUALIZAÇÕES DE SEGURANÇA">
+            <input type="text" id="schedGmudTitle" placeholder="GMUD 1007 - LIOTECNICA | 1ªONDA ATUALIZAÇÕES DE SEGURANÇA">
           </div>
           <div style="grid-column: span 2;">
             <label for="schedTo">Para (To) — separados por ;</label>
@@ -2613,6 +2613,14 @@ function getFullGmudName() {
     || extractFullGmudName(document.getElementById("gmudEmailRaw").value, number);
 }
 
+function getEmailGmudName() {
+  const fullName = getFullGmudName();
+  if (fullName) return fullName;
+  if (document.getElementById("schedGmudTitle").value.trim()) return "";
+  const number = document.getElementById("schedGmud").value.trim() || "XXX";
+  return `GMUD ${number}`;
+}
+
 function generate() {
   const gmudNumber = document.getElementById("schedGmud").value || "XXX";
   const data = processInput();
@@ -2636,7 +2644,7 @@ function generate() {
   const monitoredAlerts = getMonitoredVmAlerts(data);
   updateMonitoredVmAlerts(monitoredAlerts);
   
-  const fullGmudName = getFullGmudName();
+  const fullGmudName = getEmailGmudName();
   let emailHtml = `Senhores, boa noite.<br><br>Informamos que estamos iniciando as atividades referentes à ${escapeHtml(fullGmudName)}, conforme planejamento aprovado.<br><br>A partir deste momento, será dado início ao processo de atualização dos servidores relacionados abaixo:<br><br>`;
   
   if (data.isCmdbApplied) {
@@ -3735,10 +3743,11 @@ async function ensureClosureEvidenceOcr() {
 
 function buildClosureEmailHtml() {
   const payload = getClosurePayload();
-  if (!payload.fullGmudName) return "<strong>Nome completo da GMUD pendente:</strong> preencha o nome completo antes de gerar o e-mail de encerramento.";
+  const emailGmudName = getEmailGmudName();
+  if (!emailGmudName) return "<strong>Nome completo da GMUD pendente:</strong> confira se o título corresponde ao número da GMUD antes de gerar o e-mail de encerramento.";
   if (payload.scopeBlocked) return "<strong>Escopo não liberado:</strong> nenhuma VM confirmada como ligada pela API. Carregue a base CMDB e revise a conferência antes de gerar o encerramento.";
   const observations = payload.observations || "Sem observações adicionais.";
-  let html = `Senhores, boa noite.<br><br>Encerramento da ${escapeHtml(payload.fullGmudName)}.<br><br>`;
+  let html = `Senhores, boa noite.<br><br>Encerramento da ${escapeHtml(emailGmudName)}.<br><br>`;
 
   html += `<strong>Status final:</strong> ${escapeHtml(payload.status)}<br>`;
   html += `<strong>Data/Hora de encerramento:</strong> ${escapeHtml(payload.closureDateTime)}<br><br>`;
@@ -4103,7 +4112,7 @@ function copyText(id) {
 // ── Scheduling Script Core ─────────────────────────────────────────────────
 
 function buildSchedulingScript() {
-  const fullGmudName = getFullGmudName();
+  const fullGmudName = getEmailGmudName();
   if (!fullGmudName) return null;
   const gmudNum    = document.getElementById("schedGmud").value.trim() || "XXX";
   const schedDate  = document.getElementById("schedDate").value;   // YYYY-MM-DD

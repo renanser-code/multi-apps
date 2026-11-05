@@ -348,7 +348,20 @@ test("full GMUD name is extracted and preserved in opening, closure, report and 
   assert(b.read("buildSchedulingScript()").includes(`Início das atividades - ${title}`));
 });
 
-test("missing or mismatched complete GMUD name never silently generates number-only client emails", () => {
+test("optional GMUD title allows opening, closure and scheduling without inventing a title", () => {
+  const b=browser(true);
+  b.element("schedGmud").value="1058";
+  b.element("schedGmudTitle").value="";
+  b.element("input").value="VM-APP01 WIN/2022";
+  b.element("schedDate").value="2026-11-05";
+  b.element("schedTime").value="23:00";
+  b.read("generate();generateClosure();");
+  assert(b.element("emailText").innerHTML.includes("referentes à GMUD 1058, conforme"));
+  assert(b.element("closureEmailText").innerHTML.includes("Encerramento da GMUD 1058."));
+  assert(b.read("buildSchedulingScript()").includes("Início das atividades - GMUD 1058"));
+});
+
+test("mismatched complete GMUD name never silently generates number-only client emails", () => {
   const b=browser(true);
   b.element("schedGmud").value="1008";
   b.element("schedGmudTitle").value="GMUD 1007 - CLIENTE | 1ªONDA";
