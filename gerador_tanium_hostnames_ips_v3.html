@@ -967,26 +967,7 @@ let KB_CATALOG = {
   "11": { kb: "KB5124012", name: "Windows 11 Cumulative Update (September 2026 Security Updates)" }
 };
 
-// Temporary deployment hold; official synchronization remains independent.
-const KB_DEPLOYMENT_HOLD = {
-  enabled: true,
-  releaseDate: "2026-10-13",
-  catalog: Object.fromEntries(Object.entries({
-    "2016": "KB5126868", "2019": "KB5126651",
-    "2022": "KB5126655", "2025": "KB5126646"
-  }).map(([version, kb]) => [version, {
-    kb, osVersion: version, releaseDate: "2026-10-13",
-    name: `Windows Server ${version} Cumulative Update (2026-10-13)`
-  }]))
-};
-
-function getDeploymentKbEntry(version) {
-  return KB_DEPLOYMENT_HOLD.enabled && KB_DEPLOYMENT_HOLD.catalog[version]
-    ? KB_DEPLOYMENT_HOLD.catalog[version] : KB_CATALOG[version];
-}
-
-function getDeploymentKbBadge(version) {
-  if (KB_DEPLOYMENT_HOLD.enabled && KB_DEPLOYMENT_HOLD.catalog[version]) return "KB fixado: 13/10/2026";
+function getKbCatalogBadge() {
   return isApiLoaded && kbCatalogDocumentId ? `${kbCatalogSource}: ${kbCatalogDocumentId}` : kbCatalogSource;
 }
 
@@ -2017,13 +1998,13 @@ function renderServerKbLookup() {
     return [];
   }
 
-  const items = normalizeKbItems(getDeploymentKbEntry(version)).filter(isDeployableCumulativeKb);
+  const items = normalizeKbItems(KB_CATALOG[version]).filter(isDeployableCumulativeKb);
   if (items.length === 0) {
     result.innerHTML = `<strong>Windows Server ${escapeHtml(version)}:</strong> nenhum KB cumulativo disponível no catálogo atual.`;
     return [];
   }
 
-  const badgeText = getDeploymentKbBadge(version);
+  const badgeText = getKbCatalogBadge();
   const badgeColor = isApiLoaded ? "#8b5cf6" : "#10b981";
   result.innerHTML = `<ul>${items.map(item => renderKbSuggestionItem(item, badgeText, badgeColor)).join("")}</ul>`;
   return items;
@@ -2069,9 +2050,9 @@ function suggestKBs(lines) {
   html = renderUnsupportedOsNotices(unsupportedNotices) + html;
   let items = [];
   suggested.forEach(key => {
-    const kbItems = normalizeKbItems(getDeploymentKbEntry(key)).filter(isDeployableCumulativeKb);
+    const kbItems = normalizeKbItems(KB_CATALOG[key]).filter(isDeployableCumulativeKb);
     if (kbItems.length === 0) return;
-    const badgeText = getDeploymentKbBadge(key);
+    const badgeText = getKbCatalogBadge();
     const badgeColor = isApiLoaded ? "#8b5cf6" : "#10b981";
     kbItems.forEach(item => {
       items.push(item);

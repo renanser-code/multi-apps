@@ -14,7 +14,7 @@ function snapshot(fresh = true, newer = false) {
     sync: { status: "success", lastSuccessfulAt: fresh ? now.toISOString() : "2026-11-12T10:00:00Z", lastCompleteSuccessAt: now.toISOString(), errors: [] } };
 }
 
-function browser(realGenerators = false, deploymentHold = false) {
+function browser(realGenerators = false) {
   const elements = new Map();
   const timers = new Map();
   const stored = new Map();
@@ -41,7 +41,6 @@ function browser(realGenerators = false, deploymentHold = false) {
   assert(startup.test(script), "must suppress startup only, leaving real browser loader intact");
   script = script.replace(startup, "");
   vm.runInContext(script, context);
-  if (!deploymentHold) vm.runInContext("KB_DEPLOYMENT_HOLD.enabled = false;", context);
   if (!realGenerators) vm.runInContext("generate = generateClosure = updateScriptPreview = renderServerKbLookup = () => {};", context);
   const load = vm.runInContext("loadLatestKBsFromMicrosoft", context);
   const initialize = vm.runInContext("initializeKbSynchronization", context);
@@ -602,31 +601,27 @@ test("all-2012 scope has empty deploy outputs, and legacy IP conflicts are block
   assert.equal(target.hostnames.join(","), "VM-NEW01");
 });
 
-test("deployment hold preserves October 13 KBs across newer official snapshots, lookup, emails and PDF", async () => {
-  const b = browser(true, true);
-  assert.equal(b.read("KB_DEPLOYMENT_HOLD.enabled"), true);
+test("each new catalog snapshot replaces previous KBs in suggestions, lookup, emails and PDF", () => {
+  const b = browser(true);
   const versions = ["2016", "2019", "2022", "2025"];
-  const expected = ["KB5126868", "KB5126651", "KB5126655", "KB5126646"];
   b.element("input").value = versions.map(v => `SV-KB-${v} Windows Server ${v}`).join("\n");
-  b.read("generate(); generateClosure();");
-  b.context.nextSnapshot = snapshot(true, true);
-  b.read('applyKbSnapshot(nextSnapshot, "Microsoft automatico")');
-  assert.equal(b.read('KB_CATALOG["2016"].kb'), "KB6000001");
-  assert.equal(b.read("kbSyncSnapshot.sync.lastSuccessfulAt"), now.toISOString());
-  for (const output of [b.element("emailText").innerHTML, b.element("closureEmailText").innerHTML, b.read("buildClosureReportHtml()")]) {
-    for (const kb of expected) assert(output.includes(kb), kb);
-    assert(!/KB600000[1-4]/.test(output));
+  const previous = snapshot(true);
+  for (const current of [previous, snapshot(true, true)]) {
+    b.context.nextSnapshot = current;
+    b.read('applyKbSnapshot(nextSnapshot, "Microsoft automatico")');
+    const outputs = ["kbSuggestions", "emailText", "closureEmailText"].map(id => b.element(id).innerHTML);
+    outputs.push(b.read("buildClosureReportHtml()"));
+    for (const version of versions) {
+      for (const output of outputs) assert(output.includes(current.catalog[version].kb), version);
+      b.element("serverKbLookupInput").value = version;
+      b.read("renderServerKbLookup()");
+      const lookup = b.element("serverKbLookupResult").innerHTML;
+      assert(lookup.includes(current.catalog[version].kb), version);
+      if (current !== previous) {
+        for (const output of [...outputs, lookup]) assert(!output.includes(previous.catalog[version].kb), version);
+      }
+    }
   }
-  for (const [index, version] of versions.entries()) {
-    b.element("serverKbLookupInput").value = version;
-    b.read("renderServerKbLookup()");
-    const lookup = b.element("serverKbLookupResult").innerHTML;
-    assert(lookup.includes(expected[index]));
-    assert(lookup.includes("KB fixado: 13/10/2026"));
-    assert(!/KB600000[1-4]/.test(lookup));
-  }
-  b.read("KB_DEPLOYMENT_HOLD.enabled = false; generate();");
-  assert(b.element("emailText").innerHTML.includes("KB6000001"));
 });
 
 test("new month regenerates opening email, closure email and PDF report using only affected Servers", async () => {
