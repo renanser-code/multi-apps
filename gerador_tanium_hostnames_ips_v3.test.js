@@ -671,7 +671,7 @@ assert(html.includes("copyText('cmdbCopyResult')"), "painel CMDB deve ter botao 
 vm.runInContext("isCmdbLoaded = false; cmdbDatabase = [];", sandbox);
 assert(html.includes("tanium_kb_catalog.v2.json"), "deve consultar o catalogo automatico versionado publicado no GitHub");
 assert(html.includes('cache: "no-store"'), "deve ignorar cache antigo do catalogo mensal");
-assert(html.includes("KB5129237"), "backup local deve conter o KB corretivo de setembro do Server 2022");
+assert(!html.includes("KB5129237"), "catalogo embutido nao deve sugerir o KB emergencial de setembro do Server 2022");
 assert(!html.includes("SEPTEMBER_2026_OOB_CORRECTIONS"), "atualizacoes emergenciais nao podem ser fixadas por mes");
 assert(html.includes('onclick="copyEmailAddress(this)"'), "cada e-mail encontrado deve ter botao individual para copiar");
 assert(html.includes('data-email="${email}"'), "o botao deve usar o endereco da propria linha");

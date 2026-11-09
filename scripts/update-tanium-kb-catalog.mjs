@@ -21,7 +21,8 @@ try {
   snapshot.catalog = { ...previous.catalog, ...snapshot.catalog };
   sync.validateSnapshot(snapshot);
 } catch (error) {
-  snapshot = { ...previous, generatedAt: new Date().toISOString(), sync: {
+  const lastMonthly = sync.monthlySnapshot(previous);
+  snapshot = { ...lastMonthly, generatedAt: new Date().toISOString(), sync: {
     ...previous.sync, status: "error", lastAttemptAt: new Date().toISOString(),
     lastSuccessfulAt: previous.sync?.lastSuccessfulAt || null,
     errors: [{ source: "Synchronization", message: error.message }]

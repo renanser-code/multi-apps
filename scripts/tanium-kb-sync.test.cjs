@@ -104,11 +104,10 @@ test("publication index outage preserves fallback document queries and reports t
   assert(calls.some(url => url.endsWith("/cvrf/2026-Oct")));
 });
 
-test("emergency classified as Updates is verified with official support article and replaces monthly KB", async () => {
+test("emergency classified as Updates is recognized but never replaces the monthly KB", async () => {
   const result = await sync.synchronize({ previous: baseline(), now, Parser: DOMParser, fetchImpl: fakeSources({ oob: true }), sleep: async () => {} });
-  assert.equal(result.catalog["2022"].kind, "oob");
-  assert.equal(result.catalog["2022"].releaseDate, "2026-11-12");
-  assert.equal(result.catalog["2022"].build, "20348.9001");
+  assert.equal(result.catalog["2022"].kb, baseline().catalog["2022"].kb);
+  assert(result.history.some(entry => entry.kb === "KB6000003" && entry.kind === "oob"));
 });
 
 test("preview, .NET, hotpatch, architecture and incorrect product associations are rejected", () => {
@@ -192,11 +191,32 @@ test("calendar uses actual second Tuesday, alert awaits confirmation from data, 
   assert(sync.freshness(stale, now).some(reason => reason.includes("2026-11")));
 });
 
-test("Catalog metadata revision does not replace a newer emergency already in official history", () => {
+test("a known emergency is excluded even if another source calls it a security update", () => {
   const monthly = item("2022", "KB6000001", "2026-11-10");
   const emergency = { ...item("2022", "KB6000002", "2026-11-11", "oob"), build: "20348.9005" };
-  const revisedMetadata = { ...monthly, releaseDate: "2026-11-12", build: "" };
-  assert.equal(sync.selectLatest([monthly, revisedMetadata, emergency], {}, now)["2022"].kb, emergency.kb);
+  const mislabeled = item("2022", emergency.kb, "2026-11-10");
+  assert.equal(sync.selectLatest([monthly, mislabeled, emergency], {}, now)["2022"].kb, monthly.kb);
+});
+
+test("off-cycle MSRC and Catalog records do not pass without monthly release history", () => {
+  const monthly = item("2022", "KB6000001", "2026-11-10");
+  const ambiguous = { ...item("2022", "KB6000002", "2026-11-12"), build: "20348.9005" };
+  for (const sourceUrl of [`${sync.MSRC}/cvrf/2026-Nov`, "https://www.catalog.update.microsoft.com/Search.aspx?q=KB6000002"]) {
+    assert.equal(sync.selectLatest([monthly, { ...ambiguous, sourceUrl }], {}, now)["2022"].kb, monthly.kb);
+  }
+  assert.equal(sync.selectLatest([monthly, ambiguous], {}, now)["2022"].kb, ambiguous.kb);
+});
+
+test("old published snapshots recover the last monthly KB instead of using an emergency", () => {
+  const old = baseline();
+  const monthly = old.catalog["2022"];
+  old.history = [monthly];
+  old.catalog["2022"] = item("2022", "KB6000002", "2026-11-12", "oob");
+  const migrated = sync.monthlySnapshot(old, {}, now);
+  assert.equal(migrated.catalog["2022"].kb, monthly.kb);
+  assert.equal(migrated.documentId, "2026-Oct");
+  assert.deepEqual(migrated.sync, old.sync);
+  assert.throws(() => sync.monthlySnapshot({ ...old, history: [] }, {}, now), /Nenhum KB mensal/);
 });
 
 test("old cached HTML rejects V2 but accepts the companion V1 catalog with identical new KBs", async () => {

@@ -12,6 +12,9 @@
   const text = value => String(value?.Value || value || "");
   const clean = value => text(value).replace(/\s+/g, " ").trim();
   const excluded = /\.net|framework|hotpatch|dynamic|preview|insider|arm64|x86|servicing stack/i;
+  const oobLabel = /out.of.band|\bOOB\b/i;
+  const isOutOfBand = item => item?.kind === "oob" || oobLabel.test(item?.name || "");
+  const recordKey = item => `${item.osVersion}:${item.kb}`;
 
   function isoDate(value) {
     const valueText = text(value);
@@ -101,7 +104,8 @@
           const version = products.get(String(pid));
           if (!version || !rem.FixedBuild) continue;
           const releaseDate = isoDate(rem.Date) || isoDate(data.DocumentTracking?.InitialReleaseDate);
-          const item = record(version, `KB${match[1]}`, releaseDate, "security", `${MSRC}/cvrf/${docId}`, rem.FixedBuild);
+          const kind = oobLabel.test(text(rem.Description)) ? "oob" : "security";
+          const item = record(version, `KB${match[1]}`, releaseDate, kind, `${MSRC}/cvrf/${docId}`, rem.FixedBuild);
           if (validRecord(item, now)) results.push(item);
         }
       }
@@ -160,7 +164,7 @@
       if (!titleMonth || !releaseDate || releaseDate.slice(0, 7) !== titleMonth) continue;
       if (releaseDate < `${monthLabel(now, -2)}-01`) continue;
       const sourceUrl = `https://www.catalog.update.microsoft.com/Search.aspx?q=${kb}`;
-      const kind = /out.of.band|\bOOB\b/i.test(title) ? "oob" : /^Security Updates$/i.test(classification) ? "security" : "";
+      const kind = oobLabel.test(title) ? "oob" : /^Security Updates$/i.test(classification) ? "security" : "";
       const item = record(version, kb, releaseDate, kind, sourceUrl, title.match(/\((\d+\.\d+)\)/)?.[1] || "");
       const updateId = row.id?.match(/^[\da-f-]{36}/i)?.[0];
       if (kind && validRecord(item, now)) results.push(item);
@@ -171,10 +175,17 @@
 
   function selectLatest(candidates, previous = {}, now = new Date()) {
     const result = {};
+    const records = [...candidates, ...Object.values(previous)].filter(item => validRecord(item, now));
+    const emergencies = new Set(records.filter(isOutOfBand).map(recordKey));
     for (const version of Object.keys(SERVERS)) {
-      const records = [...candidates, previous[version]].filter(item => item?.osVersion === version && validRecord(item, now));
       const unique = new Map();
       for (const item of records) {
+        if (item.osVersion !== version || emergencies.has(recordKey(item))) continue;
+        // MSRC and Update Catalog may label emergency releases as security updates.
+        // Release history explicitly identifies regular monthly releases as type B.
+        const host = new URL(item.sourceUrl).hostname;
+        if (["api.msrc.microsoft.com", "www.catalog.update.microsoft.com"].includes(host) &&
+          patchTuesday(new Date(item.releaseDate)).toISOString().slice(0, 10) !== item.releaseDate) continue;
         const known = unique.get(item.kb);
         if (!known) unique.set(item.kb, { ...item });
         else {
@@ -197,6 +208,19 @@
     if (Date.parse(snapshot.sync.lastSuccessfulAt) > now.getTime() + 5 * 60 * 1000) throw new Error("Data de sincronizacao futura");
     for (const version of Object.keys(SERVERS)) if (!validRecord(snapshot.catalog[version], now) || snapshot.catalog[version].osVersion !== version) throw new Error(`KB invalido para Server ${version}`);
     return snapshot;
+  }
+
+  function monthlySnapshot(snapshot, previous = {}, now = new Date()) {
+    validateSnapshot(snapshot, now);
+    const latest = selectLatest([
+      ...Object.values(snapshot.catalog), ...array(snapshot.history), ...array(previous.history)
+    ], previous.catalog, now);
+    for (const version of Object.keys(SERVERS)) {
+      if (!latest[version]) throw new Error(`Nenhum KB mensal validado para Server ${version}`);
+    }
+    const dates = Object.values(latest).map(item => item.releaseDate).sort();
+    return { ...snapshot, catalog: { ...snapshot.catalog, ...latest }, documentId: monthId(new Date(`${dates.at(-1)}T12:00:00Z`)),
+      documentTitle: "Windows Server Monthly Security Cumulative Updates" };
   }
 
   function legacySnapshot(snapshot, now = new Date()) {
@@ -288,19 +312,24 @@
         covered.add(version);
       });
     }
-    const catalog = selectLatest(candidates, previous.catalog, now);
+    const catalog = selectLatest([...candidates, ...array(previous.history)], previous.catalog, now);
     for (const version of Object.keys(SERVERS)) {
       if (!catalog[version]) throw new Error(`Nenhum KB cumulativo validado para Server ${version}`);
       if (!covered.has(version)) errors.push({ source: `Server ${version}`, message: "Nenhuma fonte oficial consultada com sucesso" });
     }
     const successful = covered.size === 4;
     const dates = Object.values(catalog).map(item => item.releaseDate).sort();
-    return { schemaVersion: 2, documentId: monthId(new Date(`${dates.at(-1)}T12:00:00Z`)), documentTitle: "Windows Server Security / Out-of-Band Cumulative Updates", generatedAt: now.toISOString(),
+    const history = new Map();
+    for (const item of [...array(previous.history), ...candidates].filter(item => validRecord(item, now))) {
+      const key = recordKey(item);
+      if (!isOutOfBand(history.get(key)) || isOutOfBand(item)) history.set(key, item);
+    }
+    return { schemaVersion: 2, documentId: monthId(new Date(`${dates.at(-1)}T12:00:00Z`)), documentTitle: "Windows Server Monthly Security Cumulative Updates", generatedAt: now.toISOString(),
       sourceUrl: HISTORY, catalog,
       sync: { status: successful ? (errors.length ? "degraded" : "success") : "error", lastAttemptAt: now.toISOString(), lastSuccessfulAt: successful ? now.toISOString() : previous.sync?.lastSuccessfulAt || null,
         lastCompleteSuccessAt: successful && !errors.length ? now.toISOString() : previous.sync?.lastCompleteSuccessAt || null, checks, errors },
-      history: [...new Map(candidates.filter(item => validRecord(item, now)).map(item => [`${item.osVersion}:${item.kb}`, item])).values()].filter(item => item.releaseDate >= `${monthLabel(now, -2)}-01`).sort((a, b) => b.releaseDate.localeCompare(a.releaseDate)) };
+      history: [...history.values()].filter(item => item.releaseDate >= `${monthLabel(now, -2)}-01`).sort((a, b) => b.releaseDate.localeCompare(a.releaseDate)) };
   }
 
-  return { SERVERS, MSRC, HISTORY, isoDate, monthId, patchTuesday, osVersion, validRecord, record, parseMsrc, parseHistory, parseCatalog, selectLatest, validateSnapshot, legacySnapshot, freshness, request, synchronize };
+  return { SERVERS, MSRC, HISTORY, isoDate, monthId, patchTuesday, osVersion, validRecord, record, isOutOfBand, parseMsrc, parseHistory, parseCatalog, selectLatest, validateSnapshot, monthlySnapshot, legacySnapshot, freshness, request, synchronize };
 });

@@ -624,6 +624,27 @@ test("each new catalog snapshot replaces previous KBs in suggestions, lookup, em
   }
 });
 
+test("an old cached emergency is replaced by the monthly KB in every generator output", () => {
+  const b = browser(true);
+  b.element("input").value = "SV-KB-2022 Windows Server 2022";
+  b.element("serverKbLookupInput").value = "2022";
+  b.read("generate(); renderServerKbLookup();");
+  assert(!b.element("kbSuggestions").innerHTML.includes("KB5129237"));
+  const cached = snapshot();
+  const monthly = cached.catalog["2022"];
+  cached.history = [monthly];
+  cached.catalog["2022"] = engine.record("2022", "KB6000010", "2026-11-11", "oob", monthly.sourceUrl, "20348.9999");
+  b.context.cached = cached;
+  b.read('applyKbSnapshot(cached, "Cache")');
+  const outputs = ["kbSuggestions", "serverKbLookupResult", "emailText", "closureEmailText"].map(id => b.element(id).innerHTML);
+  outputs.push(b.read("buildClosureReportHtml()"));
+  for (const output of outputs) {
+    assert(output.includes(monthly.kb));
+    assert(!output.includes("KB6000010"));
+  }
+  assert.equal(JSON.parse(b.stored.get("tanium-kb-catalog-v2")).catalog["2022"].kb, monthly.kb);
+});
+
 test("new month regenerates opening email, closure email and PDF report using only affected Servers", async () => {
   const b = browser(true);
   b.element("input").value = [
