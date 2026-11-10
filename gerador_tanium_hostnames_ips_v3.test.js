@@ -572,7 +572,7 @@ sandbox.__setClosureEvidenceFiles([{
 }]);
 const fuzzyOcrReportHtml = sandbox.__buildClosureReportHtml();
 ["VWCSC001", "VWCSC014", "VWCSC016", "VWCSC017", "VWCSC018", "VWCSC019"].forEach(host => {
-  assert(fuzzyOcrReportHtml.includes(`<td>${host}</td><td>Windows Server 2022</td><td>Complete, All Patches Applied</td>`), `${host} deve ser correlacionado mesmo com erro simples de OCR`);
+  assert.match(fuzzyOcrReportHtml, new RegExp(`<td>${host}(?: <strong[^>]*>\\[BANCO DE DADOS\\]</strong>)?</td><td>Windows Server 2022</td><td>Complete, All Patches Applied</td>`), `${host} deve ser correlacionado mesmo com erro simples de OCR`);
 });
 assert(!fuzzyOcrReportHtml.includes("Nao evidenciado no encerramento"));
 assert(fuzzyOcrReportHtml.includes("Validação das Evidências"));

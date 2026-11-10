@@ -318,15 +318,15 @@ test("only OCR-like confusions and repeated zeroes are accepted as automatic ali
 test("registered database VMs are highlighted in both client emails and the report only when ON", () => {
   const b=browser(true);
   b.element("onlyPoweredOn").checked=true;
-  const names=["BRSAOENGADCT01","BRSAOENGDBS03"];
+  const names=["BRSAOENGADCT01","BRSAOENGDBS03","VWCSC018"];
   const records=names.map((name,i)=>({HostName:name+".example.test",IP:`192.0.2.${i+1}`,Customer:"TEST",Status:"Ligada",SO:"Windows Server 2022"}));
   b.element("input").value=records.map(r=>`${r.HostName} ${r.IP}`).join("\n");
   b.read(`isCmdbLoaded=true;cmdbDatabase=${JSON.stringify(records)};generate();generateClosure();`);
   for(const name of names) {
     assert.match(b.read(`getMonitoredVmAlertByName(${JSON.stringify(name)}).type`),/Banco de Dados/);
+    assert(b.element("monitoredVmAlerts").innerHTML.includes(name));
     for(const output of [b.element("emailText").innerHTML,b.element("closureEmailText").innerHTML,b.read("buildClosureReportHtml()")]) {
-      assert(output.includes(name));
-      assert(output.includes("[BANCO DE DADOS]"));
+      assert.match(output,new RegExp(`${name}(?:\\.example\\.test)?(?:</strong>)? <strong[^>]*>\\[BANCO DE DADOS\\]`));
     }
   }
   b.read('cmdbDatabase.forEach(r=>r.Status="Desligada");generate();generateClosure();');
