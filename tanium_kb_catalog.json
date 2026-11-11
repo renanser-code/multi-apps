@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "documentId": "2026-Nov",
   "documentTitle": "Windows Server Monthly Security Cumulative Updates",
-  "generatedAt": "2026-11-10T23:40:45.313Z",
+  "generatedAt": "2026-11-11T05:51:43.130Z",
   "sourceUrl": "https://learn.microsoft.com/en-us/windows/release-health/windows-server-release-info",
   "catalog": {
     "10": {
@@ -32,9 +32,9 @@
   },
   "sync": {
     "status": "success",
-    "lastAttemptAt": "2026-11-10T23:40:45.313Z",
-    "lastSuccessfulAt": "2026-11-10T23:40:45.313Z",
-    "lastCompleteSuccessAt": "2026-11-10T23:40:45.313Z",
+    "lastAttemptAt": "2026-11-11T05:51:43.130Z",
+    "lastSuccessfulAt": "2026-11-11T05:51:43.130Z",
+    "lastCompleteSuccessAt": "2026-11-11T05:51:43.130Z",
     "checks": [
       {
         "source": "Microsoft release history",
@@ -108,8 +108,8 @@
       "architecture": "x64",
       "kind": "security",
       "releaseDate": "2026-11-10",
-      "build": "14393.9688",
-      "sourceUrl": "https://api.msrc.microsoft.com/cvrf/v3.0/cvrf/2026-Nov",
+      "build": "",
+      "sourceUrl": "https://www.catalog.update.microsoft.com/Search.aspx?q=KB5131291",
       "name": "Windows Server 2016 Cumulative Update (2026-11-10)"
     },
     {
@@ -118,8 +118,8 @@
       "architecture": "x64",
       "kind": "security",
       "releaseDate": "2026-11-10",
-      "build": "17763.9487",
-      "sourceUrl": "https://api.msrc.microsoft.com/cvrf/v3.0/cvrf/2026-Nov",
+      "build": "",
+      "sourceUrl": "https://www.catalog.update.microsoft.com/Search.aspx?q=KB5131085",
       "name": "Windows Server 2019 Cumulative Update (2026-11-10)"
     },
     {
@@ -128,8 +128,8 @@
       "architecture": "x64",
       "kind": "security",
       "releaseDate": "2026-11-10",
-      "build": "20348.5870",
-      "sourceUrl": "https://api.msrc.microsoft.com/cvrf/v3.0/cvrf/2026-Nov",
+      "build": "",
+      "sourceUrl": "https://www.catalog.update.microsoft.com/Search.aspx?q=KB5131090",
       "name": "Windows Server 2022 Cumulative Update (2026-11-10)"
     },
     {
@@ -139,7 +139,7 @@
       "kind": "security",
       "releaseDate": "2026-11-10",
       "build": "26100.33822",
-      "sourceUrl": "https://api.msrc.microsoft.com/cvrf/v3.0/cvrf/2026-Nov",
+      "sourceUrl": "https://www.catalog.update.microsoft.com/Search.aspx?q=KB5131080",
       "name": "Windows Server 2025 Cumulative Update (2026-11-10)"
     },
     {
@@ -219,7 +219,7 @@
       "kind": "security",
       "releaseDate": "2026-10-13",
       "build": "26100.33650",
-      "sourceUrl": "https://api.msrc.microsoft.com/cvrf/v3.0/cvrf/2026-Oct",
+      "sourceUrl": "https://www.catalog.update.microsoft.com/Search.aspx?q=KB5126646",
       "name": "Windows Server 2025 Cumulative Update (2026-10-13)"
     },
     {
@@ -238,8 +238,8 @@
       "architecture": "x64",
       "kind": "security",
       "releaseDate": "2026-10-13",
-      "build": "20348.5761",
-      "sourceUrl": "https://api.msrc.microsoft.com/cvrf/v3.0/cvrf/2026-Oct",
+      "build": "",
+      "sourceUrl": "https://www.catalog.update.microsoft.com/Search.aspx?q=KB5126655",
       "name": "Windows Server 2022 Cumulative Update (2026-10-13)"
     },
     {
@@ -258,8 +258,8 @@
       "architecture": "x64",
       "kind": "security",
       "releaseDate": "2026-10-13",
-      "build": "17763.9376",
-      "sourceUrl": "https://api.msrc.microsoft.com/cvrf/v3.0/cvrf/2026-Oct",
+      "build": "",
+      "sourceUrl": "https://www.catalog.update.microsoft.com/Search.aspx?q=KB5126651",
       "name": "Windows Server 2019 Cumulative Update (2026-10-13)"
     },
     {
@@ -278,8 +278,8 @@
       "architecture": "x64",
       "kind": "security",
       "releaseDate": "2026-10-13",
-      "build": "14393.9612",
-      "sourceUrl": "https://api.msrc.microsoft.com/cvrf/v3.0/cvrf/2026-Oct",
+      "build": "",
+      "sourceUrl": "https://www.catalog.update.microsoft.com/Search.aspx?q=KB5126868",
       "name": "Windows Server 2016 Cumulative Update (2026-10-13)"
     },
     {
@@ -349,7 +349,7 @@
       "kind": "security",
       "releaseDate": "2026-09-08",
       "build": "26100.33438",
-      "sourceUrl": "https://api.msrc.microsoft.com/cvrf/v3.0/cvrf/2026-Sep",
+      "sourceUrl": "https://www.catalog.update.microsoft.com/Search.aspx?q=KB5122871",
       "name": "Windows Server 2025 Cumulative Update (2026-09-08)"
     },
     {
