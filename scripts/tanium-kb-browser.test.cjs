@@ -415,16 +415,35 @@ test("locked ON-only policy excludes OFF, retired and missing VMs from all deplo
   assert(b.read("buildClosureReportHtml()").includes("Escopo nao liberado"));
 });
 
-test("without API validation the ON-only policy never falls back to raw input", () => {
+test("opening email uses manual scope without unlocking deployment, closure or reports", () => {
   const b=browser(true);
   b.element("onlyPoweredOn").checked=true;
-  b.element("input").value="VM-RAW01 192.0.2.1 WIN/2022";
+  b.element("input").value="VWCSC018 192.0.2.1 WIN/2022\nVM-LEGACY01 192.0.2.2 WIN/2012 R2\n192.0.2.3 WIN/2022";
+  b.context.currentCatalog=snapshot(true,true);
+  b.read('applyKbSnapshot(currentCatalog, "Microsoft automático")');
+  b.element("schedDate").value="2026-11-12";
+  b.element("schedTime").value="23:00";
   b.read("generate();generateClosure();");
   assert.equal(b.read("processInput().hostnames.length"),0);
   assert.equal(b.read("processInput().ips.length"),0);
   assert.equal(b.read("getClosurePayload().servers.length"),0);
-  assert(b.element("emailText").innerHTML.includes("Escopo não liberado"));
-  assert(!b.element("closureEmailText").innerHTML.includes("VM-RAW01"));
+  const email=b.element("emailText").innerHTML;
+  for (const text of ["VWCSC018","192.0.2.3","sem confirmação","BANCO DE DADOS","2012","KB6000003"]) assert(email.includes(text),text);
+  assert(!email.includes("Servidores LIGADOS"));
+  assert(!b.element("kbSuggestions").innerHTML.includes("KB6000003"));
+  assert(b.read("buildSchedulingScript()").includes("VWCSC018"));
+  assert(b.element("closureEmailText").innerHTML.includes("Escopo não liberado"));
+  assert(b.read("buildClosureReportHtml()").includes("Escopo nao liberado"));
+});
+
+test("manual VISA email preserves hostnames and masks IPs without the CMDB", () => {
+  const b=browser(true);
+  b.element("onlyPoweredOn").checked=true;
+  b.element("input").value="VISA009 192.0.2.1 WIN/2022\n192.0.2.2 WIN/2022";
+  b.read("generate()");
+  const email=b.element("emailText").innerHTML;
+  assert(email.includes("VISA009"));
+  assert(!email.includes("192.0.2."));
 });
 
 test("a failed or malformed API reload invalidates previously eligible machines", async () => {

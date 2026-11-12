@@ -2044,7 +2044,7 @@ function selectServerKbVersion(version) {
   return renderServerKbLookup();
 }
 
-function suggestKBs(lines) {
+function suggestKBs(lines, render = true) {
   const suggested = new Set();
   const text = lines.join(" ").toLowerCase();
   const unsupportedNotices = getUnsupportedWindowsServerNotices(lines);
@@ -2062,6 +2062,8 @@ function suggestKBs(lines) {
     suggested.add("2025");
   }
 
+  const items = [...suggested].flatMap(key => normalizeKbItems(KB_CATALOG[key]).filter(isDeployableCumulativeKb));
+  if (!render) return items;
   const container = document.getElementById("kbSuggestions");
   if (suggested.size === 0) {
     const unsupportedHtml = renderUnsupportedOsNotices(unsupportedNotices);
@@ -2075,17 +2077,9 @@ function suggestKBs(lines) {
 
   let html = "<ul style='margin: 0; padding-left: 20px;'>";
   html = renderUnsupportedOsNotices(unsupportedNotices) + html;
-  let items = [];
-  suggested.forEach(key => {
-    const kbItems = normalizeKbItems(KB_CATALOG[key]).filter(isDeployableCumulativeKb);
-    if (kbItems.length === 0) return;
-    const badgeText = getKbCatalogBadge();
-    const badgeColor = isApiLoaded ? "#8b5cf6" : "#10b981";
-    kbItems.forEach(item => {
-      items.push(item);
-      html += renderKbSuggestionItem(item, badgeText, badgeColor);
-    });
-  });
+  const badgeText = getKbCatalogBadge();
+  const badgeColor = isApiLoaded ? "#8b5cf6" : "#10b981";
+  items.forEach(item => { html += renderKbSuggestionItem(item, badgeText, badgeColor); });
   html += "</ul>";
   if (items.length === 0) {
     const unsupportedHtml = renderUnsupportedOsNotices(unsupportedNotices);
@@ -2368,7 +2362,7 @@ function processInput() {
   }
 
   const osData = buildOsGroups(onlyPoweredOn ? [] : rawEntries);
-  return { lines, ...buildDeploymentTargets(onlyPoweredOn ? [] : finalHostnames, onlyPoweredOn ? [] : finalIps, onlyPoweredOn ? [] : rawEntries), osNames: osData.osNames, isCmdbApplied: false, poweredOnOnly: onlyPoweredOn };
+  return { lines, ...buildDeploymentTargets(onlyPoweredOn ? [] : finalHostnames, onlyPoweredOn ? [] : finalIps, onlyPoweredOn ? [] : rawEntries), osNames: osData.osNames, manualEntries: rawEntries, isCmdbApplied: false, poweredOnOnly: onlyPoweredOn };
 }
 
 function getDuplicateValues(values) {
@@ -2651,11 +2645,26 @@ function generate() {
   const unsupportedNotices = getUnsupportedWindowsServerNotices(osDetectionLines);
   const monitoredAlerts = getMonitoredVmAlerts(data);
   updateMonitoredVmAlerts(monitoredAlerts);
+  const manualScope = data.poweredOnOnly && !data.isCmdbApplied;
+  const manualEntries = manualScope ? data.manualEntries.filter(entry => entry.hostname || entry.ips.length) : [];
+  const manualHosts = unique(manualEntries.map(entry => entry.hostname).filter(Boolean));
+  const manualLabels = unique(manualEntries.flatMap(entry => entry.hostname ? [entry.hostname] : entry.ips));
+  const emailScope = manualScope ? { lines: data.lines, hostnames: manualHosts, osNames: buildOsGroups(manualEntries).osNames } : data;
+  const emailKbs = manualScope ? suggestKBs(emailScope.osNames, false) : suggestedKbs;
+  const emailNotices = manualScope ? getUnsupportedWindowsServerNotices(emailScope.osNames) : unsupportedNotices;
+  const emailAlerts = manualScope ? getMonitoredVmAlerts(emailScope) : monitoredAlerts;
   
   const fullGmudName = getEmailGmudName();
-  let emailHtml = `Senhores, boa noite.<br><br>Informamos que estamos iniciando as atividades referentes à ${escapeHtml(fullGmudName)}, conforme planejamento aprovado.<br><br>A partir deste momento, será dado início ao processo de atualização dos servidores relacionados abaixo:<br><br>`;
+  let emailHtml = `Senhores, boa noite.<br><br>Informamos que estamos iniciando as atividades referentes à ${escapeHtml(fullGmudName)}, conforme planejamento aprovado.<br><br>`;
+  emailHtml += manualScope
+    ? "<strong>Servidores informados para a GMUD:</strong><br>Lista informada manualmente, sem confirmação do estado das VMs pelo CMDB. Os alvos serão validados antes da aplicação dos patches.<br><br>"
+    : "A partir deste momento, será dado início ao processo de atualização dos servidores relacionados abaixo:<br><br>";
   
-  if (data.isCmdbApplied) {
+  if (manualScope) {
+    for (const label of manualLabels) {
+      emailHtml += `- <strong>${escapeHtml(label)}</strong>${formatEmailSystemText(getVmEmailClassification(label))}<br>`;
+    }
+  } else if (data.isCmdbApplied) {
     const eligibleVMs = data.activeVMs.filter(vm => !detectWindowsServer2012(vm.info));
     const excludedVMs = data.activeVMs.filter(vm => detectWindowsServer2012(vm.info));
     if (eligibleVMs.length > 0) {
@@ -2695,8 +2704,8 @@ function generate() {
     }
   }
 
-  const databaseAlerts = monitoredAlerts.filter(alert => alert.type && alert.type.includes("Banco de Dados"));
-  const priorityAlerts = monitoredAlerts.filter(alert => !alert.type || !alert.type.includes("Banco de Dados"));
+  const databaseAlerts = emailAlerts.filter(alert => alert.type && alert.type.includes("Banco de Dados"));
+  const priorityAlerts = emailAlerts.filter(alert => !alert.type || !alert.type.includes("Banco de Dados"));
 
   if (databaseAlerts.length > 0) {
     emailHtml += '<br><table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;font-family:Segoe UI,Arial,sans-serif;">';
@@ -2726,7 +2735,7 @@ function generate() {
   }
 
   emailHtml += "<br><strong>Sistemas Operacionais afetados:</strong><br>";
-  const affectedOsNames = getAffectedOsNames(data, suggestedKbs, unsupportedNotices);
+  const affectedOsNames = getAffectedOsNames(emailScope, emailKbs, emailNotices);
   if (affectedOsNames.length > 0) {
     affectedOsNames.forEach(os => {
       emailHtml += `- ${os.replace(/\(sem atualizacao padrao\)/g, "(sem atualização padrão)")}<br>`;
@@ -2735,27 +2744,29 @@ function generate() {
     emailHtml += "- Windows Server / Client (Padrão)<br>";
   }
 
-  if (unsupportedNotices.length > 0) {
-    emailHtml += renderUnsupportedOsEmailAlert(unsupportedNotices);
+  if (emailNotices.length > 0) {
+    emailHtml += renderUnsupportedOsEmailAlert(emailNotices);
   }
 
-  emailHtml += "<br><strong>Patches de segurança que serão aplicados:</strong><br>";
-  if (suggestedKbs.length > 0) {
-    suggestedKbs.forEach(item => {
+  emailHtml += manualScope ? "<br><strong>Patches de segurança previstos:</strong><br>" : "<br><strong>Patches de segurança que serão aplicados:</strong><br>";
+  if (emailKbs.length > 0) {
+    emailKbs.forEach(item => {
       emailHtml += `- ${item.kb} (${item.name})<br>`;
     });
-  } else if (unsupportedNotices.length > 0) {
+  } else if (emailNotices.length > 0) {
     emailHtml += "- Nenhum KB será sugerido automaticamente para Windows Server 2012/2012 R2 sem validação de ESU ou atualização de versão.<br>";
   } else {
     emailHtml += "- Atualizações cumulativas de segurança (Tanium Patch)<br>";
   }
 
   emailHtml += "<br>Em caso de dúvidas, estamos à disposição.<br>Atenciosamente,";
-  if (data.poweredOnOnly && (!data.isCmdbApplied || data.activeVMs.length === 0)) {
+  if (manualScope && manualLabels.length === 0) {
+    emailHtml = "<strong>Escopo não liberado:</strong> informe ao menos um servidor para gerar o e-mail de início.";
+  } else if (data.poweredOnOnly && data.isCmdbApplied && data.activeVMs.length === 0) {
     emailHtml = "<strong>Escopo não liberado:</strong> carregue a base CMDB pela API e confirme ao menos uma VM ligada antes de gerar o e-mail.";
   }
   if (!fullGmudName) emailHtml = "<strong>Nome completo da GMUD pendente:</strong> preencha o nome completo antes de gerar o e-mail de início.";
-  document.getElementById("emailText").innerHTML = applyVisaEmailPrivacy(emailHtml, data);
+  document.getElementById("emailText").innerHTML = applyVisaEmailPrivacy(emailHtml, emailScope);
   if (data.poweredOnOnly) document.getElementById("closureEmailText").innerHTML = buildClosureEmailHtml();
   updateScopeTable(data, monitoredAlerts);
   updateOperationalOverview(data, suggestedKbs, unsupportedNotices, monitoredAlerts);
