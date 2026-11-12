@@ -2316,7 +2316,7 @@ function processInput() {
         if (!onlyPoweredOn || status === "Ligada") copyLines.push(`${srv.displayName} | Cliente: ${info.Customer || "N/A"} | IP: ${info.IP || "N/A"} | OS: ${effectiveOs || "N/A"} | Status: ${status}`);
       } else {
         const details = "Não encontrado no CMDB";
-        unknownVMs.push({ name: srv.displayName, info: details, reason: "Não cadastrado no CMDB" });
+        unknownVMs.push({ name: srv.displayName, info: details, reason: "Não cadastrado no CMDB", unmatched: true, inputIp: srv.ip, inputOs: srv.lineOs });
         
         if (!onlyPoweredOn) {
           if (isValidIp(srv.displayName)) {
@@ -2623,6 +2623,23 @@ function getEmailGmudName() {
   return `GMUD ${number}`;
 }
 
+function getUnconfirmedCommunicationServers(data) {
+  if (!data.poweredOnOnly) return [];
+  const fromInput = data.isCmdbApplied
+    ? data.unknownVMs.filter(vm => vm.unmatched).map(vm => ({ name: vm.name, ips: [vm.inputIp], os: vm.inputOs }))
+    : data.manualEntries.flatMap(entry => (entry.hostname ? [entry.hostname] : entry.ips)
+      .map(name => ({ name, ips: entry.hostname ? entry.ips : [name], os: entry.os })));
+  const servers = new Map();
+  for (const { name, ips, os } of fromInput) {
+    const key = JSON.stringify([name.toLowerCase(), ips.filter(Boolean)]);
+    if (!servers.has(key)) {
+      const info = [ips.some(Boolean) && `IP: ${ips.filter(Boolean).join(", ")}`, os && `OS: ${os}`].filter(Boolean).join(" | ");
+      servers.set(key, { name, info, os, cmdbUnconfirmed: true });
+    }
+  }
+  return [...servers.values()];
+}
+
 function generate() {
   const gmudNumber = document.getElementById("schedGmud").value || "XXX";
   const data = processInput();
@@ -2646,25 +2663,19 @@ function generate() {
   const monitoredAlerts = getMonitoredVmAlerts(data);
   updateMonitoredVmAlerts(monitoredAlerts);
   const manualScope = data.poweredOnOnly && !data.isCmdbApplied;
-  const manualEntries = manualScope ? data.manualEntries.filter(entry => entry.hostname || entry.ips.length) : [];
-  const manualHosts = unique(manualEntries.map(entry => entry.hostname).filter(Boolean));
-  const manualLabels = unique(manualEntries.flatMap(entry => entry.hostname ? [entry.hostname] : entry.ips));
-  const emailScope = manualScope ? { lines: data.lines, hostnames: manualHosts, osNames: buildOsGroups(manualEntries).osNames } : data;
-  const emailKbs = manualScope ? suggestKBs(emailScope.osNames, false) : suggestedKbs;
-  const emailNotices = manualScope ? getUnsupportedWindowsServerNotices(emailScope.osNames) : unsupportedNotices;
-  const emailAlerts = manualScope ? getMonitoredVmAlerts(emailScope) : monitoredAlerts;
+  const unconfirmed = getUnconfirmedCommunicationServers(data);
+  const communicationLines = [...osDetectionLines, ...unconfirmed.map(server => server.os || "")];
+  const emailScope = unconfirmed.length ? { ...data, hostnames: [...data.hostnames, ...unconfirmed.map(server => server.name)],
+    osNames: unique([...data.osNames, ...unconfirmed.map(server => server.os).filter(Boolean)]) } : data;
+  const emailKbs = unconfirmed.length ? suggestKBs(communicationLines, false) : suggestedKbs;
+  const emailNotices = unconfirmed.length ? getUnsupportedWindowsServerNotices(communicationLines) : unsupportedNotices;
+  const emailAlerts = unconfirmed.length ? getMonitoredVmAlerts({ hostnames: emailScope.hostnames, activeVMs: data.activeVMs }) : monitoredAlerts;
   
   const fullGmudName = getEmailGmudName();
   let emailHtml = `Senhores, boa noite.<br><br>Informamos que estamos iniciando as atividades referentes à ${escapeHtml(fullGmudName)}, conforme planejamento aprovado.<br><br>`;
-  emailHtml += manualScope
-    ? "<strong>Servidores informados para a GMUD:</strong><br>Lista informada manualmente, sem confirmação do estado das VMs pelo CMDB. Os alvos serão validados antes da aplicação dos patches.<br><br>"
-    : "A partir deste momento, será dado início ao processo de atualização dos servidores relacionados abaixo:<br><br>";
+  if (!manualScope && !unconfirmed.length) emailHtml += "A partir deste momento, será dado início ao processo de atualização dos servidores relacionados abaixo:<br><br>";
   
-  if (manualScope) {
-    for (const label of manualLabels) {
-      emailHtml += `- <strong>${escapeHtml(label)}</strong>${formatEmailSystemText(getVmEmailClassification(label))}<br>`;
-    }
-  } else if (data.isCmdbApplied) {
+  if (data.isCmdbApplied) {
     const eligibleVMs = data.activeVMs.filter(vm => !detectWindowsServer2012(vm.info));
     const excludedVMs = data.activeVMs.filter(vm => detectWindowsServer2012(vm.info));
     if (eligibleVMs.length > 0) {
@@ -2694,13 +2705,20 @@ function generate() {
         emailHtml += `- <strong>${vm.name}</strong>${formatEmailSystemText(getVmEmailClassification(vm.name))} (Evidência: ${formatEmailSystemText(vm.reason)})<br>`;
       });
     }
-  } else {
+  } else if (!manualScope) {
     if (data.hostnames.length > 0) {
       data.hostnames.forEach(host => {
         emailHtml += `- <strong>${host}</strong>${formatEmailSystemText(getVmEmailClassification(host))}<br>`;
       });
     } else {
       emailHtml += "[Nenhum servidor identificado]";
+    }
+  }
+
+  if (unconfirmed.length) {
+    emailHtml += "<br><strong>Servidores sem confirmação no CMDB:</strong><br>Os servidores abaixo foram informados na GMUD e precisam ser validados antes da aplicação dos patches.<br><br>";
+    for (const server of unconfirmed) {
+      emailHtml += `- <strong>${escapeHtml(server.name)}</strong>${formatEmailSystemText(getVmEmailClassification(server.name))}<br>`;
     }
   }
 
@@ -2748,7 +2766,7 @@ function generate() {
     emailHtml += renderUnsupportedOsEmailAlert(emailNotices);
   }
 
-  emailHtml += manualScope ? "<br><strong>Patches de segurança previstos:</strong><br>" : "<br><strong>Patches de segurança que serão aplicados:</strong><br>";
+  emailHtml += unconfirmed.length ? "<br><strong>Patches de segurança previstos:</strong><br>" : "<br><strong>Patches de segurança que serão aplicados:</strong><br>";
   if (emailKbs.length > 0) {
     emailKbs.forEach(item => {
       emailHtml += `- ${item.kb} (${item.name})<br>`;
@@ -2760,9 +2778,9 @@ function generate() {
   }
 
   emailHtml += "<br>Em caso de dúvidas, estamos à disposição.<br>Atenciosamente,";
-  if (manualScope && manualLabels.length === 0) {
+  if (manualScope && unconfirmed.length === 0) {
     emailHtml = "<strong>Escopo não liberado:</strong> informe ao menos um servidor para gerar o e-mail de início.";
-  } else if (data.poweredOnOnly && data.isCmdbApplied && data.activeVMs.length === 0) {
+  } else if (data.poweredOnOnly && data.isCmdbApplied && data.activeVMs.length === 0 && unconfirmed.length === 0) {
     emailHtml = "<strong>Escopo não liberado:</strong> carregue a base CMDB pela API e confirme ao menos uma VM ligada antes de gerar o e-mail.";
   }
   if (!fullGmudName) emailHtml = "<strong>Nome completo da GMUD pendente:</strong> preencha o nome completo antes de gerar o e-mail de início.";
@@ -3217,6 +3235,7 @@ function getClosureServerItems(data, observations = "") {
   let servers = [];
   if (data.poweredOnOnly) {
     servers = (data.activeVMs || []).map(vm => ({ name: vm.name, info: vm.info || "", os: getOsFromText(vm.info || ""), result }));
+    servers.push(...getUnconfirmedCommunicationServers(data));
     return applyEvidenceResultsToServers(servers, evidenceText, observations, evidenceState);
   }
 
@@ -3281,8 +3300,11 @@ function reconcileClosureInferenceWithScope(inference) {
 
 function getClosurePayload() {
   const data = processInput();
-  const osDetectionLines = getOsDetectionLines(data);
-  const suggestedKbs = suggestKBs(osDetectionLines).filter(isDeployableCumulativeKb);
+  const observations = document.getElementById("closureObservations").value.trim();
+  const servers = getClosureServerItems(data, observations);
+  const unconfirmedServers = servers.filter(server => server.cmdbUnconfirmed);
+  const osDetectionLines = [...getOsDetectionLines(data), ...unconfirmedServers.map(server => server.os || "")];
+  const suggestedKbs = suggestKBs(osDetectionLines, false);
   const unsupportedNotices = getUnsupportedWindowsServerNotices(osDetectionLines);
   const gmudNumber = document.getElementById("schedGmud").value.trim() || "XXX";
   const selectedStatus = document.getElementById("closureStatus").value || "Concluída com sucesso";
@@ -3290,9 +3312,7 @@ function getClosurePayload() {
   const executor = document.getElementById("closureExecutor").value.trim() || "Nao informado";
   const closureDate = document.getElementById("closureDate").value || "";
   const closureTime = document.getElementById("closureTime").value || "";
-  const observations = document.getElementById("closureObservations").value.trim();
-  const servers = getClosureServerItems(data, observations);
-  const osNames = getAffectedOsNames(data, suggestedKbs, unsupportedNotices);
+  const osNames = getAffectedOsNames({ osNames: [...data.osNames, ...unconfirmedServers.map(server => server.os)] }, suggestedKbs, unsupportedNotices);
   const evidenceAnalysisState = getClosureEvidenceAnalysisState();
   const missingEvidenceServers = servers.filter(server => server.evidenceState === "missing");
   const pendingOcrServers = servers.filter(server => server.evidenceState === "pending_ocr");
@@ -3312,7 +3332,8 @@ function getClosurePayload() {
     && manualReviewServers.length === 0
     && missingEvidenceServers.length === 0;
   const status = allServersEvidencedSuccessfully ? "Concluída com sucesso"
-    : evidenceAnalysisState.hasImages && /sucesso/i.test(selectedStatus) ? "Concluída com ressalvas" : selectedStatus;
+    : (evidenceAnalysisState.hasImages || unconfirmedServers.length || (servers.length === 0 && closureEvidenceFiles.length))
+      && /sucesso/i.test(selectedStatus) ? "Concluída com ressalvas" : selectedStatus;
 
   return {
     scopeBlocked: data.poweredOnOnly && servers.length === 0,
@@ -3326,6 +3347,7 @@ function getClosurePayload() {
     closureDateTime: formatDisplayDateTime(closureDate, closureTime),
     observations,
     servers,
+    unconfirmedServers,
     evidenceAnalysisState,
     missingEvidenceServers,
     pendingOcrServers,
@@ -3770,13 +3792,16 @@ function buildClosureEmailHtml() {
 
   html += `<strong>Status final:</strong> ${escapeHtml(payload.status)}<br>`;
   html += `<strong>Data/Hora de encerramento:</strong> ${escapeHtml(payload.closureDateTime)}<br><br>`;
+  if (payload.unconfirmedServers.length) {
+    html += "Os servidores sem confirmação no CMDB foram incluídos a partir da lista da GMUD. O resultado depende das evidências ou observações registradas.<br><br>";
+  }
 
   html += "<strong>Servidores do escopo e resultado no encerramento:</strong><br>";
   if (payload.servers.length > 0) {
     payload.servers.forEach(server => {
       const filteredInfo = getCustomerEmailVmInfo(server);
       const info = filteredInfo ? ` (${escapeHtml(filteredInfo)})` : "";
-      html += `- <strong>${escapeHtml(server.name)}</strong>${formatEmailSystemText(getVmCriticalClassification(server.name))}${getVmDatabaseClassification(server.name)}${info} - ${formatEmailSystemText(escapeHtml(server.result || "Validação não informada"))}<br>`;
+      html += `- <strong>${escapeHtml(server.name)}</strong>${formatEmailSystemText(getVmCriticalClassification(server.name))}${getVmDatabaseClassification(server.name)}${info}${server.cmdbUnconfirmed ? " [Sem confirmação no CMDB]" : ""} - ${formatEmailSystemText(escapeHtml(server.result || "Validação não informada"))}<br>`;
     });
   } else {
     html += "- Não informado<br>";
@@ -3815,7 +3840,7 @@ function buildClosureEmailHtml() {
     html += renderUnsupportedOsEmailAlert(payload.unsupportedNotices);
   }
 
-  html += "<br><strong>Patches cumulativos aplicados:</strong><br>";
+  html += payload.unconfirmedServers.length ? "<br><strong>Patches cumulativos previstos:</strong><br>" : "<br><strong>Patches cumulativos aplicados:</strong><br>";
   if (payload.suggestedKbs.length > 0) {
     payload.suggestedKbs.forEach(item => {
       html += `- ${escapeHtml(item.kb)} (${escapeHtml(item.name)})<br>`;
@@ -3838,7 +3863,7 @@ function buildClosureEmailHtml() {
   }
 
   html += "<br>Em caso de dúvidas, estamos à disposição.<br>Atenciosamente,";
-  return applyVisaEmailPrivacy(html, processInput());
+  return applyVisaEmailPrivacy(html, { activeVMs: payload.servers });
 }
 
 function generateClosure() {
@@ -3858,6 +3883,12 @@ async function generateClosureFromEvidence() {
 }
 
 function buildClosureExecutiveSummary(payload) {
+  if (payload.servers.length === 0 && payload.evidenceFiles.length) {
+    return "As evidências foram anexadas sem um escopo de servidores identificado. Confira os arquivos antes de confirmar o resultado da GMUD.";
+  }
+  if (payload.unconfirmedServers.length && !payload.allServersEvidencedSuccessfully) {
+    return "O escopo inclui servidores informados na GMUD sem confirmação no CMDB. Confira o resultado de cada servidor nas evidências e observações registradas.";
+  }
   const osText = payload.osNames.length > 0 ? payload.osNames.join(" e ") : "servidores contemplados no escopo";
   const missingCount = payload.missingEvidenceServers.length;
   const pendingCount = payload.pendingOcrServers.length;
@@ -3900,10 +3931,10 @@ function buildClosureConclusion(payload) {
 
 function buildClosureReportHtml() {
   const payload = getClosurePayload();
-  if (payload.scopeBlocked) return '<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>Escopo nao liberado</title><body><h1>Escopo nao liberado</h1><p>Nenhuma VM confirmada como Ligada pela API. Carregue a base CMDB e revise a conferencia antes de emitir o relatorio.</p></body></html>';
+  if (payload.scopeBlocked && !payload.evidenceFiles.length) return '<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>Escopo nao liberado</title><body><h1>Escopo nao liberado</h1><p>Informe os servidores da GMUD ou anexe as evidências antes de emitir o relatório.</p></body></html>';
   const titleLine = payload.fullGmudName || `GMUD ${payload.gmudNumber} - ${payload.client} | Atualizações de Segurança`;
   const serversHtml = payload.servers.length > 0
-    ? payload.servers.map(server => `<tr><td>${escapeHtml(server.name)}${getVmCriticalClassification(server.name)}${getVmDatabaseClassification(server.name)}</td><td>${escapeHtml(server.os || "Nao informado")}</td><td>${escapeHtml(server.result || getClosureResultLabel(payload.status))}</td></tr>`).join("")
+    ? payload.servers.map(server => `<tr><td>${escapeHtml(server.name)}${getVmCriticalClassification(server.name)}${getVmDatabaseClassification(server.name)}${server.cmdbUnconfirmed ? "<br>Sem confirmação no CMDB" : ""}</td><td>${escapeHtml(server.os || "Nao informado")}</td><td>${escapeHtml(server.result || getClosureResultLabel(payload.status))}</td></tr>`).join("")
     : "<tr><td colspan='3'>Nao informado</td></tr>";
   const kbHtml = payload.suggestedKbs.length > 0
     ? payload.suggestedKbs.map(item => `<li>${escapeHtml(item.kb)} - ${escapeHtml(item.name)}</li>`).join("")
@@ -4004,7 +4035,7 @@ function buildClosureReportHtml() {
 
     ${missingEvidenceHtml}
 
-    <h2>Atualizações de Segurança Aplicadas</h2>
+    <h2>${payload.unconfirmedServers.length || payload.scopeBlocked ? "Atualizações de Segurança Previstas" : "Atualizações de Segurança Aplicadas"}</h2>
     <ul>${kbHtml}${linuxLine}</ul>
 
     ${unsupportedOsHtml}
@@ -4022,14 +4053,14 @@ function buildClosureReportHtml() {
 }
 
 async function openClosureReportForPdf() {
-  await ensureClosureEvidenceOcr();
-  generateClosure();
-  const reportHtml = buildClosureReportHtml();
   const reportWindow = window.open("", "_blank");
   if (!reportWindow) {
     alert("Nao foi possivel abrir o relatorio. Verifique o bloqueador de pop-ups do navegador.");
     return;
   }
+  await ensureClosureEvidenceOcr();
+  generateClosure();
+  const reportHtml = buildClosureReportHtml();
   reportWindow.document.open();
   reportWindow.document.write(reportHtml);
   reportWindow.document.close();

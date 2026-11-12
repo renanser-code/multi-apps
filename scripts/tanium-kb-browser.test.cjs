@@ -383,7 +383,7 @@ test("manual full GMUD title escapes HTML and PowerShell quotes", () => {
   assert(b.read("buildSchedulingScript()").includes("D''CLIENTE"));
 });
 
-test("locked ON-only policy excludes OFF, retired and missing VMs from all deployment and client outputs", () => {
+test("ON-only deploy excludes OFF, retired and missing VMs while communication labels missing VMs", () => {
   assert.match(html, /id="onlyPoweredOn" checked disabled/);
   const b = browser(true);
   b.element("onlyPoweredOn").checked=true;
@@ -396,12 +396,14 @@ test("locked ON-only policy excludes OFF, retired and missing VMs from all deplo
   b.element("input").value=records.map(r=>`${r.HostName} ${r.IP}`).join("\n")+"\nVM-MISS01 192.0.2.5";
   b.read(`isCmdbLoaded=true;cmdbDatabase=${JSON.stringify(records)};generate();generateClosure();`);
   assert.equal(b.read("processInput().hostnames.length"),2);
-  assert.equal(b.read("getClosurePayload().servers.length"),2);
-  for(const output of [b.element("emailText").innerHTML,b.element("closureEmailText").innerHTML,b.read("buildClosureReportHtml()"),b.element("cmdbCopyResult").value]) {
+  assert.equal(b.read("getClosurePayload().servers.length"),3);
+  for(const output of [b.element("emailText").innerHTML,b.element("closureEmailText").innerHTML,b.read("buildClosureReportHtml()")]) {
     for(const record of records.slice(2)) assert(!output.includes(record.HostName));
-    assert(!output.includes("VM-MISS01"));
+    assert(output.includes("VM-MISS01"));
+    assert(/sem confirmação no CMDB/i.test(output));
     assert(output.includes("VM-ON01"));
   }
+  assert(!b.element("cmdbCopyResult").value.includes("VM-MISS01"));
   assert.equal(b.read("getMonitoredVmAlerts(processInput()).length"),0);
   assert(!b.element("emailText").innerHTML.includes("2012"));
   assert(b.element("windowsHostnameRegex").value.includes("VM-ON01"));
@@ -410,12 +412,12 @@ test("locked ON-only policy excludes OFF, retired and missing VMs from all deplo
   assert(!b.element("vmsList").innerHTML.includes("VM-SQL-OFF01"));
   assert(b.element("scopeTableBody").innerHTML.includes("VM-SQL-OFF01"));
   b.read('cmdbDatabase=[];generate();');
-  assert.equal(b.read("getClosurePayload().servers.length"),0);
-  assert(b.element("closureEmailText").innerHTML.includes("Escopo não liberado"));
-  assert(b.read("buildClosureReportHtml()").includes("Escopo nao liberado"));
+  assert.equal(b.read("processInput().hostnames.length"),0);
+  assert(b.element("emailText").innerHTML.includes("VM-MISS01"));
+  assert(b.read("buildClosureReportHtml()").includes("VM-MISS01"));
 });
 
-test("opening email uses manual scope without unlocking deployment, closure or reports", () => {
+test("manual opening and closure scope do not unlock deployment", () => {
   const b=browser(true);
   b.element("onlyPoweredOn").checked=true;
   b.element("input").value="VWCSC018 192.0.2.1 WIN/2022\nVM-LEGACY01 192.0.2.2 WIN/2012 R2\n192.0.2.3 WIN/2022";
@@ -426,14 +428,49 @@ test("opening email uses manual scope without unlocking deployment, closure or r
   b.read("generate();generateClosure();");
   assert.equal(b.read("processInput().hostnames.length"),0);
   assert.equal(b.read("processInput().ips.length"),0);
-  assert.equal(b.read("getClosurePayload().servers.length"),0);
+  assert.equal(b.read("getClosurePayload().servers.length"),3);
   const email=b.element("emailText").innerHTML;
   for (const text of ["VWCSC018","192.0.2.3","sem confirmação","BANCO DE DADOS","2012","KB6000003"]) assert(email.includes(text),text);
   assert(!email.includes("Servidores LIGADOS"));
   assert(!b.element("kbSuggestions").innerHTML.includes("KB6000003"));
   assert(b.read("buildSchedulingScript()").includes("VWCSC018"));
-  assert(b.element("closureEmailText").innerHTML.includes("Escopo não liberado"));
-  assert(b.read("buildClosureReportHtml()").includes("Escopo nao liberado"));
+  assert(b.element("closureEmailText").innerHTML.includes("VWCSC018"));
+  assert(b.read("buildClosureReportHtml()").includes("VWCSC018"));
+  assert.equal(b.read("getClosurePayload().status"),"Concluída com ressalvas");
+});
+
+test("closure report correlates attached evidence for a VM absent from CMDB by input IP", async () => {
+  const b=browser(true);
+  b.element("onlyPoweredOn").checked=true;
+  b.element("input").value="VM-MISSING01 192.0.2.42 WIN/2022";
+  b.read('isCmdbLoaded=true; cmdbDatabase=[{HostName:"OTHER01",Status:"ON"}]; generate();');
+  b.read('closureEvidenceFiles=[{name:"evidencia.png",type:"image/png",size:32,dataUrl:"data:image/png;base64,AA==",ocrAnalyzed:true,ocrText:"192.0.2.42 Complete All Patches Applied"}];');
+  assert(b.element("emailText").innerHTML.includes("VM-MISSING01"));
+  assert.equal(b.read("processInput().ips.length"),0);
+  let report;
+  let opened=false;
+  b.context.window.open=()=>{
+    opened=true;
+    return {document:{open(){},write(value){report=value;},close(){}},focus(){}};
+  };
+  const reportPromise=b.read("openClosureReportForPdf()");
+  assert(opened, "open the window before awaiting OCR");
+  await reportPromise;
+  assert.match(report,/VM-MISSING01.*Complete, All Patches Applied/);
+  assert(report.includes('src="data:image/png;base64,AA=="'));
+  assert(report.includes("evidencia.png"));
+  assert.equal(b.read("getClosurePayload().allServersEvidencedSuccessfully"),true);
+});
+
+test("an evidence-only report opens without claiming success for an unidentified scope", () => {
+  const b=browser(true);
+  b.element("onlyPoweredOn").checked=true;
+  b.read('closureEvidenceFiles=[{name:"evidencia.pdf",type:"application/pdf",size:32,ocrAnalyzed:true,ocrText:"OTHER01 Complete All Patches Applied"}];');
+  const report=b.read("buildClosureReportHtml()");
+  assert(report.includes("evidencia.pdf"));
+  assert(report.includes("sem um escopo de servidores identificado"));
+  assert(!report.includes("100% de sucesso"));
+  assert.equal(b.read("getClosurePayload().status"),"Concluída com ressalvas");
 });
 
 test("manual VISA email preserves hostnames and masks IPs without the CMDB", () => {
@@ -459,7 +496,7 @@ test("a failed or malformed API reload invalidates previously eligible machines"
     assert.equal(b.read("isCmdbLoaded"),false);
     assert.equal(b.read("processInput().hostnames.length"),0);
     assert(!b.element("hostnameRegex").value.includes("VM-ON01"));
-    assert(b.element("closureEmailText").innerHTML.includes("Escopo não liberado"));
+    assert(b.element("closureEmailText").innerHTML.includes("Sem confirmação no CMDB"));
   }
 });
 
@@ -938,8 +975,8 @@ test("missing and discontinued VMs are pending validation, never labelled powere
   const html = b.element("emailText").innerHTML;
   assert(!html.includes("Servidores DESLIGADOS"));
   assert(!html.includes("Não serão atualizados"));
-  assert(html.includes("Escopo não liberado"));
-  assert(!html.includes("VM-MISSING01"));
+  assert(html.includes("Servidores sem confirmação no CMDB"));
+  assert(html.includes("VM-MISSING01"));
   assert(!html.includes("VM-RETIRED01"));
   assert(!b.element("vmsList").innerHTML.includes("VM-MISSING01"));
   assert(b.element("scopeTableBody").innerHTML.includes("VM-MISSING01"));
