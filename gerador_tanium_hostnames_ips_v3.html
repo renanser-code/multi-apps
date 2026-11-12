@@ -2672,7 +2672,8 @@ function generate() {
   const emailAlerts = unconfirmed.length ? getMonitoredVmAlerts({ hostnames: emailScope.hostnames, activeVMs: data.activeVMs }) : monitoredAlerts;
   
   const fullGmudName = getEmailGmudName();
-  let emailHtml = `Senhores, boa noite.<br><br>Informamos que estamos iniciando as atividades referentes à ${escapeHtml(fullGmudName)}, conforme planejamento aprovado.<br><br>`;
+  const introduction = `Senhores, boa noite.<br><br>Informamos que estamos iniciando as atividades referentes à ${escapeHtml(fullGmudName)}, conforme planejamento aprovado.<br><br>`;
+  let emailHtml = introduction;
   if (!manualScope && !unconfirmed.length) emailHtml += "A partir deste momento, será dado início ao processo de atualização dos servidores relacionados abaixo:<br><br>";
   
   if (data.isCmdbApplied) {
@@ -2778,10 +2779,8 @@ function generate() {
   }
 
   emailHtml += "<br>Em caso de dúvidas, estamos à disposição.<br>Atenciosamente,";
-  if (manualScope && unconfirmed.length === 0) {
-    emailHtml = "<strong>Escopo não liberado:</strong> informe ao menos um servidor para gerar o e-mail de início.";
-  } else if (data.poweredOnOnly && data.isCmdbApplied && data.activeVMs.length === 0 && unconfirmed.length === 0) {
-    emailHtml = "<strong>Escopo não liberado:</strong> carregue a base CMDB pela API e confirme ao menos uma VM ligada antes de gerar o e-mail.";
+  if (data.poweredOnOnly && !data.activeVMs?.length && !unconfirmed.length) {
+    emailHtml = introduction + "A lista de servidores ainda está em validação. A aplicação dos patches só será iniciada após a confirmação do escopo.<br><br>Em caso de dúvidas, estamos à disposição.<br>Atenciosamente,";
   }
   if (!fullGmudName) emailHtml = "<strong>Nome completo da GMUD pendente:</strong> preencha o nome completo antes de gerar o e-mail de início.";
   document.getElementById("emailText").innerHTML = applyVisaEmailPrivacy(emailHtml, emailScope);

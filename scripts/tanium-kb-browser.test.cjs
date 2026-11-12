@@ -473,6 +473,29 @@ test("an evidence-only report opens without claiming success for an unidentified
   assert.equal(b.read("getClosurePayload().status"),"Concluída com ressalvas");
 });
 
+test("opening email remains available with an empty scope or only powered-off VMs", () => {
+  for (const connected of [false, true]) {
+    const b=browser(true);
+    b.element("onlyPoweredOn").checked=true;
+    b.element("schedGmud").value="1058";
+    b.element("schedGmudTitle").value="";
+    b.element("schedDate").value="2026-11-12";
+    b.element("schedTime").value="23:00";
+    if (connected) {
+      b.element("input").value="VM-OFF01 192.0.2.1 WIN/2022";
+      b.read('isCmdbLoaded=true;cmdbDatabase=[{HostName:"VM-OFF01",IP:"192.0.2.1",Status:"OFF"}];');
+    }
+    b.read("generate()");
+    const email=b.element("emailText").innerHTML;
+    assert.match(email,/GMUD 1058/);
+    assert.match(email,/lista de servidores ainda está em validação/);
+    assert.doesNotMatch(email,/Escopo não liberado|VM-OFF01|Patches de segurança que serão aplicados/);
+    assert.equal(b.element("hostnameRegex").value,"");
+    assert.equal(b.element("ipRegex").value,"");
+    assert(b.read("buildSchedulingScript()").includes("lista de servidores ainda está em validação"));
+  }
+});
+
 test("manual VISA email preserves hostnames and masks IPs without the CMDB", () => {
   const b=browser(true);
   b.element("onlyPoweredOn").checked=true;
