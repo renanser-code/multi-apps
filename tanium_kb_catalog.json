@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "documentId": "2026-Nov",
   "documentTitle": "Windows Server Monthly Security Cumulative Updates",
-  "generatedAt": "2026-11-12T11:38:59.339Z",
+  "generatedAt": "2026-11-12T11:44:38.325Z",
   "sourceUrl": "https://learn.microsoft.com/en-us/windows/release-health/windows-server-release-info",
   "catalog": {
     "10": {
@@ -32,9 +32,9 @@
   },
   "sync": {
     "status": "success",
-    "lastAttemptAt": "2026-11-12T11:38:59.339Z",
-    "lastSuccessfulAt": "2026-11-12T11:38:59.339Z",
-    "lastCompleteSuccessAt": "2026-11-12T11:38:59.339Z",
+    "lastAttemptAt": "2026-11-12T11:44:38.325Z",
+    "lastSuccessfulAt": "2026-11-12T11:44:38.325Z",
+    "lastCompleteSuccessAt": "2026-11-12T11:44:38.325Z",
     "checks": [
       {
         "source": "Microsoft release history",
@@ -108,8 +108,8 @@
       "architecture": "x64",
       "kind": "security",
       "releaseDate": "2026-11-10",
-      "build": "14393.9688",
-      "sourceUrl": "https://api.msrc.microsoft.com/cvrf/v3.0/cvrf/2026-Nov",
+      "build": "",
+      "sourceUrl": "https://www.catalog.update.microsoft.com/Search.aspx?q=KB5131291",
       "name": "Windows Server 2016 Cumulative Update (2026-11-10)"
     },
     {
@@ -128,8 +128,8 @@
       "architecture": "x64",
       "kind": "security",
       "releaseDate": "2026-11-10",
-      "build": "20348.5870",
-      "sourceUrl": "https://api.msrc.microsoft.com/cvrf/v3.0/cvrf/2026-Nov",
+      "build": "",
+      "sourceUrl": "https://www.catalog.update.microsoft.com/Search.aspx?q=KB5131090",
       "name": "Windows Server 2022 Cumulative Update (2026-11-10)"
     },
     {
