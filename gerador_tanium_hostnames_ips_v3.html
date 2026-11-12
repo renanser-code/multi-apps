@@ -286,7 +286,7 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
         <label class="check"><input type="checkbox" id="escapeIps"> Escapar pontos dos IPs com \.</label>
         <label class="check"><input type="checkbox" id="appendWildcard" checked> Adicionar .* no final</label>
         <label class="check"><input type="checkbox" id="ignoreInvalidIps" checked> Ignorar IPs inválidos</label>
-        <label class="check"><input type="checkbox" id="onlyPoweredOn" checked disabled> Somente VMs confirmadas como Ligada na API</label>
+        <label class="check"><input type="checkbox" id="onlyPoweredOn" checked disabled> Deploy: somente VMs confirmadas como ligadas na API</label>
       </div>
 
       <div class="review-panel" id="gmudReviewPanel">
@@ -1723,7 +1723,7 @@ const HOSTNAME_WORD_DENYLIST = new Set([
 
 const HOSTNAME_INFRA_PREFIXES = new Set([
   "AD", "APP", "DB", "DC", "FS", "FTP", "FW", "HYP", "LIN", "LNX", "PRD", "SAP",
-  "SQL", "SRV", "SVR", "SV", "VDI", "WEB", "WIN", "WS"
+  "SQL", "SRV", "SVR", "SV", "VDI", "VM", "WEB", "WIN", "WS"
 ]);
 
 function normalizeHostnameToken(token) {
@@ -2518,7 +2518,7 @@ function buildGmudReview(data, suggestedKbs, unsupportedNotices, monitoredAlerts
   if (duplicateHosts.length > 0) add("warning", `${duplicateHosts.length} hostname(s) duplicado(s): ${duplicateHosts.join(", ")}.`);
   if (duplicateIps.length > 0) add("warning", `${duplicateIps.length} IP(s) duplicado(s): ${duplicateIps.join(", ")}.`);
 
-  if (data.hostnames.length === 0) add("critical", "Nenhum hostname válido foi identificado na entrada.");
+  if (rawHosts.length === 0 && rawIps.length === 0) add("critical", "Nenhum hostname ou IP válido foi identificado na entrada.");
   if (data.isCmdbApplied) {
     if (data.unknownVMs.length > 0) add("critical", `${data.unknownVMs.length} VM(s) não encontrada(s) ou sem status válido na CMDB.`);
     if (data.offlineVMs.length > 0) add("warning", `${data.offlineVMs.length} VM(s) desligada(s) e fora do escopo de atualização.`);
@@ -2528,7 +2528,7 @@ function buildGmudReview(data, suggestedKbs, unsupportedNotices, monitoredAlerts
     if (missingOs > 0) add("critical", `${missingOs} VM(s) ligada(s) sem sistema operacional informado pela CMDB.`);
     [...data.activeVMs, ...data.offlineVMs, ...data.unknownVMs].filter(vm => vm.osConflict).forEach(vm => add("warning", `${vm.name}: ${vm.osConflict}`));
   } else {
-    add("warning", "A base CMDB ainda não foi aplicada; status e cadastro das VMs não foram validados.");
+    add("warning", "CMDB não conectado: o e-mail usa a lista digitada; as listas de deploy ficam vazias até a validação.");
   }
 
   if (unsupportedNotices.length > 0) add("critical", "Windows Server 2012/2012 R2 detectado: essas máquinas não serão atualizadas.");

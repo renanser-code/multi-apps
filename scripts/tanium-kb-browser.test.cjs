@@ -473,6 +473,22 @@ test("an evidence-only report opens without claiming success for an unidentified
   assert.equal(b.read("getClosurePayload().status"),"Concluída com ressalvas");
 });
 
+test("manual VM-prefixed Linux names without digits appear in the email and scope, not in deploy", () => {
+  const b=browser(true);
+  b.element("onlyPoweredOn").checked=true;
+  const names=["VM-EXAMPLE-DEVELOP","vm-example-homol","vm-example-prod"];
+  b.element("input").value=names.map(name=>`${name} LINUX`).join("\n");
+  b.read("generate()");
+  for (const name of names) {
+    assert(b.element("emailText").innerHTML.includes(name));
+    assert(b.element("scopeTableBody").innerHTML.includes(name));
+  }
+  assert.match(b.element("emailText").innerHTML,/Servidores sem confirmação no CMDB/);
+  assert.doesNotMatch(b.element("gmudReviewItems").innerHTML,/Nenhum hostname/);
+  assert.equal(b.element("cleanHostnames").value,"");
+  assert.equal(b.element("linuxHostnameRegex").value,"");
+});
+
 test("opening email remains available with an empty scope or only powered-off VMs", () => {
   for (const connected of [false, true]) {
     const b=browser(true);
