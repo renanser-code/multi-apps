@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "documentId": "2026-Nov",
   "documentTitle": "Windows Server Monthly Security Cumulative Updates",
-  "generatedAt": "2026-11-13T14:50:50.269Z",
+  "generatedAt": "2026-11-13T21:21:51.887Z",
   "sourceUrl": "https://learn.microsoft.com/en-us/windows/release-health/windows-server-release-info",
   "catalog": {
     "10": {
@@ -56,9 +56,9 @@
   },
   "sync": {
     "status": "success",
-    "lastAttemptAt": "2026-11-13T14:50:50.269Z",
-    "lastSuccessfulAt": "2026-11-13T14:50:50.269Z",
-    "lastCompleteSuccessAt": "2026-11-13T14:50:50.269Z",
+    "lastAttemptAt": "2026-11-13T21:21:51.887Z",
+    "lastSuccessfulAt": "2026-11-13T21:21:51.887Z",
+    "lastCompleteSuccessAt": "2026-11-13T21:21:51.887Z",
     "checks": [
       {
         "source": "Microsoft release history",
@@ -116,6 +116,36 @@
     "errors": []
   },
   "history": [
+    {
+      "kb": "KB5136489",
+      "osVersion": "2025",
+      "architecture": "x64",
+      "kind": "oob",
+      "releaseDate": "2026-11-13",
+      "build": "26100.33828",
+      "sourceUrl": "https://support.microsoft.com/help/5136489",
+      "name": "Windows Server 2025 Cumulative Update Out-of-Band (2026-11-13)"
+    },
+    {
+      "kb": "KB5136487",
+      "osVersion": "2022",
+      "architecture": "x64",
+      "kind": "oob",
+      "releaseDate": "2026-11-13",
+      "build": "20348.5873",
+      "sourceUrl": "https://support.microsoft.com/help/5136487",
+      "name": "Windows Server 2022 Cumulative Update Out-of-Band (2026-11-13)"
+    },
+    {
+      "kb": "KB5136490",
+      "osVersion": "2019",
+      "architecture": "x64",
+      "kind": "oob",
+      "releaseDate": "2026-11-13",
+      "build": "17763.9488",
+      "sourceUrl": "https://support.microsoft.com/help/5136490",
+      "name": "Windows Server 2019 Cumulative Update Out-of-Band (2026-11-13)"
+    },
     {
       "kb": "KB5120233",
       "osVersion": "2025",
