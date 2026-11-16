@@ -1971,12 +1971,11 @@ function formatEmailSystemText(value) {
 function isVisaEmailScope(data) {
   const visaClient = value => /\b(?:visa|hiperativa|hyperativa)\b/i.test(String(value || ""));
   if (visaClient(getFullGmudName())) return true;
-  const servers = data.activeVMs || [];
+  const servers = [...(data.activeVMs || []), ...(data.offlineVMs || []), ...(data.unknownVMs || [])];
   const clients = servers.map(vm => getScopeInfoValue(vm.info, "Cliente")).filter(value => value && value !== "N/A");
-  if (clients.length) return clients.some(visaClient);
-  return visaClient(document.getElementById("closureClient").value)
-    || servers.some(vm => /^visa\d/i.test(vm.name))
-    || (data.hostnames || []).some(name => /^visa\d/i.test(name));
+  if (clients.some(visaClient)) return true;
+  if (servers.some(vm => /^visa\d/i.test(vm.name)) || (data.hostnames || []).some(name => /^visa\d/i.test(name)) || (data.manualEntries || []).some(entry => /^visa\d/i.test(entry.hostname))) return true;
+  return !clients.length && visaClient(document.getElementById("closureClient").value);
 }
 
 function applyVisaEmailPrivacy(html, data) {
@@ -1986,10 +1985,21 @@ function applyVisaEmailPrivacy(html, data) {
     if (!file.name) return;
     output = output.split(escapeHtml(file.name)).join(`Evidência ${index + 1}`);
   });
-  return output.split(/(<[^>]*>)/g).map(part => {
-    if (part.startsWith("<")) return part;
-    return part.replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, "[IP omitido]");
-  }).join("");
+  const names = [
+    ...(data.hostnames || []),
+    ...(data.manualEntries || []).map(entry => entry.hostname).filter(Boolean),
+    ...[...(data.activeVMs || []), ...(data.offlineVMs || []), ...(data.unknownVMs || [])].map(vm => vm.name)
+  ].flatMap(name => [name, getVmHostname(name)]).filter(name => name && !isValidIp(name));
+  const escapes = [...new Set(names)].sort((a, b) => b.length - a.length)
+    .map(name => name.replace(/[.*+?^$\x7b\x7d()|[\]\\]/g, "\\$&"));
+  const hostPattern = new RegExp("(?<![\\w-])(?:" + [...escapes, "VISA\\d+[\\w-]*"].join("|") + ")(?:\\.[a-z0-9-]+)*(?![\\w-])", "gi");
+  return output.replace(/<[^>]*>|[^<]+|</g, part => {
+    if (part.startsWith("<") && part.endsWith(">")) return part;
+    return part
+      .replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, "[IP omitido]")
+      .replace(/(?<![\w:])(?=[0-9a-f:]*::|(?:[0-9a-f]{1,4}:){7})[0-9a-f:]*:[0-9a-f:]+(?![\w:])/gi, "[IP omitido]")
+      .replace(hostPattern, "[servidor omitido]");
+  });
 }
 
 function renderKbCopyButton(kb) {
@@ -2682,83 +2692,108 @@ function generate() {
   const fullGmudName = getEmailGmudName();
   const introduction = `Senhores, boa noite.<br><br>Informamos que estamos iniciando as atividades referentes à ${escapeHtml(fullGmudName)}, conforme planejamento aprovado.<br><br>`;
   let emailHtml = introduction;
-  if (!manualScope && !unconfirmed.length) emailHtml += "A partir deste momento, será dado início ao processo de atualização dos servidores relacionados abaixo:<br><br>";
-  
-  if (data.isCmdbApplied) {
-    const eligibleVMs = data.activeVMs.filter(vm => !detectWindowsServer2012(vm.info));
-    const excludedVMs = data.activeVMs.filter(vm => detectWindowsServer2012(vm.info));
-    if (eligibleVMs.length > 0) {
-      emailHtml += "<strong>Servidores LIGADOS (Patches serão aplicados):</strong><br>";
-      eligibleVMs.forEach(vm => {
-        emailHtml += `- <strong>${vm.name}</strong>${formatEmailSystemText(getVmEmailClassification(vm.name))} (${getCustomerEmailVmInfo(vm)})<br>`;
-      });
-    } else {
-      emailHtml += "<strong>Servidores LIGADOS:</strong><br>- n/a<br>";
+  const privateVisaEmail = isVisaEmailScope(emailScope);
+  if (privateVisaEmail) {
+    const active = data.activeVMs || [];
+    const eligible = active.filter(vm => !detectWindowsServer2012(vm.info)).length;
+    const excluded = active.length - eligible;
+    emailHtml += "<strong>Resumo do escopo:</strong><br>";
+    if (data.isCmdbApplied) {
+      emailHtml += `- Servidores ligados previstos para atualização: ${eligible}<br>`;
+      if (excluded) emailHtml += `- Windows Server 2012/2012 R2 (não serão atualizados): ${excluded}<br>`;
+      if (!data.poweredOnOnly && data.offlineVMs.length) emailHtml += `- Servidores desligados (não serão atualizados): ${data.offlineVMs.length}<br>`;
     }
-    if (excludedVMs.length > 0) {
-      emailHtml += "<br><strong>Windows Server 2012/2012 R2 - Não serão atualizados (fora do deploy):</strong><br>";
-      excludedVMs.forEach(vm => {
-        emailHtml += `- <strong>${escapeHtml(vm.name)}</strong> (${getCustomerEmailVmInfo(vm)})<br>`;
-      });
+    const pending = unconfirmed.length || (!data.poweredOnOnly ? (data.unknownVMs || []).length || (!data.isCmdbApplied ? data.hostnames.length : 0) : 0);
+    if (pending) emailHtml += `- Servidores sem confirmação: ${pending}<br>`;
+    if (emailAlerts.length) {
+      const critical = emailAlerts.filter(alert => /critica/i.test(alert.type)).length;
+      const database = emailAlerts.filter(alert => /Banco de Dados/i.test(alert.type)).length;
+      const thirdWave = emailAlerts.filter(alert => /3a onda VISA/i.test(alert.type)).length;
+      emailHtml += `<br><strong>Atenção:</strong> ${emailAlerts.length} VM(s) monitorada(s) exigem acompanhamento prioritário.<br>`;
+      if (critical) emailHtml += `- VMs críticas: ${critical}<br>`;
+      if (database) emailHtml += `- VMs de banco de dados: ${database}<br>`;
+      if (thirdWave) emailHtml += `- VMs prioritárias da 3ª onda VISA: ${thirdWave}<br>`;
     }
-    
-    if (!data.poweredOnOnly && data.offlineVMs.length > 0) {
-      emailHtml += "<br><strong>Servidores DESLIGADOS / Fora do escopo (Não serão atualizados):</strong><br>";
-      data.offlineVMs.forEach(vm => {
-        emailHtml += `- <strong>${vm.name}</strong>${formatEmailSystemText(getVmEmailClassification(vm.name))} (Evidência: ${formatEmailSystemText(vm.reason)} | ${getCustomerEmailVmInfo(vm)})<br>`;
-      });
-    }
-    if (!data.poweredOnOnly && data.unknownVMs.length > 0) {
-      emailHtml += "<br><strong>Servidores com status não confirmado (validar antes da atualização):</strong><br>";
-      data.unknownVMs.forEach(vm => {
-        emailHtml += `- <strong>${vm.name}</strong>${formatEmailSystemText(getVmEmailClassification(vm.name))} (Evidência: ${formatEmailSystemText(vm.reason)})<br>`;
-      });
-    }
-  } else if (!manualScope) {
-    if (data.hostnames.length > 0) {
-      data.hostnames.forEach(host => {
-        emailHtml += `- <strong>${host}</strong>${formatEmailSystemText(getVmEmailClassification(host))}<br>`;
-      });
-    } else {
-      emailHtml += "[Nenhum servidor identificado]";
-    }
-  }
+  } else {
+    if (!manualScope && !unconfirmed.length) emailHtml += "A partir deste momento, será dado início ao processo de atualização dos servidores relacionados abaixo:<br><br>";
 
-  if (unconfirmed.length) {
-    emailHtml += "<br><strong>Servidores sem confirmação no CMDB:</strong><br>Os servidores abaixo foram informados na GMUD e precisam ser validados antes da aplicação dos patches.<br><br>";
-    for (const server of unconfirmed) {
-      emailHtml += `- <strong>${escapeHtml(server.name)}</strong>${formatEmailSystemText(getVmEmailClassification(server.name))}<br>`;
+    if (data.isCmdbApplied) {
+      const eligibleVMs = data.activeVMs.filter(vm => !detectWindowsServer2012(vm.info));
+      const excludedVMs = data.activeVMs.filter(vm => detectWindowsServer2012(vm.info));
+      if (eligibleVMs.length > 0) {
+        emailHtml += "<strong>Servidores LIGADOS (Patches serão aplicados):</strong><br>";
+        eligibleVMs.forEach(vm => {
+          emailHtml += `- <strong>${vm.name}</strong>${formatEmailSystemText(getVmEmailClassification(vm.name))} (${getCustomerEmailVmInfo(vm)})<br>`;
+        });
+      } else {
+        emailHtml += "<strong>Servidores LIGADOS:</strong><br>- n/a<br>";
+      }
+      if (excludedVMs.length > 0) {
+        emailHtml += "<br><strong>Windows Server 2012/2012 R2 - Não serão atualizados (fora do deploy):</strong><br>";
+        excludedVMs.forEach(vm => {
+          emailHtml += `- <strong>${escapeHtml(vm.name)}</strong> (${getCustomerEmailVmInfo(vm)})<br>`;
+        });
+      }
+
+      if (!data.poweredOnOnly && data.offlineVMs.length > 0) {
+        emailHtml += "<br><strong>Servidores DESLIGADOS / Fora do escopo (Não serão atualizados):</strong><br>";
+        data.offlineVMs.forEach(vm => {
+          emailHtml += `- <strong>${vm.name}</strong>${formatEmailSystemText(getVmEmailClassification(vm.name))} (Evidência: ${formatEmailSystemText(vm.reason)} | ${getCustomerEmailVmInfo(vm)})<br>`;
+        });
+      }
+      if (!data.poweredOnOnly && data.unknownVMs.length > 0) {
+        emailHtml += "<br><strong>Servidores com status não confirmado (validar antes da atualização):</strong><br>";
+        data.unknownVMs.forEach(vm => {
+          emailHtml += `- <strong>${vm.name}</strong>${formatEmailSystemText(getVmEmailClassification(vm.name))} (Evidência: ${formatEmailSystemText(vm.reason)})<br>`;
+        });
+      }
+    } else if (!manualScope) {
+      if (data.hostnames.length > 0) {
+        data.hostnames.forEach(host => {
+          emailHtml += `- <strong>${host}</strong>${formatEmailSystemText(getVmEmailClassification(host))}<br>`;
+        });
+      } else {
+        emailHtml += "[Nenhum servidor identificado]";
+      }
     }
-  }
 
-  const databaseAlerts = emailAlerts.filter(alert => alert.type && alert.type.includes("Banco de Dados"));
-  const priorityAlerts = emailAlerts.filter(alert => !alert.type || !alert.type.includes("Banco de Dados"));
-
-  if (databaseAlerts.length > 0) {
-    emailHtml += '<br><table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;font-family:Segoe UI,Arial,sans-serif;">';
-    emailHtml += '<tr><td style="background-color:#b91c1c;color:#ffffff;padding:10px 12px;border:1px solid #991b1b;font-size:16px;"><strong>ATENÇÃO: SERVIDORES DE BANCO DE DADOS</strong></td></tr>';
-    emailHtml += '<tr><td style="background-color:#fff1f2;color:#7f1d1d;padding:12px;border:1px solid #f87171;"><strong>Os servidores abaixo são bancos de dados e exigem acompanhamento prioritário durante toda a GMUD:</strong><br><br>';
-    databaseAlerts.forEach(alert => {
-      const classification = alert.type && alert.type.includes("VM prioritaria") ? "[VM PRIORITARIA / BANCO DE DADOS]" : "[BANCO DE DADOS]";
-      emailHtml += `&#9888; <strong style="color:#b91c1c;font-size:16px;">${escapeHtml(alert.name)}</strong> <strong>${formatEmailSystemText(classification)}</strong><br>${formatEmailSystemText(escapeHtml(alert.message))}<br><br>`;
-    });
-    emailHtml += '</td></tr></table>';
-  }
-
-  if (priorityAlerts.length > 0) {
-    const visaThirdWaveAlerts = priorityAlerts.filter(alert => alert.type && alert.type.includes("3a onda VISA"));
-    const individualPriorityAlerts = priorityAlerts.filter(alert => !alert.type || !alert.type.includes("3a onda VISA"));
-    emailHtml += '<br><table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;font-family:Segoe UI,Arial,sans-serif;">';
-    emailHtml += '<tr><td style="background-color:#b45309;color:#ffffff;padding:10px 12px;border:1px solid #92400e;font-size:16px;"><strong>ATENÇÃO: VMs PRIORITÁRIAS</strong></td></tr>';
-    emailHtml += '<tr><td style="background-color:#fffbeb;color:#78350f;padding:12px;border:1px solid #f59e0b;"><strong>As VMs abaixo exigem acompanhamento prioritário durante toda a GMUD:</strong><br><br>';
-    individualPriorityAlerts.forEach(alert => {
-      emailHtml += `&#9888; <strong style="color:#b45309;font-size:16px;">${escapeHtml(alert.name)}</strong> <strong>${/critica/i.test(alert.type) ? "[VM CRÍTICA]" : "[VM PRIORITÁRIA]"}</strong><br>${formatEmailSystemText(escapeHtml(alert.message))}<br><br>`;
-    });
-    if (visaThirdWaveAlerts.length > 0) {
-      emailHtml += `<strong style="color:#b45309;font-size:16px;">3ª ONDA VISA (${visaThirdWaveAlerts.length} VMs)</strong> <strong>[VMs PRIORITÁRIAS]</strong><br>`;
-      emailHtml += `<strong>${visaThirdWaveAlerts.map(alert => escapeHtml(alert.name)).join(" | ")}</strong><br>${escapeHtml(VISA_THIRD_WAVE_ALERT_MESSAGE)}<br>`;
+    if (unconfirmed.length) {
+      emailHtml += "<br><strong>Servidores sem confirmação no CMDB:</strong><br>Os servidores abaixo foram informados na GMUD e precisam ser validados antes da aplicação dos patches.<br><br>";
+      for (const server of unconfirmed) {
+        emailHtml += `- <strong>${escapeHtml(server.name)}</strong>${formatEmailSystemText(getVmEmailClassification(server.name))}<br>`;
+      }
     }
-    emailHtml += '</td></tr></table>';
+
+    const databaseAlerts = emailAlerts.filter(alert => alert.type && alert.type.includes("Banco de Dados"));
+    const priorityAlerts = emailAlerts.filter(alert => !alert.type || !alert.type.includes("Banco de Dados"));
+
+    if (databaseAlerts.length > 0) {
+      emailHtml += '<br><table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;font-family:Segoe UI,Arial,sans-serif;">';
+      emailHtml += '<tr><td style="background-color:#b91c1c;color:#ffffff;padding:10px 12px;border:1px solid #991b1b;font-size:16px;"><strong>ATENÇÃO: SERVIDORES DE BANCO DE DADOS</strong></td></tr>';
+      emailHtml += '<tr><td style="background-color:#fff1f2;color:#7f1d1d;padding:12px;border:1px solid #f87171;"><strong>Os servidores abaixo são bancos de dados e exigem acompanhamento prioritário durante toda a GMUD:</strong><br><br>';
+      databaseAlerts.forEach(alert => {
+        const classification = alert.type && alert.type.includes("VM prioritaria") ? "[VM PRIORITARIA / BANCO DE DADOS]" : "[BANCO DE DADOS]";
+        emailHtml += `&#9888; <strong style="color:#b91c1c;font-size:16px;">${escapeHtml(alert.name)}</strong> <strong>${formatEmailSystemText(classification)}</strong><br>${formatEmailSystemText(escapeHtml(alert.message))}<br><br>`;
+      });
+      emailHtml += '</td></tr></table>';
+    }
+
+    if (priorityAlerts.length > 0) {
+      const visaThirdWaveAlerts = priorityAlerts.filter(alert => alert.type && alert.type.includes("3a onda VISA"));
+      const individualPriorityAlerts = priorityAlerts.filter(alert => !alert.type || !alert.type.includes("3a onda VISA"));
+      emailHtml += '<br><table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;font-family:Segoe UI,Arial,sans-serif;">';
+      emailHtml += '<tr><td style="background-color:#b45309;color:#ffffff;padding:10px 12px;border:1px solid #92400e;font-size:16px;"><strong>ATENÇÃO: VMs PRIORITÁRIAS</strong></td></tr>';
+      emailHtml += '<tr><td style="background-color:#fffbeb;color:#78350f;padding:12px;border:1px solid #f59e0b;"><strong>As VMs abaixo exigem acompanhamento prioritário durante toda a GMUD:</strong><br><br>';
+      individualPriorityAlerts.forEach(alert => {
+        emailHtml += `&#9888; <strong style="color:#b45309;font-size:16px;">${escapeHtml(alert.name)}</strong> <strong>${/critica/i.test(alert.type) ? "[VM CRÍTICA]" : "[VM PRIORITÁRIA]"}</strong><br>${formatEmailSystemText(escapeHtml(alert.message))}<br><br>`;
+      });
+      if (visaThirdWaveAlerts.length > 0) {
+        emailHtml += `<strong style="color:#b45309;font-size:16px;">3ª ONDA VISA (${visaThirdWaveAlerts.length} VMs)</strong> <strong>[VMs PRIORITÁRIAS]</strong><br>`;
+        emailHtml += `<strong>${visaThirdWaveAlerts.map(alert => escapeHtml(alert.name)).join(" | ")}</strong><br>${escapeHtml(VISA_THIRD_WAVE_ALERT_MESSAGE)}<br>`;
+      }
+      emailHtml += '</td></tr></table>';
+    }
+
   }
 
   emailHtml += "<br><strong>Sistemas Operacionais afetados:</strong><br>";
@@ -4116,7 +4151,7 @@ function copyEmailAddress(button) {
 }
 
 function copyText(id) {
-  if (document.getElementById("onlyPoweredOn").checked) generate();
+  if (id === "emailText" || document.getElementById("onlyPoweredOn").checked) generate();
   const el = document.getElementById(id);
   
   if (id === "emailText" || id === "closureEmailText") {
@@ -4189,6 +4224,7 @@ function buildSchedulingScript() {
   // Use individual integer components for DateTime - completely culture-independent
   const dtNew = "[DateTime]::new(" + parseInt(y) + ", " + parseInt(mo) + ", " + parseInt(d) + ", " + parseInt(hh) + ", " + parseInt(mm) + ", 0)";
 
+  generate();
   const emailContent = document.getElementById("emailText").innerHTML;
   const escapedHtml  = emailContent.replace(/'/g, "''");
   const subject = applyVisaEmailPrivacy("Início das atividades - " + fullGmudName, processInput()).replace(/'/g, "''");
@@ -4576,3 +4612,4 @@ initializeKbSynchronization();
 </script>
 </body>
 </html>
+
