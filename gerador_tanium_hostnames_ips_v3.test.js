@@ -377,10 +377,9 @@ const visaThirdWaveEmailHtml = getElement("emailText").innerHTML;
 assert(visaThirdWaveAlertsHtml.includes("VISA035"));
 assert(visaThirdWaveAlertsHtml.includes("VISA034-W"));
 assert(!visaThirdWaveAlertsHtml.includes("<strong>VISA034</strong>"));
-assert(visaThirdWaveEmailHtml.includes("[VM PRIORITÁRIA - 3ª ONDA VISA]"));
-assert(visaThirdWaveEmailHtml.includes("3ª onda VISA: VM prioritária"));
-assert(visaThirdWaveEmailHtml.includes("3ª ONDA VISA (2 VMs)"));
-assert.strictEqual((visaThirdWaveEmailHtml.match(/3ª onda VISA: VM prioritária/g) || []).length, 1);
+assert(visaThirdWaveEmailHtml.includes("VMs prioritárias da 3ª onda VISA: 2"));
+assert(!visaThirdWaveEmailHtml.includes("VISA035"));
+assert(!visaThirdWaveEmailHtml.includes("VISA034-W"));
 
 getElement("input").value = [
   "WINAPP01 Microsoft Windows Server 2019 (64-bit) 10.10.10.1",
