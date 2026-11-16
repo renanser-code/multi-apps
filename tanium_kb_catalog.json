@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "documentId": "2026-Nov",
   "documentTitle": "Windows Server Monthly Security Cumulative Updates",
-  "generatedAt": "2026-11-16T17:20:37.972Z",
+  "generatedAt": "2026-11-16T21:04:29.330Z",
   "sourceUrl": "https://learn.microsoft.com/en-us/windows/release-health/windows-server-release-info",
   "catalog": {
     "10": {
@@ -32,9 +32,9 @@
   },
   "sync": {
     "status": "success",
-    "lastAttemptAt": "2026-11-16T17:20:37.972Z",
-    "lastSuccessfulAt": "2026-11-16T17:20:37.972Z",
-    "lastCompleteSuccessAt": "2026-11-16T17:20:37.972Z",
+    "lastAttemptAt": "2026-11-16T21:04:29.330Z",
+    "lastSuccessfulAt": "2026-11-16T21:04:29.330Z",
+    "lastCompleteSuccessAt": "2026-11-16T21:04:29.330Z",
     "checks": [
       {
         "source": "Microsoft release history",
