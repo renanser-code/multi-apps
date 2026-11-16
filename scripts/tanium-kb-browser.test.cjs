@@ -417,7 +417,7 @@ test("ON-only deploy excludes OFF, retired and missing VMs while communication l
   assert(b.read("buildClosureReportHtml()").includes("VM-MISS01"));
 });
 
-test("manual opening and closure scope do not unlock deployment", () => {
+test("manual scope generates copyable targets without including Server 2012 R2", () => {
   const b=browser(true);
   b.element("onlyPoweredOn").checked=true;
   b.element("input").value="VWCSC018 192.0.2.1 WIN/2022\nVM-LEGACY01 192.0.2.2 WIN/2012 R2\n192.0.2.3 WIN/2022";
@@ -428,6 +428,10 @@ test("manual opening and closure scope do not unlock deployment", () => {
   b.read("generate();generateClosure();");
   assert.equal(b.read("processInput().hostnames.length"),0);
   assert.equal(b.read("processInput().ips.length"),0);
+  assert.equal(b.element("cleanHostnames").value,"VWCSC018");
+  assert.equal(b.element("cleanIps").value,"192.0.2.1\n192.0.2.3");
+  assert.match(b.element("cleanHostnamesLabel").textContent,/entrada manual/);
+  assert.equal(b.element("windowsIpRegex").value,"(192.0.2.1|192.0.2.3)");
   assert.equal(b.read("getClosurePayload().servers.length"),3);
   const email=b.element("emailText").innerHTML;
   for (const text of ["VWCSC018","192.0.2.3","sem confirmação","BANCO DE DADOS","2012","KB6000003"]) assert(email.includes(text),text);
@@ -473,7 +477,7 @@ test("an evidence-only report opens without claiming success for an unidentified
   assert.equal(b.read("getClosurePayload().status"),"Concluída com ressalvas");
 });
 
-test("manual VM-prefixed Linux names without digits appear in the email and scope, not in deploy", () => {
+test("manual VM-prefixed Linux names without digits appear in the email, scope and manual targets", () => {
   const b=browser(true);
   b.element("onlyPoweredOn").checked=true;
   const names=["VM-EXAMPLE-DEVELOP","vm-example-homol","vm-example-prod"];
@@ -485,8 +489,8 @@ test("manual VM-prefixed Linux names without digits appear in the email and scop
   }
   assert.match(b.element("emailText").innerHTML,/Servidores sem confirmação no CMDB/);
   assert.doesNotMatch(b.element("gmudReviewItems").innerHTML,/Nenhum hostname/);
-  assert.equal(b.element("cleanHostnames").value,"");
-  assert.equal(b.element("linuxHostnameRegex").value,"");
+  assert.equal(b.element("cleanHostnames").value,names.join("\n"));
+  assert.equal(b.element("linuxHostnameRegex").value,`(${names.join("|")})`);
 });
 
 test("opening email remains available with an empty scope or only powered-off VMs", () => {
@@ -522,12 +526,12 @@ test("manual VISA email preserves hostnames and masks IPs without the CMDB", () 
   assert(!email.includes("192.0.2."));
 });
 
-test("a failed or malformed API reload invalidates previously eligible machines", async () => {
+test("a failed or malformed API reload replaces confirmed targets with labeled manual output", async () => {
   for(const malformed of [false,true]) {
     const b=browser(true);
     b.context.console.error=()=>{};
     b.element("onlyPoweredOn").checked=true;
-    b.element("input").value="VM-ON01 192.0.2.1 WIN/2022";
+    b.element("input").value="VM-MANUAL01 192.0.2.1 WIN/2022";
     b.read('isCmdbLoaded=true;cmdbDatabase=[{HostName:"VM-ON01",IP:"192.0.2.1",Status:"ON"}];generate();');
     assert(b.element("hostnameRegex").value.includes("VM-ON01"));
     b.context.fetch=async()=>{if(!malformed)throw Error("offline");return {ok:true,json:async()=>({error:"bad"})};};
@@ -535,6 +539,8 @@ test("a failed or malformed API reload invalidates previously eligible machines"
     assert.equal(b.read("isCmdbLoaded"),false);
     assert.equal(b.read("processInput().hostnames.length"),0);
     assert(!b.element("hostnameRegex").value.includes("VM-ON01"));
+    assert.match(b.element("hostnameRegex").value,/VM-MANUAL01/);
+    assert.match(b.element("cleanIpsLabel").textContent,/entrada manual/);
     assert(b.element("closureEmailText").innerHTML.includes("Sem confirmação no CMDB"));
   }
 });

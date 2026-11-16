@@ -272,9 +272,9 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
         </div>
 
         <div>
-          <label for="cleanHostnames">Hostnames identificados (filtrados pela API)</label>
+          <label for="cleanHostnames" id="cleanHostnamesLabel">Hostnames identificados</label>
           <textarea id="cleanHostnames" class="small" readonly></textarea>
-          <label for="cleanIps">IPs identificados (filtrados pela API)</label>
+          <label for="cleanIps" id="cleanIpsLabel">IPs identificados</label>
           <textarea id="cleanIps" class="small" readonly></textarea>
         </div>
       </div>
@@ -1896,7 +1896,7 @@ function buildOsGroups(entries) {
 
 function buildDeploymentTargets(hostnames, ips, entries) {
   const excluded = entries.filter(entry => detectWindowsServer2012(entry.os));
-  const blockedNames = new Set(excluded.map(entry => getVmHostname(entry.hostname).toLowerCase()));
+  const blockedNames = new Set(excluded.map(entry => getVmHostname(entry.hostname).toLowerCase()).filter(Boolean));
   const blockedIps = new Set(excluded.flatMap(entry => entry.ips || []));
   const eligible = entries.filter(entry => !blockedNames.has(getVmHostname(entry.hostname).toLowerCase()) && !detectWindowsServer2012(entry.os))
     .map(entry => ({ ...entry, ips: (entry.ips || []).filter(ip => !blockedIps.has(ip)) }));
@@ -2362,7 +2362,8 @@ function processInput() {
   }
 
   const osData = buildOsGroups(onlyPoweredOn ? [] : rawEntries);
-  return { lines, ...buildDeploymentTargets(onlyPoweredOn ? [] : finalHostnames, onlyPoweredOn ? [] : finalIps, onlyPoweredOn ? [] : rawEntries), osNames: osData.osNames, manualEntries: rawEntries, isCmdbApplied: false, poweredOnOnly: onlyPoweredOn };
+  const manualTargets = buildDeploymentTargets(finalHostnames, finalIps, rawEntries);
+  return { lines, ...(onlyPoweredOn ? buildDeploymentTargets([], [], []) : manualTargets), osNames: osData.osNames, manualEntries: rawEntries, manualTargets, isCmdbApplied: false, poweredOnOnly: onlyPoweredOn };
 }
 
 function getDuplicateValues(values) {
@@ -2528,7 +2529,10 @@ function buildGmudReview(data, suggestedKbs, unsupportedNotices, monitoredAlerts
     if (missingOs > 0) add("critical", `${missingOs} VM(s) ligada(s) sem sistema operacional informado pela CMDB.`);
     [...data.activeVMs, ...data.offlineVMs, ...data.unknownVMs].filter(vm => vm.osConflict).forEach(vm => add("warning", `${vm.name}: ${vm.osConflict}`));
   } else {
-    add("warning", "CMDB não conectado: o e-mail usa a lista digitada; as listas de deploy ficam vazias até a validação.");
+    add("warning", "CMDB não conectado: as listas usam a entrada manual. Confira o estado e o sistema operacional das VMs antes do deploy.");
+    if (getUnsupportedWindowsServerNotices(inputLines).length && !unsupportedNotices.length) {
+      add("critical", "Windows Server 2012/2012 R2 detectado e excluído das listas manuais.");
+    }
   }
 
   if (unsupportedNotices.length > 0) add("critical", "Windows Server 2012/2012 R2 detectado: essas máquinas não serão atualizadas.");
@@ -2644,17 +2648,21 @@ function generate() {
   const gmudNumber = document.getElementById("schedGmud").value || "XXX";
   const data = processInput();
 
-  document.getElementById("cleanHostnames").value = data.hostnames.join("\n");
-  document.getElementById("cleanIps").value = data.ips.join("\n");
+  const targets = data.manualTargets || data;
+  const source = data.isCmdbApplied ? "filtrados pela API" : "entrada manual, sem validação do CMDB";
+  document.getElementById("cleanHostnamesLabel").textContent = `Hostnames identificados (${source})`;
+  document.getElementById("cleanIpsLabel").textContent = `IPs identificados (${source})`;
+  document.getElementById("cleanHostnames").value = targets.hostnames.join("\n");
+  document.getElementById("cleanIps").value = targets.ips.join("\n");
 
-  document.getElementById("hostnameRegex").value = makeRegex(data.hostnames, false);
-  document.getElementById("ipRegex").value = makeRegex(data.ips, true);
-  updateOsSplitOutputs(data);
+  document.getElementById("hostnameRegex").value = makeRegex(targets.hostnames, false);
+  document.getElementById("ipRegex").value = makeRegex(targets.ips, true);
+  updateOsSplitOutputs(targets);
 
-  document.getElementById("hostCount").innerText = data.hostnames.length;
-  document.getElementById("ipCount").innerText = data.ips.length;
-  document.getElementById("windowsMachineCount").innerText = data.osGroups?.windows?.hostnames?.length || 0;
-  document.getElementById("linuxMachineCount").innerText = data.osGroups?.linux?.hostnames?.length || 0;
+  document.getElementById("hostCount").innerText = targets.hostnames.length;
+  document.getElementById("ipCount").innerText = targets.ips.length;
+  document.getElementById("windowsMachineCount").innerText = targets.osGroups.windows.hostnames.length;
+  document.getElementById("linuxMachineCount").innerText = targets.osGroups.linux.hostnames.length;
   document.getElementById("lineCount").innerText = data.lines.length;
 
   const osDetectionLines = getOsDetectionLines(data);
