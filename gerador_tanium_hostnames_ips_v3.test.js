@@ -377,10 +377,9 @@ const visaThirdWaveEmailHtml = getElement("emailText").innerHTML;
 assert(visaThirdWaveAlertsHtml.includes("VISA035"));
 assert(visaThirdWaveAlertsHtml.includes("VISA034-W"));
 assert(!visaThirdWaveAlertsHtml.includes("<strong>VISA034</strong>"));
-assert(visaThirdWaveEmailHtml.includes("[VM PRIORITÁRIA - 3ª ONDA VISA]"));
-assert(visaThirdWaveEmailHtml.includes("3ª onda VISA: VM prioritária"));
-assert(visaThirdWaveEmailHtml.includes("3ª ONDA VISA (2 VMs)"));
-assert.strictEqual((visaThirdWaveEmailHtml.match(/3ª onda VISA: VM prioritária/g) || []).length, 1);
+assert(visaThirdWaveEmailHtml.includes("VMs prioritárias da 3ª onda VISA: 2"));
+assert(!visaThirdWaveEmailHtml.includes("VISA035"));
+assert(!visaThirdWaveEmailHtml.includes("VISA034-W"));
 
 getElement("input").value = [
   "WINAPP01 Microsoft Windows Server 2019 (64-bit) 10.10.10.1",
@@ -440,7 +439,7 @@ assert(closureEmailHtml.includes("Encerramento da GMUD GMUD-TESTE"));
 assert(closureEmailHtml.includes("Concluída com ressalvas"), "evidencias pendentes nao comprovam sucesso");
 assert(closureEmailHtml.includes("Atualizacao finalizada sem incidentes"));
 assert(closureEmailHtml.includes("KB5120242"));
-assert(closureEmailHtml.includes("VISA011-B"));
+assert(!closureEmailHtml.includes("VISA011-B"));
 assert(!closureEmailHtml.includes("print-finalizacao.png"));
 assert(closureEmailHtml.includes("Evidência 1"));
 
@@ -516,7 +515,7 @@ sandbox.__generateClosure();
 const missingEvidenceEmailHtml = getElement("closureEmailText").innerHTML;
 const missingEvidenceReportHtml = sandbox.__buildClosureReportHtml();
 assert(missingEvidenceEmailHtml.includes("Servidores com validação manual necessária"));
-assert(missingEvidenceEmailHtml.includes("VISA029-1"));
+assert(!missingEvidenceEmailHtml.includes("VISA029-1"));
 assert(missingEvidenceReportHtml.includes("<td>VISA029-1</td><td>Windows Server 2016</td><td>OCR sem correspondencia com o servidor; validar manualmente</td>"));
 assert(missingEvidenceReportHtml.includes("<td>VISA050-X</td><td>Windows Server 2022</td><td>Registrado nas observacoes da GMUD</td>"));
 assert(missingEvidenceReportHtml.includes("validacao manual"));
@@ -649,20 +648,20 @@ vm.runInContext(`isCmdbLoaded = true; cmdbDatabase = [{
 }];`, sandbox);
 sandbox.__generateClosure();
 const visaClosureEmailHtml = getElement("closureEmailText").innerHTML;
-assert(visaClosureEmailHtml.includes("VISA004"), "encerramento VISA deve mostrar o hostname");
+assert(!visaClosureEmailHtml.includes("VISA004"), "encerramento VISA deve ocultar o hostname");
 assert(visaClosureEmailHtml.includes("Cliente: VISA-HYPERATIVA"));
 assert(visaClosureEmailHtml.includes("Microsoft Windows Server 2022"));
 assert(!visaClosureEmailHtml.includes("10.203.159.14"), "e-mail de encerramento da VISA nao deve exibir IP");
 sandbox.__generate();
 const visaStartEmailHtml = getElement("emailText").innerHTML;
-assert(visaStartEmailHtml.includes("VISA004"), "inicio VISA deve mostrar o hostname");
+assert(!visaStartEmailHtml.includes("VISA004"), "inicio VISA deve ocultar o hostname");
 assert(!visaStartEmailHtml.includes("10.203.159.14"), "inicio VISA deve continuar sem IP");
 const visaPrivacyText = vm.runInContext(`applyVisaEmailPrivacy(
   "<strong>VISA048-A.VISABRASIL.local</strong> Observacao: VISA009 10.203.159.14",
   { activeVMs: [{ name: "VISA004", info: "Cliente: VISA-HYPERATIVA" }] }
 )`, sandbox);
-assert(visaPrivacyText.includes("VISA048-A.VISABRASIL.local"), "preservar FQDN e sufixo");
-assert(visaPrivacyText.includes("VISA009"), "preservar hostname nas observacoes");
+assert(!visaPrivacyText.includes("VISA048-A"), "ocultar FQDN e sufixo");
+assert(!visaPrivacyText.includes("VISA009"), "ocultar hostname nas observacoes");
 assert(!visaPrivacyText.includes("10.203.159.14"), "ocultar IP nas observacoes");
 const cmdbCopyResult = getElement("cmdbCopyResult").value;
 assert(cmdbCopyResult.includes("VISA004 | Cliente: VISA-HYPERATIVA | IP: 10.203.159.14"));
