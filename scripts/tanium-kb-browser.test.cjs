@@ -285,6 +285,22 @@ test("CMDB Server 2008 R2 conflicting with WIN/2022 stays out of deployment targ
   assert.equal(b.read("suggestKBs(getOsDetectionLines(processInput()), false).length"),0);
 });
 
+test("CMDB Linux is not classified as Windows when GMUD says WIN/2022", () => {
+  const b=browser(true);
+  b.element("onlyPoweredOn").checked=true;
+  b.element("input").value="SV-AD-LNX01 192.0.2.10 WIN/2022\nSV-WINDOWS01 192.0.2.11 WIN/2022";
+  b.read('isCmdbLoaded=true;cmdbDatabase=[{HostName:"SV-AD-LNX01",IP:"192.0.2.10",Status:"ON",SO:"Debian GNU/Linux 12"},{HostName:"SV-WINDOWS01",IP:"192.0.2.11",Status:"ON",SO:"Microsoft Windows Server 2022"}];generate();');
+  assert.match(b.element("linuxHostnameRegex").value,/SV-AD-LNX01/);
+  assert.match(b.element("linuxIpRegex").value,/192\.0\.2\.10/);
+  assert.doesNotMatch(b.element("windowsHostnameRegex").value,/SV-AD-LNX01/);
+  assert.match(b.element("windowsHostnameRegex").value,/SV-WINDOWS01/);
+  assert.equal(b.element("linuxMachineCount").innerText,1);
+  assert.match(b.element("emailText").innerHTML,/Debian GNU\/Linux 12/);
+  assert.match(b.element("vmsList").innerHTML,/SO informado na GMUD: Windows Server 2022; CMDB: Debian Linux/);
+  b.element("input").value="SV-AD-LNX01 192.0.2.10 WIN/2022";
+  assert.equal(b.read("suggestKBs(getOsDetectionLines(processInput()), false).length"),0);
+});
+
 test("selecting another evidence batch preserves prior files and OCR without duplicating reselected files", () => {
   const b=browser(true);
   b.context.batchOne=[{name:"one.png",type:"image/png",size:100,lastModified:1}];
