@@ -1224,6 +1224,16 @@ function detectWindowsServer2012(text) {
   return /(?:^|[\s|:(])(?:srv12|server12|2012\s+r2)(?=$|[\s|;)])/i.test(String(text || ""));
 }
 
+function detectWindowsServer2008(text) {
+  const value = String(text || "");
+  const osField = value.match(/\b(?:OS|SO):\s*([^|]+)/i);
+  return /(?:^|[\s|:(])(?:windows\s+server|microsoft\s+server|server|windows|win|ws)\s*[/-]?\s*2008\b/i.test(osField ? osField[1] : value);
+}
+
+function isWindowsServerExcludedFromDeploy(text) {
+  return detectWindowsServer2008(text) || detectWindowsServer2012(text);
+}
+
 function getUnsupportedWindowsServerNotices(lines) {
   const rows = Array.isArray(lines) ? lines : String(lines || "").split(/\r?\n/);
   return rows.some(detectWindowsServer2012) ? [WINDOWS_SERVER_2012_UNSUPPORTED_NOTICE] : [];
@@ -1822,6 +1832,7 @@ function getOsLabelFromText(text) {
   const value = String(text || "");
   const normalized = normalizeOsDetectionText(value);
 
+  if (detectWindowsServer2008(value)) return "Windows Server 2008/2008 R2";
   const explicitVersion = getExplicitWindowsServerVersion(value);
   if (explicitVersion && explicitVersion !== "2012") return `Windows Server ${explicitVersion}`;
   if (detectWindowsServer2012(value)) return "Windows Server 2012/2012 R2 (sem atualizacao padrao)";
@@ -1895,10 +1906,10 @@ function buildOsGroups(entries) {
 }
 
 function buildDeploymentTargets(hostnames, ips, entries) {
-  const excluded = entries.filter(entry => detectWindowsServer2012(entry.os));
+  const excluded = entries.filter(entry => isWindowsServerExcludedFromDeploy(entry.os));
   const blockedNames = new Set(excluded.map(entry => getVmHostname(entry.hostname).toLowerCase()).filter(Boolean));
   const blockedIps = new Set(excluded.flatMap(entry => entry.ips || []));
-  const eligible = entries.filter(entry => !blockedNames.has(getVmHostname(entry.hostname).toLowerCase()) && !detectWindowsServer2012(entry.os))
+  const eligible = entries.filter(entry => !blockedNames.has(getVmHostname(entry.hostname).toLowerCase()) && !isWindowsServerExcludedFromDeploy(entry.os))
     .map(entry => ({ ...entry, ips: (entry.ips || []).filter(ip => !blockedIps.has(ip)) }));
   return {
     hostnames: hostnames.filter(name => !blockedNames.has(getVmHostname(name).toLowerCase())),
@@ -2066,7 +2077,7 @@ function suggestKBs(lines, render = true) {
     if (osLabel === "Windows 11") suggested.add("11");
   });
 
-  if (unsupportedNotices.length === 0 && suggested.size === 0 && (text.includes("win") || text.includes("microsoft") || text.includes("ad") || text.includes("sql"))) {
+  if (unsupportedNotices.length === 0 && !lines.some(detectWindowsServer2008) && suggested.size === 0 && (text.includes("win") || text.includes("microsoft") || text.includes("ad") || text.includes("sql"))) {
     suggested.add("2019");
     suggested.add("2022");
     suggested.add("2025");
@@ -2272,8 +2283,11 @@ function processInput() {
         const info = srv.serverInfo;
         const status = normalizeCmdbPowerStatus(info.Status);
         const cmdbOs = getOsLabelFromText(info.SO);
-        const inputOs = getExplicitWindowsServerVersion(srv.sourceLine) && !/or\s+later|ou\s+posterior|ou\s+superior/i.test(srv.sourceLine) ? srv.lineOs : "";
-        const effectiveOs = inputOs && inputOs !== cmdbOs ? inputOs : (info.SO || srv.lineOs || srv.sourceLine);
+        const inputOs = (getExplicitWindowsServerVersion(srv.sourceLine) || detectWindowsServer2008(srv.sourceLine))
+          && !/or\s+later|ou\s+posterior|ou\s+superior/i.test(srv.sourceLine) ? srv.lineOs : "";
+        // Keep a legacy OS out of deploy until conflicting records are verified.
+        const confirmedLegacyOs = detectWindowsServer2008(info.SO) ? info.SO : detectWindowsServer2008(inputOs) ? inputOs : "";
+        const effectiveOs = confirmedLegacyOs || (inputOs && inputOs !== cmdbOs ? inputOs : (info.SO || srv.lineOs || srv.sourceLine));
         const osConflict = inputOs && cmdbOs && inputOs !== cmdbOs
           ? `SO informado na GMUD: ${inputOs}; CMDB: ${cmdbOs}. Validar cadastro.` : "";
         const ipInfo = info.IP ? ` | IP: ${info.IP}` : "";
@@ -2546,6 +2560,9 @@ function buildGmudReview(data, suggestedKbs, unsupportedNotices, monitoredAlerts
   }
 
   if (unsupportedNotices.length > 0) add("critical", "Windows Server 2012/2012 R2 detectado: essas máquinas não serão atualizadas.");
+  if ([...getOsDetectionLines(data), ...inputLines].some(detectWindowsServer2008)) {
+    add("critical", "Windows Server 2008/2008 R2 detectado e excluído das listas de atualização.");
+  }
 
   const expectedVersions = new Set();
   getOsDetectionLines(data).map(getOsLabelFromText).forEach(label => {
@@ -2695,12 +2712,14 @@ function generate() {
   const privateVisaEmail = isVisaEmailScope(emailScope);
   if (privateVisaEmail) {
     const active = data.activeVMs || [];
-    const eligible = active.filter(vm => !detectWindowsServer2012(vm.info)).length;
-    const excluded = active.length - eligible;
+    const eligible = active.filter(vm => !isWindowsServerExcludedFromDeploy(vm.info)).length;
+    const excluded2012 = active.filter(vm => detectWindowsServer2012(vm.info)).length;
+    const excluded2008 = active.filter(vm => detectWindowsServer2008(vm.info)).length;
     emailHtml += "<strong>Resumo do escopo:</strong><br>";
     if (data.isCmdbApplied) {
       emailHtml += `- Servidores ligados previstos para atualização: ${eligible}<br>`;
-      if (excluded) emailHtml += `- Windows Server 2012/2012 R2 (não serão atualizados): ${excluded}<br>`;
+      if (excluded2012) emailHtml += `- Windows Server 2012/2012 R2 (não serão atualizados): ${excluded2012}<br>`;
+      if (excluded2008) emailHtml += `- Windows Server 2008/2008 R2 (fora do deploy; validar cadastro): ${excluded2008}<br>`;
       if (!data.poweredOnOnly && data.offlineVMs.length) emailHtml += `- Servidores desligados (não serão atualizados): ${data.offlineVMs.length}<br>`;
     }
     const pending = unconfirmed.length || (!data.poweredOnOnly ? (data.unknownVMs || []).length || (!data.isCmdbApplied ? data.hostnames.length : 0) : 0);
@@ -2718,8 +2737,9 @@ function generate() {
     if (!manualScope && !unconfirmed.length) emailHtml += "A partir deste momento, será dado início ao processo de atualização dos servidores relacionados abaixo:<br><br>";
 
     if (data.isCmdbApplied) {
-      const eligibleVMs = data.activeVMs.filter(vm => !detectWindowsServer2012(vm.info));
+      const eligibleVMs = data.activeVMs.filter(vm => !isWindowsServerExcludedFromDeploy(vm.info));
       const excludedVMs = data.activeVMs.filter(vm => detectWindowsServer2012(vm.info));
+      const legacyVMs = data.activeVMs.filter(vm => detectWindowsServer2008(vm.info));
       if (eligibleVMs.length > 0) {
         emailHtml += "<strong>Servidores LIGADOS (Patches serão aplicados):</strong><br>";
         eligibleVMs.forEach(vm => {
@@ -2731,6 +2751,12 @@ function generate() {
       if (excludedVMs.length > 0) {
         emailHtml += "<br><strong>Windows Server 2012/2012 R2 - Não serão atualizados (fora do deploy):</strong><br>";
         excludedVMs.forEach(vm => {
+          emailHtml += `- <strong>${escapeHtml(vm.name)}</strong> (${getCustomerEmailVmInfo(vm)})<br>`;
+        });
+      }
+      if (legacyVMs.length > 0) {
+        emailHtml += "<br><strong>Windows Server 2008/2008 R2 - Fora do deploy até validação:</strong><br>";
+        legacyVMs.forEach(vm => {
           emailHtml += `- <strong>${escapeHtml(vm.name)}</strong> (${getCustomerEmailVmInfo(vm)})<br>`;
         });
       }
@@ -2817,6 +2843,8 @@ function generate() {
     });
   } else if (emailNotices.length > 0) {
     emailHtml += "- Nenhum KB será sugerido automaticamente para Windows Server 2012/2012 R2 sem validação de ESU ou atualização de versão.<br>";
+  } else if (communicationLines.some(detectWindowsServer2008)) {
+    emailHtml += "- Nenhum KB foi identificado para os servidores elegíveis neste escopo.<br>";
   } else {
     emailHtml += "- Atualizações cumulativas de segurança (Tanium Patch)<br>";
   }

@@ -270,6 +270,21 @@ test("VISA customer detection works for non-VISA hostnames and non-VISA emails r
   }
 });
 
+test("CMDB Server 2008 R2 conflicting with WIN/2022 stays out of deployment targets", () => {
+  const b=browser(true);
+  b.element("onlyPoweredOn").checked=true;
+  b.element("input").value="SV-LEGACY-01 192.0.2.10 WIN/2022\nSV-CURRENT-01 192.0.2.11 WIN/2022";
+  b.read('isCmdbLoaded=true;cmdbDatabase=[{HostName:"SV-LEGACY-01",IP:"192.0.2.10",Status:"ON",SO:"Microsoft Windows Server 2008 R2"},{HostName:"SV-CURRENT-01",IP:"192.0.2.11",Status:"ON",SO:"Microsoft Windows Server 2022"}];generate();');
+  const data=b.read("processInput()");
+  assert.deepEqual(Array.from(data.hostnames),["SV-CURRENT-01"]);
+  assert.deepEqual(Array.from(data.ips),["192.0.2.11"]);
+  assert.match(b.element("vmsList").innerHTML,/SO informado na GMUD: Windows Server 2022; CMDB: Windows Server 2008/);
+  assert.match(b.element("emailText").innerHTML,/Windows Server 2008\/2008 R2 - Fora do deploy até validação/);
+  assert.equal(b.read('detectWindowsServer2008("SV-WIN-2008 WIN/2022")'),false);
+  b.element("input").value="SV-LEGACY-01 192.0.2.10 WIN/2022";
+  assert.equal(b.read("suggestKBs(getOsDetectionLines(processInput()), false).length"),0);
+});
+
 test("selecting another evidence batch preserves prior files and OCR without duplicating reselected files", () => {
   const b=browser(true);
   b.context.batchOne=[{name:"one.png",type:"image/png",size:100,lastModified:1}];
