@@ -112,11 +112,12 @@ assert(html.includes('class="regex-grid"'), "resultados finais devem usar grade 
 assert(html.includes("grid-template-columns:repeat(2,minmax(0,1fr))"), "resultados gerais separados devem ter duas colunas em telas largas");
 assert(html.includes("align-items:stretch"), "paineis paralelos devem preencher toda a altura disponivel");
 assert(html.includes("grid-template-rows:repeat(2,minmax(0,1fr))"), "resultados da coluna esquerda devem preencher o espaco vertical");
-const requiredCcList = "noc@br.clara.net; henrique.urbaninho@claranet.com; filipe.evangelista@claranet.com; ronald.magalhaes@claranet.com; aliffe.santos@claranet.com";
+const requiredCcList = "noc@br.clara.net; henrique.urbaninho@claranet.com; filipe.evangelista@claranet.com; aliffe.santos@claranet.com";
 getElement("schedGmudTitle").value = "GMUD XXX - TEST | Atualizações de Segurança";
 assert(html.includes(`id="schedCc" value="${requiredCcList}"`), "campo Cc deve iniciar com todos os destinatarios obrigatorios");
 assert.strictEqual(vm.runInContext('ensureRequiredCc("")', sandbox), requiredCcList);
-assert.strictEqual(vm.runInContext('ensureRequiredCc("cliente@empresa.com; NOC@BR.CLARA.NET")', sandbox), `cliente@empresa.com; NOC@BR.CLARA.NET; henrique.urbaninho@claranet.com; filipe.evangelista@claranet.com; ronald.magalhaes@claranet.com; aliffe.santos@claranet.com`);
+assert.strictEqual(vm.runInContext('ensureRequiredCc("cliente@empresa.com; NOC@BR.CLARA.NET; RONALD.MAGALHAES@CLARANET.COM")', sandbox), `cliente@empresa.com; NOC@BR.CLARA.NET; henrique.urbaninho@claranet.com; filipe.evangelista@claranet.com; aliffe.santos@claranet.com`);
+assert.strictEqual(vm.runInContext('getGmudRecipients("Ronald <ronald.magalhaes@claranet.com>; cliente@empresa.com").join("; ")', sandbox), "cliente@empresa.com");
 getElement("schedDate").value = "2026-10-04";
 getElement("schedTime").value = "23:00";
 getElement("schedCc").value = "";

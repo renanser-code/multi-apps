@@ -458,7 +458,7 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
           </div>
           <div>
             <label for="schedCc">Cópia (Cc) — separados por ;</label>
-            <input type="text" id="schedCc" value="noc@br.clara.net; henrique.urbaninho@claranet.com; filipe.evangelista@claranet.com; ronald.magalhaes@claranet.com; aliffe.santos@claranet.com" placeholder="copia@empresa.com">
+            <input type="text" id="schedCc" value="noc@br.clara.net; henrique.urbaninho@claranet.com; filipe.evangelista@claranet.com; aliffe.santos@claranet.com" placeholder="copia@empresa.com">
           </div>
         </div>
 
@@ -1004,12 +1004,20 @@ const REQUIRED_CC_EMAILS = [
   "noc@br.clara.net",
   "henrique.urbaninho@claranet.com",
   "filipe.evangelista@claranet.com",
-  "ronald.magalhaes@claranet.com",
   "aliffe.santos@claranet.com"
 ];
 
+function isAllowedGmudRecipient(value) {
+  const address = (value.match(/<\s*([^<>]+)\s*>/)?.[1] || value).trim().toLowerCase();
+  return address !== "ronald.magalhaes@claranet.com";
+}
+
+function getGmudRecipients(value) {
+  return String(value || "").split(/[;,]/).map(email => email.trim()).filter(email => email && isAllowedGmudRecipient(email));
+}
+
 function ensureRequiredCc(value) {
-  const emails = String(value || "").split(/[;,]/).map(email => email.trim()).filter(Boolean);
+  const emails = getGmudRecipients(value);
   REQUIRED_CC_EMAILS.forEach(requiredEmail => {
     if (!emails.some(email => email.toLowerCase() === requiredEmail)) emails.push(requiredEmail);
   });
@@ -4243,7 +4251,7 @@ function buildSchedulingScript() {
   const gmudNum    = document.getElementById("schedGmud").value.trim() || "XXX";
   const schedDate  = document.getElementById("schedDate").value;   // YYYY-MM-DD
   const schedTime  = document.getElementById("schedTime").value;   // HH:MM
-  const toAddr     = document.getElementById("schedTo").value.trim() || "";
+  const toAddr     = getGmudRecipients(document.getElementById("schedTo").value).join("; ");
   const ccField    = document.getElementById("schedCc");
   const ccAddr     = ensureRequiredCc(ccField.value);
   ccField.value    = ccAddr;
@@ -4427,7 +4435,7 @@ function parseGmudEmail() {
 
   // 3. Extract ALL email addresses from the ENTIRE text
   const emailRegex = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
-  const allEmailsFound = [...new Set(raw.match(emailRegex) || [])];
+  const allEmailsFound = [...new Set(raw.match(emailRegex) || [])].filter(isAllowedGmudRecipient);
 
   // 4. Extract server hostnames and IPs from the body
   const ipPattern = /\b(?:\d{1,3}\.){3}\d{1,3}\b/;
