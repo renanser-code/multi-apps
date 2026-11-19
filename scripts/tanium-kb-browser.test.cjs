@@ -428,7 +428,7 @@ test("manual full GMUD title escapes HTML and PowerShell quotes", () => {
   assert(b.read("buildSchedulingScript()").includes("D''CLIENTE"));
 });
 
-test("ON-only deploy excludes OFF, retired and missing VMs while communication labels missing VMs", () => {
+test("deploy includes missing GMUD hosts while excluding confirmed OFF and retired VMs", () => {
   assert.match(html, /id="onlyPoweredOn" checked disabled/);
   const b = browser(true);
   b.element("onlyPoweredOn").checked=true;
@@ -440,7 +440,7 @@ test("ON-only deploy excludes OFF, retired and missing VMs while communication l
   ];
   b.element("input").value=records.map(r=>`${r.HostName} ${r.IP}`).join("\n")+"\nVM-MISS01 192.0.2.5";
   b.read(`isCmdbLoaded=true;cmdbDatabase=${JSON.stringify(records)};generate();generateClosure();`);
-  assert.equal(b.read("processInput().hostnames.length"),2);
+  assert.equal(b.read("processInput().hostnames.length"),3);
   assert.equal(b.read("getClosurePayload().servers.length"),3);
   for(const output of [b.element("emailText").innerHTML,b.element("closureEmailText").innerHTML,b.read("buildClosureReportHtml()")]) {
     for(const record of records.slice(2)) assert(!output.includes(record.HostName));
@@ -457,9 +457,32 @@ test("ON-only deploy excludes OFF, retired and missing VMs while communication l
   assert(!b.element("vmsList").innerHTML.includes("VM-SQL-OFF01"));
   assert(b.element("scopeTableBody").innerHTML.includes("VM-SQL-OFF01"));
   b.read('cmdbDatabase=[];generate();');
-  assert.equal(b.read("processInput().hostnames.length"),0);
+  assert.equal(b.read("processInput().hostnames.length"),5);
   assert(b.element("emailText").innerHTML.includes("VM-MISS01"));
   assert(b.read("buildClosureReportHtml()").includes("VM-MISS01"));
+});
+
+test("missing CMDB targets use declared Windows/Linux without guessing an unknown OS", () => {
+  const b=browser(true);
+  b.element("onlyPoweredOn").checked=true;
+  b.element("input").value=[
+    "VM-NEW-WIN01 192.0.2.10 WIN/2022",
+    "VM-NEW-LIN01 192.0.2.11 Debian Linux",
+    "VM-UNKNOWN01",
+    "VM-OLD01 WIN/2008 R2",
+    "VM-OLD02 WIN/2012",
+    "VM-OFF01 WIN/2022"
+  ].join("\n");
+  b.read('isCmdbLoaded=true;cmdbDatabase=[{HostName:"VM-OFF01",Status:"OFF",SO:"Windows Server 2022"}];generate();');
+  assert(b.element("windowsHostnameRegex").value.includes("VM-NEW-WIN01"));
+  assert(b.element("linuxHostnameRegex").value.includes("VM-NEW-LIN01"));
+  assert(b.element("hostnameRegex").value.includes("VM-UNKNOWN01"));
+  for(const id of ["windowsHostnameRegex","linuxHostnameRegex"]) assert(!b.element(id).value.includes("VM-UNKNOWN01"));
+  for(const name of ["VM-OLD01","VM-OLD02","VM-OFF01"]) assert(!b.element("hostnameRegex").value.includes(name));
+  assert.equal(b.element("windowsMachineCount").innerText,1);
+  assert.equal(b.element("linuxMachineCount").innerText,1);
+  assert(b.read("processInput().unknownVMs.every(vm => vm.unmatched)"));
+  assert(!b.read("getClosurePayload().allServersEvidencedSuccessfully"));
 });
 
 test("manual scope generates copyable targets without including Server 2012 R2", () => {
@@ -495,7 +518,7 @@ test("closure report correlates attached evidence for a VM absent from CMDB by i
   b.read('isCmdbLoaded=true; cmdbDatabase=[{HostName:"OTHER01",Status:"ON"}]; generate();');
   b.read('closureEvidenceFiles=[{name:"evidencia.png",type:"image/png",size:32,dataUrl:"data:image/png;base64,AA==",ocrAnalyzed:true,ocrText:"192.0.2.42 Complete All Patches Applied"}];');
   assert(b.element("emailText").innerHTML.includes("VM-MISSING01"));
-  assert.equal(b.read("processInput().ips.length"),0);
+  assert.equal(b.read("processInput().ips.length"),1);
   let report;
   let opened=false;
   b.context.window.open=()=>{

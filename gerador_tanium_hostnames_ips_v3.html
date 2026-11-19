@@ -286,7 +286,7 @@ SV-DBS-BARUEL02&nbsp;&nbsp;&nbsp;10.255.68.9 - Garantir integridade dos backups
         <label class="check"><input type="checkbox" id="escapeIps"> Escapar pontos dos IPs com \.</label>
         <label class="check"><input type="checkbox" id="appendWildcard" checked> Adicionar .* no final</label>
         <label class="check"><input type="checkbox" id="ignoreInvalidIps" checked> Ignorar IPs inválidos</label>
-        <label class="check"><input type="checkbox" id="onlyPoweredOn" checked disabled> Deploy: somente VMs confirmadas como ligadas na API</label>
+        <label class="check"><input type="checkbox" id="onlyPoweredOn" checked disabled> Deploy: VMs ligadas e VMs da GMUD não encontradas no CMDB</label>
       </div>
 
       <div class="review-panel" id="gmudReviewPanel">
@@ -1248,7 +1248,10 @@ function getUnsupportedWindowsServerNotices(lines) {
 }
 
 function getOsDetectionLines(data) {
-  if (data.poweredOnOnly) return (data.activeVMs || []).map(vm => `${vm.name} ${vm.info || ""}`);
+  if (data.poweredOnOnly) return [
+    ...(data.activeVMs || []).map(vm => `${vm.name} ${vm.info || ""}`),
+    ...(data.unknownVMs || []).filter(vm => vm.unmatched && vm.inputOs).map(vm => `OS: ${vm.inputOs}`)
+  ];
   const cmdbLines = [
     ...((data.activeVMs || []).map(vm => `${vm.name || ""} ${vm.info || ""}`)),
     ...((data.offlineVMs || []).map(vm => `${vm.name || ""} ${vm.info || ""}`))
@@ -2356,17 +2359,16 @@ function processInput() {
         const details = "Não encontrado no CMDB";
         unknownVMs.push({ name: srv.displayName, info: details, reason: "Não cadastrado no CMDB", unmatched: true, inputIp: srv.ip, inputOs: srv.lineOs });
         
-        if (!onlyPoweredOn) {
-          if (isValidIp(srv.displayName)) {
-            filteredIps.push(srv.displayName);
-          } else {
-            filteredHostnames.push(srv.displayName.split(".")[0]);
-            if (srv.ip) filteredIps.push(srv.ip);
-          }
-          const entryHost = isValidIp(srv.displayName) ? "" : srv.displayName.split(".")[0];
-          const entryIps = srv.ip ? [srv.ip] : (isValidIp(srv.displayName) ? [srv.displayName] : []);
-          scopedEntries.push(createOsEntry(entryHost, entryIps, srv.lineOs || srv.sourceLine));
+        // A missing CMDB record must not discard an explicitly requested target.
+        if (isValidIp(srv.displayName)) {
+          filteredIps.push(srv.displayName);
+        } else {
+          filteredHostnames.push(srv.displayName.split(".")[0]);
+          if (srv.ip) filteredIps.push(srv.ip);
         }
+        const entryHost = isValidIp(srv.displayName) ? "" : srv.displayName.split(".")[0];
+        const entryIps = srv.ip ? [srv.ip] : (isValidIp(srv.displayName) ? [srv.displayName] : []);
+        scopedEntries.push(createOsEntry(entryHost, entryIps, srv.lineOs || srv.sourceLine));
         
         if (!onlyPoweredOn) listHtml += `<div class="vm-item">
           <span><strong>${srv.displayName}</strong> (${details})</span>
@@ -2560,6 +2562,8 @@ function buildGmudReview(data, suggestedKbs, unsupportedNotices, monitoredAlerts
   if (rawHosts.length === 0 && rawIps.length === 0) add("critical", "Nenhum hostname ou IP válido foi identificado na entrada.");
   if (data.isCmdbApplied) {
     if (data.unknownVMs.length > 0) add("critical", `${data.unknownVMs.length} VM(s) não encontrada(s) ou sem status válido na CMDB.`);
+    const unclassified = data.unknownVMs.filter(vm => vm.unmatched && !getOsFamily(vm.inputOs));
+    if (unclassified.length) add("warning", `${unclassified.length} VM(s) sem SO informado: incluídas na lista geral do Tanium, com classificação Windows/Linux pendente.`);
     if (data.offlineVMs.length > 0) add("warning", `${data.offlineVMs.length} VM(s) desligada(s) e fora do escopo de atualização.`);
     const missingIp = data.activeVMs.filter(vm => !/\|\s*IP:\s*(?!N\/A)[^|]+/i.test(vm.info || "")).length;
     const missingOs = data.activeVMs.filter(vm => /\|\s*OS:\s*(?:N\/A|Nao informado)?\s*$/i.test(vm.info || "")).length;
@@ -2690,7 +2694,10 @@ function generate() {
   const data = processInput();
 
   const targets = data.manualTargets || data;
-  const source = data.isCmdbApplied ? "filtrados pela API" : "entrada manual, sem validação do CMDB";
+  const pendingTargets = (data.unknownVMs || []).filter(vm => vm.unmatched);
+  const source = data.isCmdbApplied
+    ? pendingTargets.length ? "CMDB e entrada da GMUD sem confirmação" : "filtrados pela API"
+    : "entrada manual, sem validação do CMDB";
   document.getElementById("cleanHostnamesLabel").textContent = `Hostnames identificados (${source})`;
   document.getElementById("cleanIpsLabel").textContent = `IPs identificados (${source})`;
   document.getElementById("cleanHostnames").value = targets.hostnames.join("\n");
