@@ -485,6 +485,26 @@ test("missing CMDB targets use declared Windows/Linux without guessing an unknow
   assert(!b.read("getClosurePayload().allServersEvidencedSuccessfully"));
 });
 
+test("standalone hosts inherit only an unambiguous peer family, never its OS version or power status", () => {
+  const b=browser(true);
+  b.element("onlyPoweredOn").checked=true;
+  b.element("input").value="VISA026-2 192.0.2.1 WIN/2022\nVISA028-5\nVISA028-6\nVISA047-C\nREDIS-CLUSTER-04 192.0.2.2 LINUX\nREDIS-CLUSTER-07";
+  b.read('isCmdbLoaded=true;cmdbDatabase=[{HostName:"VISA026-2",IP:"192.0.2.1",SO:"Windows Server 2022",Status:"ON"},{HostName:"REDIS-CLUSTER-04",IP:"192.0.2.2",SO:"Debian Linux",Status:"ON"}];generate();');
+  for(const name of ["VISA028-5","VISA028-6","VISA047-C"]) assert(b.element("windowsHostnameRegex").value.includes(name));
+  assert(b.element("linuxHostnameRegex").value.includes("REDIS-CLUSTER-07"));
+  assert.equal(b.element("windowsMachineCount").innerText,4);
+  assert.equal(b.element("linuxMachineCount").innerText,2);
+  assert.equal(b.read("processInput().inferredOsFamilies.length"),4);
+  assert.equal(b.read("processInput().activeVMs.length"),2);
+  assert(b.read('processInput().unknownVMs.every(vm => !vm.inputOs)'));
+  b.element("input").value="MIX-WIN01 WIN/2022\nMIX-LINUX01 LINUX\nMIX-UNKNOWN01\nUNRELATED01";
+  b.read('cmdbDatabase=[];generate();');
+  assert(!b.element("windowsHostnameRegex").value.includes("MIX-UNKNOWN01"));
+  assert(!b.element("linuxHostnameRegex").value.includes("MIX-UNKNOWN01"));
+  assert(!b.element("windowsHostnameRegex").value.includes("UNRELATED01"));
+  assert(b.element("hostnameRegex").value.includes("MIX-UNKNOWN01"));
+});
+
 test("manual scope generates copyable targets without including Server 2012 R2", () => {
   const b=browser(true);
   b.element("onlyPoweredOn").checked=true;

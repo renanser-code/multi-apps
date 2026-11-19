@@ -1922,10 +1922,26 @@ function buildDeploymentTargets(hostnames, ips, entries) {
   const blockedIps = new Set(excluded.flatMap(entry => entry.ips || []));
   const eligible = entries.filter(entry => !blockedNames.has(getVmHostname(entry.hostname).toLowerCase()) && !isWindowsServerExcludedFromDeploy(entry.os))
     .map(entry => ({ ...entry, ips: (entry.ips || []).filter(ip => !blockedIps.has(ip)) }));
+  const familyKey = name => getVmHostname(name).split(/[-_]/)[0].replace(/\d+$/, "").toLowerCase();
+  const familiesByPrefix = new Map();
+  eligible.filter(entry => entry.hostname && entry.family).forEach(entry => {
+    const key = familyKey(entry.hostname);
+    if (key.length < 3) return;
+    if (!familiesByPrefix.has(key)) familiesByPrefix.set(key, new Set());
+    familiesByPrefix.get(key).add(entry.family);
+  });
+  const inferredOsFamilies = [];
+  eligible.filter(entry => entry.hostname && !entry.family && !entry.os).forEach(entry => {
+    const candidates = familiesByPrefix.get(familyKey(entry.hostname));
+    if (candidates?.size !== 1) return;
+    entry.family = [...candidates][0];
+    inferredOsFamilies.push({ name: entry.hostname, family: entry.family });
+  });
   return {
     hostnames: hostnames.filter(name => !blockedNames.has(getVmHostname(name).toLowerCase())),
     ips: ips.filter(ip => !blockedIps.has(ip)),
-    osGroups: buildOsGroups(eligible).groups
+    osGroups: buildOsGroups(eligible).groups,
+    inferredOsFamilies
   };
 }
 
@@ -2562,7 +2578,8 @@ function buildGmudReview(data, suggestedKbs, unsupportedNotices, monitoredAlerts
   if (rawHosts.length === 0 && rawIps.length === 0) add("critical", "Nenhum hostname ou IP válido foi identificado na entrada.");
   if (data.isCmdbApplied) {
     if (data.unknownVMs.length > 0) add("critical", `${data.unknownVMs.length} VM(s) não encontrada(s) ou sem status válido na CMDB.`);
-    const unclassified = data.unknownVMs.filter(vm => vm.unmatched && !getOsFamily(vm.inputOs));
+    const inferredNames = new Set((data.inferredOsFamilies || []).map(entry => getVmHostname(entry.name).toLowerCase()));
+    const unclassified = data.unknownVMs.filter(vm => vm.unmatched && !getOsFamily(vm.inputOs) && !inferredNames.has(getVmHostname(vm.name).toLowerCase()));
     if (unclassified.length) add("warning", `${unclassified.length} VM(s) sem SO informado: incluídas na lista geral do Tanium, com classificação Windows/Linux pendente.`);
     if (data.offlineVMs.length > 0) add("warning", `${data.offlineVMs.length} VM(s) desligada(s) e fora do escopo de atualização.`);
     const missingIp = data.activeVMs.filter(vm => !/\|\s*IP:\s*(?!N\/A)[^|]+/i.test(vm.info || "")).length;
@@ -2578,6 +2595,8 @@ function buildGmudReview(data, suggestedKbs, unsupportedNotices, monitoredAlerts
   }
 
   if (unsupportedNotices.length > 0) add("critical", "Windows Server 2012/2012 R2 detectado: essas máquinas não serão atualizadas.");
+  const inferred = (data.manualTargets || data).inferredOsFamilies || [];
+  if (inferred.length) add("warning", `Família inferida pelo prefixo unânime no escopo, sem versão ou confirmação do CMDB: ${inferred.map(entry => `${entry.name} (${entry.family === "windows" ? "Windows" : "Linux"})`).join(", ")}. Validar antes do deploy.`);
   if ([...getOsDetectionLines(data), ...inputLines].some(detectWindowsServer2008)) {
     add("critical", "Windows Server 2008/2008 R2 detectado e excluído das listas de atualização.");
   }
