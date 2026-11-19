@@ -301,6 +301,24 @@ test("CMDB Linux is not classified as Windows when GMUD says WIN/2022", () => {
   assert.equal(b.read("suggestKBs(getOsDetectionLines(processInput()), false).length"),0);
 });
 
+test("GMUD import keeps standalone digit-suffix hosts, Unicode spacing and long server rows", () => {
+  const b=browser(true);
+  const rows=["VISA028-5","VISA028-6","VISA047-C","REDIS-CLUSTER-07",
+    "VISA026-2\u2002\u2002192.0.2.1\u2002WIN/2022 "+ "observacao ".repeat(30)];
+  b.context.mailFixture=["HOSTNAME: IP: SO:",...rows,...rows,"LINUX","Windows Server 2022",
+    "https://teams.microsoft.com/meet/example","Qui, 19/11/2026, 22:00"].join("\n");
+  const extracted=b.read("extractGmudServerLines(mailFixture)");
+  assert.deepEqual(Array.from(extracted),rows.map(row => row.trim()));
+  b.element("input").value=extracted.join("\n");
+  b.element("onlyPoweredOn").checked=true;
+  b.read('isCmdbLoaded=true;cmdbDatabase=[{HostName:"VISA028-5",IP:"192.0.2.5",SO:"Windows Server 2022",Status:"ON"},{HostName:"VISA028-6",IP:"192.0.2.6",SO:"Windows Server 2022",Status:"OFF"},{HostName:"VISA047-C",IP:"192.0.2.7",SO:"Windows Server 2022",Status:"ON"},{HostName:"REDIS-CLUSTER-07",IP:"192.0.2.8",SO:"Debian Linux",Status:"ON"},{HostName:"VISA026-2",IP:"192.0.2.1",SO:"Windows Server 2022",Status:"ON"}];generate();');
+  const data=b.read("processInput()");
+  assert.equal(data.activeVMs.length,4);
+  assert.equal(data.offlineVMs.length,1);
+  assert(!Array.from(data.hostnames).includes("VISA028-6"));
+  assert(b.element("linuxHostnameRegex").value.includes("REDIS-CLUSTER-07"));
+});
+
 test("selecting another evidence batch preserves prior files and OCR without duplicating reselected files", () => {
   const b=browser(true);
   b.context.batchOne=[{name:"one.png",type:"image/png",size:100,lastModified:1}];
