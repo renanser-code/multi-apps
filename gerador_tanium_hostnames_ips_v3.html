@@ -3368,7 +3368,7 @@ function getClosureServerItems(data, observations = "") {
     seen.add(key);
     servers.push({
       name: host,
-      info: "",
+      info: findIps(line).length ? `IP: ${findIps(line).join(", ")}` : "",
       os: getOsFromText(line),
       result
     });
@@ -3892,11 +3892,63 @@ async function ensureClosureEvidenceOcr() {
   return await analyzeClosureEvidenceStatus({ force: false, skipGenerate: true });
 }
 
+function buildVisaClosureEmailHtml(payload, gmudName) {
+  const scope = { activeVMs: payload.servers };
+  const privateText = value => applyVisaEmailPrivacy(escapeHtml(value), scope);
+  const cleanText = value => privateText(value).replace(/\[(?:servidor|IP) omitido\]/g, "").replace(/[ |\-]+$/, "").trim();
+  const confirmed = new Set(payload.evidencedSuccessServers);
+  const counts = { success: confirmed.size, restart: 0, failed: 0, notApplicable: 0, installing: 0, waiting: 0, unconfirmed: 0 };
+  payload.servers.forEach(server => {
+    if (confirmed.has(server)) return;
+    if (server.evidenceState !== "evidenced") { counts.unconfirmed++; return; }
+    const result = normalizeEvidenceText(server.result || "");
+    if (/falha|failed|error|erro/.test(result)) counts.failed++;
+    else if (/restart|reinicio|reboot/.test(result)) counts.restart++;
+    else if (/not applicable|nao aplicavel/.test(result)) counts.notApplicable++;
+    else if (/installing|andamento/.test(result)) counts.installing++;
+    else if (/waiting|aguardando/.test(result)) counts.waiting++;
+    else counts.unconfirmed++;
+  });
+  const status = !payload.allServersEvidencedSuccessfully && /sucesso/i.test(payload.status) ? "Concluída com ressalvas" : payload.status;
+  let html = `Senhores, boa noite.<br><br>Encerramento da ${cleanText(gmudName)}.<br><br>`;
+  html += `<strong>Cliente: ${cleanText(payload.client)}</strong><br><strong>Status final:</strong> ${escapeHtml(status)}<br>`;
+  html += `<strong>Data/Hora de encerramento:</strong> ${escapeHtml(payload.closureDateTime)}<br><br>`;
+  html += `<strong>Resumo do encerramento:</strong><br>- Servidores no escopo: ${payload.servers.length}<br>- Atualizações concluídas com evidência de sucesso: ${counts.success}<br>`;
+  const results = [["Reinício pendente", counts.restart], ["Falha identificada", counts.failed], ["Atualização não aplicável", counts.notApplicable], ["Instalação em andamento", counts.installing], ["Aguardando execução", counts.waiting], ["Resultado sem confirmação", counts.unconfirmed]];
+  results.forEach(([label, count]) => { if (count) html += `- ${label}: ${count}<br>`; });
+  if (payload.unconfirmedServers.length) html += `- Servidores sem confirmação no CMDB: ${payload.unconfirmedServers.length}<br>`;
+  if (payload.pendingOcrServers.length) html += `- Análise das evidências pendente: ${payload.pendingOcrServers.length}<br>`;
+  if (payload.manualReviewServers.length) html += `<br><strong>Servidores com validação manual necessária:</strong> ${payload.manualReviewServers.length}<br>`;
+  const critical = payload.servers.filter(server => getVmCriticalClassification(server.name)).length;
+  const database = payload.servers.filter(server => getVmDatabaseClassification(server.name)).length;
+  if (critical || database) {
+    html += "<br><strong>Acompanhamento prioritário:</strong><br>";
+    if (critical) html += `- VMs críticas: ${critical}<br>`;
+    if (database) html += `- VMs de banco de dados: ${database}<br>`;
+  }
+  html += "<br><strong>Sistemas operacionais do escopo:</strong><br>";
+  payload.osNames.forEach(os => { html += `- ${cleanText(os)}<br>`; });
+  if (payload.unsupportedNotices.length) html += renderUnsupportedOsEmailAlert(payload.unsupportedNotices);
+  html += "<br><strong>Patches de segurança do escopo:</strong><br>";
+  if (payload.suggestedKbs.length) payload.suggestedKbs.forEach(item => { html += `- ${cleanText(item.kb)} (${cleanText(item.name)})<br>`; });
+  else html += "- Conforme aplicabilidade e validação no relatório de fechamento.<br>";
+  const observations = payload.observations || "Sem observações adicionais.";
+  const safeObservations = privateText(observations);
+  html += "<br><strong>Observações finais:</strong><br>";
+  html += /\[(?:servidor|IP) omitido\]/.test(safeObservations)
+    ? "As observações técnicas individuais constam no relatório de fechamento.<br>"
+    : `${safeObservations.replace(/\r?\n/g, "<br>")}<br>`;
+  html += `<br><strong>Evidências de encerramento:</strong> ${payload.evidenceFiles.length} arquivo(s).<br>`;
+  html += "Os resultados individuais e detalhes técnicos constam no relatório de fechamento.<br><br>Em caso de dúvidas, estamos à disposição.<br>Atenciosamente,";
+  return html;
+}
+
 function buildClosureEmailHtml() {
   const payload = getClosurePayload();
   const emailGmudName = getEmailGmudName();
   if (!emailGmudName) return "<strong>Nome completo da GMUD pendente:</strong> confira se o título corresponde ao número da GMUD antes de gerar o e-mail de encerramento.";
   if (payload.scopeBlocked) return "<strong>Escopo não liberado:</strong> nenhuma VM confirmada como ligada pela API. Carregue a base CMDB e revise a conferência antes de gerar o encerramento.";
+  if (isVisaEmailScope({ activeVMs: payload.servers })) return buildVisaClosureEmailHtml(payload, emailGmudName);
   const observations = payload.observations || "Sem observações adicionais.";
   let html = `Senhores, boa noite.<br><br>Encerramento da ${escapeHtml(emailGmudName)}.<br><br>`;
 
@@ -4044,8 +4096,8 @@ function buildClosureReportHtml() {
   if (payload.scopeBlocked && !payload.evidenceFiles.length) return '<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>Escopo nao liberado</title><body><h1>Escopo nao liberado</h1><p>Informe os servidores da GMUD ou anexe as evidências antes de emitir o relatório.</p></body></html>';
   const titleLine = payload.fullGmudName || `GMUD ${payload.gmudNumber} - ${payload.client} | Atualizações de Segurança`;
   const serversHtml = payload.servers.length > 0
-    ? payload.servers.map(server => `<tr><td>${escapeHtml(server.name)}${getVmCriticalClassification(server.name)}${getVmDatabaseClassification(server.name)}${server.cmdbUnconfirmed ? "<br>Sem confirmação no CMDB" : ""}</td><td>${escapeHtml(server.os || "Nao informado")}</td><td>${escapeHtml(server.result || getClosureResultLabel(payload.status))}</td></tr>`).join("")
-    : "<tr><td colspan='3'>Nao informado</td></tr>";
+    ? payload.servers.map(server => `<tr><td>${escapeHtml(server.name)}${getVmCriticalClassification(server.name)}${getVmDatabaseClassification(server.name)}${server.cmdbUnconfirmed ? "<br>Sem confirmação no CMDB" : ""}</td><td>${escapeHtml(server.os || "Nao informado")}</td><td>${escapeHtml(server.result || getClosureResultLabel(payload.status))}</td><td>${escapeHtml(getScopeInfoValue(server.info, "IP") || (isValidIp(server.name) ? server.name : "Não informado"))}</td></tr>`).join("")
+    : "<tr><td colspan='4'>Nao informado</td></tr>";
   const kbHtml = payload.suggestedKbs.length > 0
     ? payload.suggestedKbs.map(item => `<li>${escapeHtml(item.kb)} - ${escapeHtml(item.name)}</li>`).join("")
     : payload.unsupportedNotices.length > 0
@@ -4103,7 +4155,7 @@ function buildClosureReportHtml() {
     .meta-table td { border:1px solid #111; padding:3px 8px; font-size:12pt; }
     .meta-label { width:48%; background:#d9d9d9; font-weight:700; }
     .server-table th { background:#b00000; color:#fff; border:1px solid #111; padding:4px 8px; text-align:left; font-size:11pt; }
-    .server-table td { border:1px solid #111; padding:3px 8px; font-size:10.2pt; vertical-align:top; }
+    .server-table td { border:1px solid #111; padding:3px 8px; font-size:10.2pt; vertical-align:top; overflow-wrap:anywhere; }
     ul { margin: 0 0 20px 0; padding-left: 0; list-style-position: inside; }
     li { margin: 3px 0; }
     .evidence { margin:10px 0 20px; page-break-inside:avoid; }
@@ -4133,7 +4185,7 @@ function buildClosureReportHtml() {
     <p>${buildClosureExecutiveSummary(payload)}</p>
 
     <table class="server-table">
-      <thead><tr><th>Servidor</th><th>SO</th><th>Resultado</th></tr></thead>
+      <thead><tr><th>Servidor</th><th>SO</th><th>Resultado</th><th>IP</th></tr></thead>
       <tbody>${serversHtml}</tbody>
     </table>
 

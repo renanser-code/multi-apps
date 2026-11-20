@@ -227,7 +227,8 @@ test("four registered VISA critical VMs retain alerts without exposing hostnames
     assert(b.read("buildClosureReportHtml()").toLowerCase().includes(name.toLowerCase()));
   }
   assert(b.element("emailText").innerHTML.includes("VMs críticas: 4"));
-  assert(b.element("closureEmailText").innerHTML.includes("[VM CRÍTICA]"));
+  assert(b.element("closureEmailText").innerHTML.includes("VMs críticas: 4"));
+  assert(!/omitido/i.test(b.element("closureEmailText").innerHTML));
   assert(b.read("buildClosureReportHtml()").includes("[VM CRITICA]"));
   assert(b.element("scopeTableBody").innerHTML.includes("Crítica"));
   assert.equal(b.read('getVmCriticalClassification("VISA011")'),"");
@@ -248,12 +249,39 @@ test("VISA emails and scheduling script hide hostnames, IPs, and evidence filena
     assert(output.includes("VISA-HYPERATIVA"));
   }
   assert(b.element("emailText").innerHTML.includes("VMs prioritárias da 3ª onda VISA: 1"));
-  assert(b.element("closureEmailText").innerHTML.includes("Pending Restart"));
+  assert(b.element("closureEmailText").innerHTML.includes("Reinício pendente: 1"));
+  assert(b.element("closureEmailText").innerHTML.includes("evidência de sucesso: 1"));
+  assert(!/omitido/i.test(b.element("closureEmailText").innerHTML));
   assert(!b.element("closureEmailText").innerHTML.includes("VISA035-SVR-SQL01.png"));
-  assert(b.element("closureEmailText").innerHTML.includes("Evidência 1"));
+  assert(b.element("closureEmailText").innerHTML.includes("1 arquivo(s)"));
   assert(b.element("windowsHostnameRegex").value.includes("VISA035"));
   assert(b.read("getClosurePayload().servers[0].name").includes("VISA035"));
   assert(b.read("buildClosureReportHtml()").includes("VISA035"));
+  const report=b.read("buildClosureReportHtml()");
+  for(const expected of ["192.0.2.1","192.0.2.2","SVR-SQL01","Pending Restart","VISA035-SVR-SQL01.png","Reinicio pendente em VISA035"]) assert(report.includes(expected),expected);
+  assert(report.includes("<th>IP</th>"));
+  assert(!/omitido/i.test(report));
+});
+
+test("VISA closure summary never claims success without evidence and PDF keeps unregistered host and IP", () => {
+  const b=browser(true);
+  b.element("onlyPoweredOn").checked=true;
+  b.element("schedGmudTitle").value="GMUD XXX - VISA | Atualização de Segurança";
+  b.element("input").value="VISA099 192.0.2.99 WIN/2022";
+  b.element("closureStatus").value="Concluída com sucesso";
+  b.element("closureObservations").value="VISA099: verificar 192.0.2.99.";
+  b.read('isCmdbLoaded=true;cmdbDatabase=[];generateClosure();');
+  let email=b.element("closureEmailText").innerHTML;
+  assert(email.includes("Concluída com ressalvas"));
+  assert(email.includes("evidência de sucesso: 0"));
+  assert(!/omitido|VISA099|192\.0\.2\.99/i.test(email));
+  assert(b.read("buildClosureReportHtml()").includes("192.0.2.99"));
+  assert(b.read("buildClosureReportHtml()").includes("VISA099: verificar"));
+  b.read('closureEvidenceFiles=[{name:"VISA099.png",type:"image/png",size:10,ocrAnalyzed:true,ocrText:"VISA099 Complete All Patches Applied"}];generateClosure();');
+  email=b.element("closureEmailText").innerHTML;
+  assert(email.includes("Concluída com sucesso"));
+  assert(email.includes("evidência de sucesso: 1"));
+  assert(!/omitido|VISA099|192\.0\.2\.99/i.test(email));
 });
 
 test("VISA customer detection works for non-VISA hostnames and non-VISA emails remain unchanged", () => {

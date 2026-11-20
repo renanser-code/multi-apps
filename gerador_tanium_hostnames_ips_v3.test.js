@@ -442,7 +442,7 @@ assert(closureEmailHtml.includes("Atualizacao finalizada sem incidentes"));
 assert(closureEmailHtml.includes("KB5120242"));
 assert(!closureEmailHtml.includes("VISA011-B"));
 assert(!closureEmailHtml.includes("print-finalizacao.png"));
-assert(closureEmailHtml.includes("Evidência 1"));
+assert(closureEmailHtml.includes("2 arquivo(s)"));
 
 const closureReportHtml = sandbox.__buildClosureReportHtml();
 assert(closureReportHtml.includes("RELATÓRIO TÉCNICO DE EVIDÊNCIA"));
@@ -639,6 +639,7 @@ assert.strictEqual(visaEmailInfo, "Cliente: VISA-HYPERATIVA | OS: Windows Server
 assert.strictEqual(regularEmailInfo, "Cliente: OUTRO | IP: 10.0.0.2 | OS: Windows Server 2022");
 getElement("input").value = "VISA004 10.203.159.14 Microsoft Windows Server 2022 (64-bit)";
 getElement("onlyPoweredOn").checked = true;
+getElement("closureClient").value = "VISA-HYPERATIVA";
 vm.runInContext(`isCmdbLoaded = true; cmdbDatabase = [{
   HostName: "VISA004",
   IP: "10.203.159.14",
@@ -651,7 +652,7 @@ sandbox.__generateClosure();
 const visaClosureEmailHtml = getElement("closureEmailText").innerHTML;
 assert(!visaClosureEmailHtml.includes("VISA004"), "encerramento VISA deve ocultar o hostname");
 assert(visaClosureEmailHtml.includes("Cliente: VISA-HYPERATIVA"));
-assert(visaClosureEmailHtml.includes("Microsoft Windows Server 2022"));
+assert(visaClosureEmailHtml.includes("Windows Server 2022"));
 assert(!visaClosureEmailHtml.includes("10.203.159.14"), "e-mail de encerramento da VISA nao deve exibir IP");
 sandbox.__generate();
 const visaStartEmailHtml = getElement("emailText").innerHTML;
